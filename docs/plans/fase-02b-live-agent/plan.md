@@ -1,0 +1,80 @@
+# Phase 02b - An agent that writes no numbers, live and recorded: plan and results
+
+Status: in progress
+Spec: `spec.md` (approved, frozen)
+Base: branch `fase-02b-live-agent` from `main` at ce1a81f (phase 02a merged)
+
+## Increments
+Each increment leaves the product working and covers specific criteria.
+This file is the durable state: a new session resumes from here and from Git.
+Every increment closes with `npm run check` green (C1) and a commit on `fase-02b-live-agent`.
+Increments 1-6 need no network, no AWS and no cost: every model call goes through a fake client injected into the gateway.
+Increments 7-8 are the only ones that call Bedrock; they wait for user decision U1, the user runs them on the laptop, and no agent reads, uses or asks for AWS credentials.
+Increment 11 also needs AWS (the existing Lightsail deploy) and is run by the user under the same decision.
+Execution batches for delegated agents: A = 1-4, B = 5-6, gate U1, C = 7-10 (after the user's runs), D = 11-12, then review (13) and delivery (14).
+
+Fixture recordings before the real ones:
+- Until increment 8 lands, tests and step 2 replay hand-written fixtures under `tests/fixtures/recordings/`, never under `recordings/`.
+- Each fixture carries `"source": "fixture"`, model `"fixture"` and no cost, and the step 2 badge for a fixture reads "FIXTURE - not a model reply" instead of "RECORDED".
+- `test_recordings_metadata_*` rejects any file under `recordings/` whose source is not Bedrock in an EU region, so a fixture can never satisfy C15.
+- The C16 and C17 evidence is taken only in increment 9, on the real Q2 and Q6 recordings; fixtures only prove the code path.
+
+- [ ] 1. Dependencies and gateway configuration: add `anthropic[bedrock]` and `boto3` to `pyproject.toml` and `uv.lock` (decision D6); new `src/cairn/gateway.py` with `LLMGateway`, a mode setting (`replay` default, `record`, `live`) read from `CAIRN_LLM_MODE`, a client factory building `AnthropicBedrock(aws_region="eu-west-1", timeout=45, max_retries=0)`, one table of the EU inference profile IDs for Opus 5.5, Sonnet 5.5 and Opus 4.8 (IDs confirmed by increment 7), calls made with `messages.create` and never streaming, and a refusal to build a client for record or live when the region is not an EU region; the client is injectable so tests use a fake (C13, C1) - verification: `uv run pytest tests/test_gateway.py -k gateway_config` with `test_gateway_config_*` (region, profile prefix `eu.`, timeout, retries, no `stream`, record and live raise outside the EU, replay builds no client), then `npm run check` - evidence:
+- [ ] 2. `stop_reason` before content: the gateway reads `stop_reason` first; `refusal` returns a result marked declined that the UI shows as "the model declined", `max_tokens` discards the content and returns a truncated result, `tool_use` and `end_turn` pass through, anything else is an error (C12) - verification: `uv run pytest tests/test_gateway.py -k "refusal or truncated"` with `test_gateway_refusal_*` and `test_gateway_truncated_*` over a fake client, then `npm run check` - evidence:
+- [ ] 3. Recordings, replay and record, stale check and cost: new `src/cairn/recording.py` with one JSON per question under `recordings/` (decision D7), keyed by question ID, prompt version, tool schema hash (canonical SHA-256 of the tool definitions sent to the model) and model; each call stores model, region, date, latency, input and output tokens and cost; replay serves the stored calls in order and fails with "stale recording: run make record" when the file is missing or any key part differs; record runs live and writes the file; new `src/cairn/pricing.py` holds the published per-token prices in one table and computes cost (C11, C15 code path) - verification: `uv run pytest tests/test_recording.py` with `test_replay_stale_*` (missing file, changed prompt version, changed tool schema, changed model), a record round trip on a fake client, and `test_recordings_metadata_*` parametrised over every file in `recordings/` (required fields, source Bedrock, region `eu-*`), then `npm run check` - evidence:
+- [ ] 4. Question loop: new `src/cairn/loop.py` with at most 6 model calls per question; the first call forces `run_job` (`tool_choice`), the study tools come from `cairn.tools.REGISTRY` as strict tool definitions, each tool result is added to an `ObservationLedger` and shown to the model only by its `O1`, `O2`... ID; the final answer is structured output validated as a list of `Sentence` (`Text` and `ValueRef` only); a model text with any digit is rejected before rendering; a tool call that breaks its schema goes back to the model as an error and counts toward the cap; the result is rendered with `cairn.render` and checked with `cairn.verify`; the prompt lives in `src/cairn/prompts/question.md` with a `PROMPT_VERSION` constant, and the Q2 and Q6 texts in `src/cairn/questions.py` (Q2 wording taken from the private PRD, with no company or person terms) (C14) - verification: `uv run pytest tests/test_loop.py` with `test_loop_*` over a fake client (cap of 6 reached, `run_job` first, only `Text` and `ValueRef`, digit rejected before rendering, schema error counted, a rule failure carried to the result), then `npm run check` - evidence:
+- [ ] 5. Laptop commands: `cairn ask "<question>"` (replay of a recorded question, or live with `--live`), `cairn record Q2 Q6`, and `cairn smoke` which sends the representative question, draft and judge prompts on toxicology content to each profile and writes `docs/adr/evidence/bedrock-smoke.json` (model ID, profile, stop reason, refusal, strict tools and structured output result, latency, tokens, cost, quota errors); Makefile targets `record`, `live` and `smoke` that pass `AWS_PROFILE` through and print the estimated ceiling first; none of them is reachable from the web (decision D8) (C11-C14 surfaces, C18 code path, C1) - verification: `uv run pytest tests/test_cli_ask.py` with the CLI over a fake client (ask in replay prints the rendered text and the rules fired, record writes a file, smoke writes the evidence JSON), `grep` showing no route imports the live client, then `npm run check` - evidence:
+- [ ] 6. Step 2 of the web in replay: routes `GET /step/2` and `POST /step/2/run` (question Q2 or Q6, HTMX) in `src/cairn/web/__init__.py`, templates `step2.html` and `step2_result.html` with the trace, the screening table with the printed rule and "not examined" rows, the toggle "What the model wrote" (markers, zero digits), the evidence panel (tool, population, n examined, source IDs), the rules fired, the badge (RECORDED with date, region, model, latency and cost, or FIXTURE) and an "In production ->" line; the web always uses replay whatever `CAIRN_LLM_MODE` says; the recordings folder is read from `CAIRN_RECORDINGS` (default `recordings/`), tests point it at the fixtures; the `Dockerfile` copies `recordings/`; `demo-offline-check` also fetches `/step/2`; `test_word_cap` covers step 2 (C17 and C16 code path, C20 code path) - verification: `uv run pytest tests/test_web.py tests/test_word_cap.py` (step 2 renders from a fixture, toggle markup has zero digits, missing recording shows the stale message, word cap), then `npm run check` - evidence:
+- [ ] 7. Bedrock smoke test and ADR-001, after U1: the user runs `make smoke AWS_PROFILE=<profile>` on the laptop and commits `docs/adr/evidence/bedrock-smoke.json` (or pastes it back for the supervisor to commit); an agent then writes `docs/adr/ADR-001-bedrock.md` from that file only: per profile the model ID and profile, result, refusals, strict tools and structured output behaviour, quotas, latency and cost, and the profile IDs are fixed in the gateway table; a missing profile or one without EU routing stops the phase for a deviation (C18) - verification: ADR-001 and the evidence file reviewed by the supervisor; `npm run check` - evidence:
+- [ ] 8. Recordings Q2 and Q6, after U1 and increment 7: the user runs `make record AWS_PROFILE=<profile>` (Opus 5.5; for a question Opus 5.5 refuses, `make record MODEL=opus-4-8 QUESTIONS=<id>`, decision D2) and commits `recordings/q2.json` and `recordings/q6.json`; the command prints the cost spent and stops before passing the 10 USD ceiling; if Q6 is declined instead of answered, C16 needs a deviation (spec risk) (C15) - verification: `uv run pytest -k recordings_metadata` over the real files plus `test_recordings_present_q2_q6`, inspection of the two files - evidence:
+- [ ] 9. Replay on real recordings: `test_q2_replay` (offline replay renders the 9-row screen with honest denominators and passes the verifier) and `test_q6_blocked` (blocked, rules 6 and 1 fired and shown); step 2 defaults to the real recordings; browser walkthrough at 1440x900 with the network disabled, screenshot of Q2 and Q6, toggle on and off, no scroll (C16, C17) - verification: `uv run pytest -k "q2_replay or q6_blocked"`, the walkthrough with the screenshots saved under `docs/plans/fase-02b-live-agent/evidence/`, then `npm run check` - evidence:
+- [ ] 10. Rule 3 and number words (02a decision U2): `cairn.verify` rule 3 also blocks English number words used as quantities in model text ("seven of ten", "twelve animals"), with a fixed word list in the module; checked first against the real Q2 draft so that it does not block it; no 02a criterion changes and no recording becomes stale because prompts and tool schemas do not change (C1, carry-over) - verification: `uv run pytest tests/test_rules.py -k rule_3` with a new failing fixture for number words and the existing ones, `uv run pytest tests/evals` still green, `test_q2_replay` still green, then `npm run check` - evidence:
+- [ ] 11. Deployment, after U1: `make deploy` gains a bounded wait that polls the service state until RUNNING or fails after a fixed number of tries (closes the open item from phase 01); the user runs `make deploy` with the deploy profile already used in phase 01; an agent then checks without credentials: `curl -s -o /dev/null -w "%{http_code}"` on `/healthz` and `/step/2` of https://cairn.v2m8ts8nv4tzc.eu-west-1.cs.amazonlightsail.com, the footer commit equals the branch tip, and `make demo-offline-check` passes locally with `/step/2` (C20) - verification: the curl codes, the footer commit, the offline check output - evidence:
+- [ ] 12. Clean clone and brand grep: fresh clone of the branch with `uv sync` and `npm run check`; local grep of the PRD company, person and place terms (read from the git-ignored `docs/PRD_Cairn.pdf`, never written into a versioned file or a commit message) over tracked files, the `main...HEAD` diff and the commit messages; no GxP validation claim added (C1, C21) - verification: clean clone output green, grep with 0 hits, GxP grep showing only "not GxP-validated" notices - evidence:
+- [ ] 13. Adversarial review: independent review with sdd-review over `git diff ce1a81f`, at most two rounds; confirmed findings fixed with regressions, open items after round 2 go to the user as accepted limits or a decision (all criteria) - verification: review table below filled and closed - evidence:
+- [ ] 14. Delivery: repeat increment 12 at the tip, push `fase-02b-live-agent` and open the PR to `main`, not merged, with the required `evals` check green (C1, C21) - verification: `gh pr checks` green, PR URL in Results - evidence:
+
+Decisions taken by the supervisor's planner, recommended option, accepted by the standing instruction of the user (02a U4):
+- Q6 and Q2 are replayed through the same loop code as live; step 2 never calls a model.
+- The model sees only the `O1`, `O2`... IDs; the hex `obs_id` stays internal, so the two IDs per Observation (02a round 1) stay as they are.
+- The smoke test uses Opus 5.5 and Opus 4.8 for the question and draft prompts and Sonnet 5.5 for the judge prompt, one call each per prompt.
+- `make deploy` gets the wait for RUNNING because increment 11 needs a reliable state check; nothing else in the deploy changes.
+
+Accepted demo limits carried from phase 02a, not fixed in this phase unless one blocks a 02b criterion:
+- H4: non-Latin sentence ends, an exempt abbreviation ending a sentence ("etc. All"), a newline without punctuation and ".all" pass rule 1.
+- H5: any letters/letters value is dropped from study terms, so such a finding could be written by hand (none in the snapshot).
+- Homoglyphs are not normalized by the verifier.
+- Round 1 plausible items: two IDs per Observation, two naive AUCtau implementations guarded by an equality test, duplicated SQL predicates and `TKDESC`, double argument validation, double rounding.
+- FastMCP sync tools on the event loop, not reviewed.
+
+## Briefs
+Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, failed, cancelled.
+
+| ID | Agent | Brief | Status | Result or blocker |
+|---|---|---|---|---|
+| E1 | ejecutor (Opus) | Write this plan | done | this commit |
+
+## User decisions
+Questions the supervisor raises with the user. Statuses: open, answered, deferred; each closes with the user's literal answer.
+
+| ID | Question | Options and recommendation | Status | User answer |
+|---|---|---|---|---|
+| U1 | Go-ahead for the only steps that use AWS: you run on the laptop, with the AWS user limited to invoking the model, `make smoke` (Opus 5.5, Sonnet 5.5 and Opus 4.8 EU inference profiles in eu-west-1, about 9 calls), then `make record` for Q2 and Q6 (Opus 5.5, Opus 4.8 only for a question Opus 5.5 refuses, at most 6 calls per question, up to three attempts each), then `make deploy` with the phase 01 deploy profile; estimated Bedrock spend under 3 USD, hard stop at 10 USD; no agent touches the credentials | A: approve as described (recommended); B: approve the smoke test only and decide recordings after ADR-001; C: not now, the phase stops at increment 6 | open | |
+
+## Deviations
+| ID | Summary | Affects criteria | Status |
+|---|---|---|---|
+
+## Adversarial review
+| Round | Backend | Range | Lenses | Findings | Status |
+|---|---|---|---|---|---|
+
+## Results
+Per criterion: command or walkthrough run, observed result and reference to the evidence.
+Pending items, limitations and what could not be checked, stated plainly.
+
+| Criterion | Run | Observed | Evidence |
+|---|---|---|---|
+
+## Candidate learnings
+Only reusable lessons with a verbatim quote from the session; consolidated when the phase closes.
