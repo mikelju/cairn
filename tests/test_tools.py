@@ -84,6 +84,7 @@ def test_registry_has_exactly_the_registered_tools() -> None:
         "incidence",
         "run_job",
         "study_design",
+        "tk_summary",
     ]
 
 

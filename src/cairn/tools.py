@@ -10,6 +10,7 @@ from cairn.canonical import canonical_sha256
 from cairn.incidence import incidence
 from cairn.jobs import execute, inputs_hash
 from cairn.observation import Observation, build_observation, query
+from cairn.tk_summary import tk_summary
 
 
 def run_job(kind: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -60,6 +61,7 @@ REGISTRY: dict[str, Callable[..., Any]] = {
     "study_design": study_design,
     "incidence": incidence,
     "body_weight_change": body_weight_change,
+    "tk_summary": tk_summary,
 }
 
 
