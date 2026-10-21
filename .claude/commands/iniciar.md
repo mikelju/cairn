@@ -1,1 +1,1 @@
-Lee `.agents/skills/sdd-lite/SKILL.md` e inicia el proyecto: adapta `AGENTS.md` y redacta el plan maestro con el usuario, sin implementar: $ARGUMENTS.
+Lee `.agents/skills/sdd-lite/SKILL.md` e inicia el proyecto como supervisor: encarga la adaptación de `AGENTS.md` y el borrador del plan maestro, y acuérdalo con el usuario, sin implementar: $ARGUMENTS.

@@ -5,6 +5,8 @@ description: Validar y entregar un incremento, fase o cambio - comprobaciones, e
 # Entrega
 
 La validación es un pipeline, no una lectura del diff. Cada etapa deja evidencia en el plan de fase o en el cambio.
+Las etapas las ejecutan agentes: comprobaciones y evidencia el ejecutor, revisión los revisores y entrega un ejecutor con encargo de entrega.
+El supervisor juzga la evidencia de cada etapa antes de pasar a la siguiente; puede repetir una comprobación para contrastarla, pero no corrige ni entrega.
 
 ## Pipeline local (por defecto)
 1. Comprobaciones del proyecto en verde (`npm run check` o las del mapa de `AGENTS.md`).
@@ -19,7 +21,8 @@ La validación es un pipeline, no una lectura del diff. Cada etapa deja evidenci
    No se entrega ni se cierra una fase o un cambio con un hallazgo de seguridad Critical o High abierto en su rango,
    salvo aplazamiento decidido por el usuario y anotado en `docs/security.md`.
    Los abiertos de otras partes no bloquean, pero la revisión de seguridad los menciona si el rango toca ese código.
-Modo verificación (`/verificar`): se ejecutan 1 a 3 sin corregir ni publicar y se entregan hallazgos y límites.
+Modo verificación (`/verificar`): se ejecutan 1 a 3 sin corregir ni publicar, con un explorador para las comprobaciones y la evidencia
+y revisores para la etapa 3, y se entregan hallazgos y límites.
 
 ## Auditoría de seguridad (`/verificar seguridad [alcance]`)
 Sustituye a las etapas 1 a 3: una sola revisión con la lente de seguridad y datos de `../sdd-review/references/lentes.md`,

@@ -7,7 +7,7 @@ description: Pedir decisiones y comentarios al usuario, o que revise planes, alt
 - Fuera de un proyecto SDD Lite (sin `.agents/skills/lavish/` en el repo), usa solo la última sección.
 - En cada llamada a Lavish, también las que sugiere su propia salida (`next_step`), fija en ese mismo comando
   `LAVISH_AXI_STATE_DIR` (ruta absoluta de `.runtime/lavish` de este repo) y `LAVISH_AXI_TELEMETRY=0`:
-  Lavish envía por defecto estadísticas de uso, los proyectos de PEIA son privados y el shell no conserva variables entre llamadas.
+  Lavish envía por defecto estadísticas de uso, los proyectos son privados y el shell no conserva variables entre llamadas.
 - Sin `package.json` con lavish-axi (repos que no son Node), sustituye `npm run lavish --` por `npx -y lavish-axi@0.1.76` en lo que sigue.
 - Consulta `npm run lavish -- --help` y el playbook pertinente antes de crear HTML.
 
@@ -34,14 +34,3 @@ description: Pedir decisiones y comentarios al usuario, o que revise planes, alt
 - El HTML es temporal: decisiones aceptadas y criterios viven en la spec de fase o en el cambio, sin mantener dos planes.
 - No uses `share` ni recursos externos con información privada; cerrar o exportar se rige por la ayuda instalada.
 
-## Fuera de un proyecto SDD Lite
-Con `/sdd-lavish`, en un repositorio sin el marco. `<plantilla>` es la carpeta de SDD Lite.
-Todo pasa por `node "<plantilla>/scripts/lavish-suelto.mjs"`, que sustituye a `npm run lavish --` en las secciones anteriores:
-fija telemetría apagada, un puerto y un estado propios, y ejecuta Lavish desde la carpeta de trabajo, fuera del repo.
-- Antes de nada, guarda `git status --porcelain --ignored` del repo; al terminar debe ser idéntico.
-- `... lavish-suelto.mjs carpeta` imprime la carpeta de trabajo (`~/.sdd-lite/lavish/<repo>-<huella>/`) y deja allí
-  `estilo.css` y `plantilla.html`. Escribe ahí la página, nunca en `.lavish/` del repo.
-- Abre, recoge feedback y cierra con `... lavish-suelto.mjs plan.html`, `... poll plan.html` y `... end plan.html`:
-  los `.html` relativos se resuelven en la carpeta de trabajo. Rutas siempre entre comillas.
-- Ni `.lavish/`, ni `.runtime/`, ni menciones del marco en el repo, sus commits o sus PR.
-- No hay documento de cambio: resume lo decidido en el chat.
