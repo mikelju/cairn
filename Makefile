@@ -1,6 +1,8 @@
 IMAGE ?= cairn
 PORT ?= 8000
 # Lightsail runs linux/amd64; an arm64 laptop without emulation can pass PLATFORM=linux/arm64.
+# On an ARM64 laptop the amd64 build needs emulation: docker run --privileged --rm tonistiigi/binfmt:qemu-v8.1.5 --install amd64
+# (qemu v10 segfaults on "import duckdb").
 PLATFORM ?= linux/amd64
 SERVICE ?= cairn
 REGION ?= eu-west-1
@@ -9,7 +11,7 @@ POWER ?= medium
 .PHONY: build demo demo-offline-check deploy
 
 build:
-	docker build --platform $(PLATFORM) -t $(IMAGE) .
+	docker build --platform $(PLATFORM) --build-arg COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo unknown) -t $(IMAGE) .
 
 # Serves the app on loopback. The image holds the DuckDB file and the app makes no outbound calls,
 # so it also works with the machine offline.

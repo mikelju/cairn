@@ -2,6 +2,7 @@ import hashlib
 import re
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from cairn.app import create_app
@@ -61,3 +62,10 @@ def test_templates_hold_no_literal_means() -> None:
     pattern = re.compile(r"2,?821|2,?820|15,?956")
     for template in (HERE / "templates").glob("*.html"):
         assert not pattern.search(template.read_text(encoding="utf-8")), template.name
+
+
+def test_footer_uses_baked_commit(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CAIRN_COMMIT", "abc1234")
+    with TestClient(create_app()) as client:
+        page = client.get("/").text
+    assert "commit abc1234" in page

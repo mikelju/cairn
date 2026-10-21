@@ -1,5 +1,6 @@
 """Web pages: landing page, step 1 and /healthz, rendered with Jinja2 and local HTMX."""
 
+import os
 import subprocess
 from pathlib import Path
 from typing import Annotated, Any
@@ -23,6 +24,9 @@ STEPS = ["Validate", "Design", "Explore", "Analyse", "Draft", "Check", "Review"]
 
 
 def _commit() -> str:
+    baked = os.environ.get("CAIRN_COMMIT", "").strip()
+    if baked:
+        return baked
     try:
         out = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"],

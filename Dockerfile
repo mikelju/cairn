@@ -17,7 +17,8 @@ FROM python:3.12-slim
 WORKDIR /app
 RUN useradd --system --no-create-home cairn
 COPY --from=build /app /app
-ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1
+ARG COMMIT=unknown
+ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 CAIRN_COMMIT=$COMMIT
 USER cairn
 EXPOSE 8000
 CMD ["uvicorn", "cairn.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
