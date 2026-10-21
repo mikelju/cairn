@@ -268,7 +268,7 @@ function tipoCuerpo(antes, despues) {
  * uno que recibe un shell o un lenguaje se analiza. Lo que sigue al marcador en la
  * misma linea se conserva.
  */
-function separarCuerpos(comando) {
+export function separarCuerpos(comando) {
   const fuera = [];
   const cuerpos = [];
   let abierto = null;

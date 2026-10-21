@@ -15,6 +15,7 @@ import { dirname, join } from "node:path";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { evaluar } from "./guard-reglas.mjs";
+import { evaluarSupervisor } from "./supervisor-reglas.mjs";
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 
@@ -221,7 +222,7 @@ function repoTemporal(scripts, rama = "main") {
 }
 
 // La guardia se evalua en este proceso: arrancar Node por caso cuesta caro en Windows con
-// antivirus (cambio 007). `proceso: true` fuerza el hook real; la entrada cruda, siempre.
+// antivirus. `proceso: true` fuerza el hook real; la entrada cruda, siempre.
 function ejecutar(script, dir, entrada, { crudo = false, proceso = false } = {}) {
   const inicio = Date.now();
   if (script === "guard.mjs" && !crudo && !proceso) {
@@ -433,6 +434,240 @@ try {
   rmSync(marcaAporte, { force: true });
   ejecutar("format.mjs", aporteFormato, { tool_input: { file_path: join(aporteFormato, ".sdd", "cambio.md") } });
   comprobar("aporte: no formatea los documentos de .sdd", false, existsSync(marcaAporte));
+
+  console.log("\nsupervisor.mjs (PreToolUse)");
+  const supRaiz = mkdtempSync(join(tmpdir(), "sdd-hooks-"));
+  temporales.push(supRaiz);
+  const fuera = mkdtempSync(join(tmpdir(), "sdd-hooks-"));
+  temporales.push(fuera);
+  const BRIEF_EJECUTOR = "## Intención del usuario\nArreglar el login.\n\n## Terminado\nLa suite pasa.";
+  const agente = (subagent_type, prompt, extra = {}) => ({ tool_name: "Agent", tool_input: { subagent_type, prompt, description: "x" }, ...extra });
+  const escribe = (tool_name, file_path, extra = {}) => ({ tool_name, tool_input: { file_path }, ...extra });
+  const shell = (tool_name, command, extra = {}) => ({ tool_name, tool_input: { command }, ...extra });
+  // [esperado, entrada, nota, env]
+  const CASOS_SUPERVISOR = [
+    [PERMITE, agente("ejecutor", BRIEF_EJECUTOR), "ejecutor con brief completo"],
+    [PERMITE, agente("explorador", "## intencion del usuario\nx\n## TERMINADO cuando\ny"), "explorador: sin tildes y en mayusculas"],
+    [PERMITE, agente("revisor", "## Criterios\nC1\n## Rango\nmain..HEAD"), "revisor con brief completo"],
+    [BLOQUEA, agente("revisor", BRIEF_EJECUTOR), "revisor con brief de ejecutor"],
+    [BLOQUEA, agente("ejecutor", "## Intención del usuario\nx"), "ejecutor sin ## Terminado"],
+    [BLOQUEA, agente("ejecutor", "Intención del usuario y Terminado sin encabezado"), "texto sin encabezados"],
+    [BLOQUEA, agente("general-purpose", BRIEF_EJECUTOR), "tipo general-purpose"],
+    [BLOQUEA, agente("Explore", BRIEF_EJECUTOR), "tipo Explore"],
+    [BLOQUEA, agente(undefined, BRIEF_EJECUTOR), "fork sin tipo"],
+    [BLOQUEA, agente("ejecutor", BRIEF_EJECUTOR, { agent_id: "a1", agent_type: "ejecutor" }), "un subagente no delega"],
+    [BLOQUEA, escribe("Write", join(supRaiz, "src", "app.js")), "codigo del proyecto"],
+    [BLOQUEA, escribe("Edit", "README.md"), "ruta relativa dentro de la raiz"],
+    [BLOQUEA, escribe("MultiEdit", join(supRaiz, "AGENTS.md")), "MultiEdit en el proyecto"],
+    [BLOQUEA, { tool_name: "NotebookEdit", tool_input: { notebook_path: join(supRaiz, "a.ipynb") } }, "NotebookEdit usa notebook_path"],
+    [BLOQUEA, escribe("Write", `${supRaiz}/docs/plans/../../src/a.js`), ".. que escapa del registro al codigo"],
+    [BLOQUEA, escribe("Write", join(supRaiz, "docs", "plans-falsos", "a.md")), "prefijo parecido no es registro"],
+    [PERMITE, escribe("Write", join(supRaiz, "docs", "plans", "fase-01", "plan.md")), "registro: docs/plans/"],
+    [PERMITE, escribe("Edit", "docs/changes/001-x.md"), "registro: docs/changes/ relativo"],
+    [PERMITE, escribe("Edit", join(supRaiz, "docs", "security.md")), "registro: docs/security.md"],
+    [PERMITE, escribe("Write", join(supRaiz, ".claude", "relevo", "traspaso.md")), "registro: .claude/relevo/"],
+    [PERMITE, escribe("Write", join(fuera, "notas.md")), "ruta fuera de la raiz"],
+    [PERMITE, escribe("Write", `${supRaiz}/../${"fuera-de-la-raiz"}/a.js`), ".. que sale de la raiz"],
+    [PERMITE, escribe("Write", join(supRaiz, "src", "app.js"), { agent_id: "a1", agent_type: "ejecutor" }), "dentro de un subagente"],
+    [PERMITE, { tool_name: "Read", tool_input: { file_path: join(supRaiz, "src", "app.js") } }, "otra herramienta"],
+    [PERMITE, escribe("Write", join(supRaiz, "src", "app.js")), "escape SDD_SUPERVISOR_LIBRE", { SDD_SUPERVISOR_LIBRE: "1" }],
+    [PERMITE, agente("general-purpose", "x"), "escape tambien para Agent", { SDD_SUPERVISOR_LIBRE: "1" }],
+    // Bash y PowerShell en la sesion principal: escribir archivos o instalar se deniega.
+    [BLOQUEA, shell("Bash", "echo hola > src/app.js"), "Bash: redireccion > a archivo"],
+    [BLOQUEA, shell("Bash", "cat notas.txt >> README.md"), "Bash: redireccion >> a archivo"],
+    [BLOQUEA, shell("Bash", "git status && echo x >\"docs/a b.md\""), "Bash: redireccion a ruta entre comillas"],
+    [BLOQUEA, shell("Bash", "cat > src/a.js <<'EOF'\nconsole.log(1)\nEOF"), "Bash: heredoc redirigido a archivo"],
+    [BLOQUEA, shell("Bash", "cp a.js b.js"), "Bash: cp"],
+    [BLOQUEA, shell("Bash", "mv src/a.js src/b.js"), "Bash: mv"],
+    [BLOQUEA, shell("Bash", "rm -rf build"), "Bash: rm"],
+    [BLOQUEA, shell("Bash", "sed -i 's/a/b/' src/a.js"), "Bash: sed -i"],
+    [BLOQUEA, shell("Bash", "git diff | tee cambios.txt"), "Bash: tee al final de una tuberia"],
+    [BLOQUEA, shell("Bash", "npm install left-pad"), "Bash: npm install"],
+    [BLOQUEA, shell("Bash", "npm ci"), "Bash: npm ci"],
+    [BLOQUEA, shell("Bash", "pip install requests"), "Bash: pip install"],
+    [BLOQUEA, shell("Bash", "uv add httpx"), "Bash: uv add"],
+    [BLOQUEA, shell("Bash", "uv run pip install x"), "Bash: uv run pip install"],
+    [BLOQUEA, shell("Bash", "uv run python -m pip install x"), "Bash: pip dentro de uv run python -m"],
+    [BLOQUEA, shell("Bash", "uv run --with x pytest"), "Bash: uv run --with"],
+    [BLOQUEA, shell("Bash", "uv run --with=x pytest"), "Bash: uv run --with="],
+    [BLOQUEA, shell("Bash", "uv lock"), "Bash: uv lock"],
+    [BLOQUEA, shell("Bash", "uv sync"), "Bash: uv sync"],
+    [BLOQUEA, shell("Bash", "uv pip install x"), "Bash: uv pip install"],
+    [BLOQUEA, shell("Bash", "uv run ruff format"), "Bash: ruff format dentro de uv run"],
+    [BLOQUEA, shell("Bash", "uv run --project sub ruff format src"), "Bash: uv run con opcion y valor"],
+    [BLOQUEA, shell("Bash", "uv run ruff check --fix"), "Bash: ruff check --fix dentro de uv run"],
+    [BLOQUEA, shell("Bash", "ruff format src"), "Bash: ruff format"],
+    [BLOQUEA, shell("Bash", "uvx ruff format"), "Bash: ruff format dentro de uvx"],
+    [BLOQUEA, shell("Bash", "black ."), "Bash: black"],
+    [BLOQUEA, shell("Bash", "python -m black src"), "Bash: python -m black"],
+    [BLOQUEA, shell("Bash", "isort src"), "Bash: isort"],
+    [BLOQUEA, shell("Bash", "pnpm add zod"), "Bash: pnpm add"],
+    [BLOQUEA, shell("Bash", "winget install Git.Git"), "Bash: winget"],
+    [BLOQUEA, shell("Bash", "bash -c \"rm src/a.js\""), "Bash: anidado en bash -c"],
+    [BLOQUEA, shell("Bash", "git apply parche.diff"), "Bash: git apply"],
+    [BLOQUEA, shell("Bash", "git rm src/a.js"), "Bash: git rm"],
+    [BLOQUEA, shell("Bash", "git mv a.js b.js"), "Bash: git mv"],
+    [BLOQUEA, shell("Bash", "git reset --hard HEAD~1"), "Bash: git reset --hard"],
+    [BLOQUEA, shell("Bash", "git -C . clean -fd"), "Bash: git -C . clean -fd"],
+    [BLOQUEA, shell("Bash", "git restore src/a.js"), "Bash: git restore"],
+    [BLOQUEA, shell("Bash", "git checkout -- src/a.js"), "Bash: git checkout -- <ruta>"],
+    [BLOQUEA, shell("Bash", "git stash pop"), "Bash: git stash pop"],
+    [BLOQUEA, shell("Bash", "git stash"), "Bash: git stash"],
+    [BLOQUEA, shell("Bash", "git switch -f main"), "Bash: git switch -f"],
+    [BLOQUEA, shell("Bash", "python -m pip install requests"), "Bash: python -m pip install"],
+    [BLOQUEA, shell("PowerShell", "py -m pip install requests"), "PowerShell: py -m pip install"],
+    [BLOQUEA, shell("Bash", "python -m venv .venv"), "Bash: python -m venv"],
+    [BLOQUEA, shell("Bash", "npx create-vite app"), "Bash: npx create-vite"],
+    [BLOQUEA, shell("Bash", "npx -y cowsay hola"), "Bash: npx -y"],
+    [BLOQUEA, shell("Bash", "yarn"), "Bash: yarn sin subcomando"],
+    [BLOQUEA, shell("Bash", "bash -c \"yarn\""), "Bash: yarn anidado en bash -c"],
+    [BLOQUEA, shell("Bash", "pnpm dlx create-vite app"), "Bash: pnpm dlx"],
+    [BLOQUEA, shell("Bash", "npm --prefix sub install"), "Bash: npm --prefix sub install"],
+    [BLOQUEA, shell("Bash", "npm pkg set name=x"), "Bash: npm pkg set"],
+    [BLOQUEA, shell("Bash", "npm audit fix"), "Bash: npm audit fix"],
+    [BLOQUEA, shell("Bash", "npm init -y"), "Bash: npm init"],
+    [BLOQUEA, shell("PowerShell", "Set-Content -Path src/a.js -Value 'x'"), "PowerShell: Set-Content"],
+    [BLOQUEA, shell("PowerShell", "'x' | Out-File README.md"), "PowerShell: Out-File"],
+    [BLOQUEA, shell("PowerShell", "Add-Content notas.md 'x'"), "PowerShell: Add-Content"],
+    [BLOQUEA, shell("PowerShell", "[System.IO.File]::WriteAllText('a.js', 'x')"), "PowerShell: WriteAllText"],
+    [BLOQUEA, shell("PowerShell", "Copy-Item a.js b.js"), "PowerShell: Copy-Item"],
+    [BLOQUEA, shell("PowerShell", "Move-Item a.js b.js"), "PowerShell: Move-Item"],
+    [BLOQUEA, shell("PowerShell", "New-Item -ItemType File src/a.js"), "PowerShell: New-Item"],
+    [BLOQUEA, shell("PowerShell", "Remove-Item -Recurse build"), "PowerShell: Remove-Item"],
+    [BLOQUEA, shell("PowerShell", "powershell -Command \"Set-Content a.js x\""), "PowerShell: anidado en powershell -Command"],
+    [PERMITE, shell("Bash", "git status && git log --oneline -5"), "Bash: git status y log"],
+    [PERMITE, shell("Bash", "uv run pytest"), "Bash: uv run pytest"],
+    [PERMITE, shell("Bash", "uv run --python 3.12 pytest -q"), "Bash: uv run con opcion y valor"],
+    [PERMITE, shell("Bash", "uv run ruff check"), "Bash: ruff check sin --fix"],
+    [PERMITE, shell("Bash", "uvx ruff check src"), "Bash: uvx ruff check"],
+    [PERMITE, shell("Bash", "uv run mypy src"), "Bash: uv run mypy"],
+    [PERMITE, shell("Bash", "uv run ruff format --check"), "Bash: ruff format --check"],
+    [PERMITE, shell("Bash", "black --check ."), "Bash: black --check"],
+    [PERMITE, shell("Bash", "git diff main...HEAD -- src"), "Bash: git diff"],
+    [PERMITE, shell("Bash", "git add docs/changes/001-x.md && git commit -m \"Registro: cambio 001 > borrador\""), "Bash: add y commit de registros; > entre comillas"],
+    [PERMITE, shell("Bash", "git checkout -b trabajo/001 && git push -u origin trabajo/001"), "Bash: rama nueva y push"],
+    [PERMITE, shell("Bash", "gh pr create --title x --body \"$(cat <<'EOF'\nResumen\n> cita en markdown\nEOF\n)\""), "Bash: gh pr create con heredoc que contiene >"],
+    [PERMITE, shell("Bash", "gh pr view 12 --json state"), "Bash: gh"],
+    [PERMITE, shell("Bash", "npm run check 2>&1 | tail -20"), "Bash: npm run check con 2>&1"],
+    [PERMITE, shell("Bash", "ls docs/plans > /dev/null 2>&1"), "Bash: redireccion a /dev/null"],
+    [PERMITE, shell("Bash", "cat AGENTS.md; grep -rn supervisor .claude/hooks"), "Bash: lectura"],
+    [PERMITE, shell("Bash", "npm run arrancar"), "Bash: npm run arrancar (lo pide /iniciar)"],
+    [PERMITE, shell("Bash", "git fetch origin && git switch -c trabajo/002"), "Bash: git fetch y switch -c"],
+    [PERMITE, shell("Bash", "git reset HEAD~1"), "Bash: git reset sin --hard (no toca el arbol)"],
+    [PERMITE, shell("Bash", "git stash list"), "Bash: git stash list"],
+    [PERMITE, shell("Bash", "npx eslint ."), "Bash: npx de una herramienta instalada"],
+    [PERMITE, shell("Bash", "npm pkg get name && npm audit"), "Bash: npm pkg get y npm audit"],
+    [PERMITE, shell("Bash", "yarn test"), "Bash: yarn test"],
+    [PERMITE, shell("Bash", "python -m pytest -q"), "Bash: python -m pytest"],
+    [PERMITE, shell("PowerShell", "Get-Content AGENTS.md | Select-String Supervisor"), "PowerShell: lectura"],
+    [PERMITE, shell("PowerShell", "git status 2>$null"), "PowerShell: redireccion a $null"],
+    [PERMITE, shell("Bash", "rm -rf build", { agent_id: "a1", agent_type: "ejecutor" }), "Bash: dentro de un subagente"],
+    [PERMITE, shell("PowerShell", "npm install", { agent_id: "a1", agent_type: "ejecutor" }), "PowerShell: dentro de un subagente"],
+    [PERMITE, shell("Bash", "npm install"), "Bash: escape SDD_SUPERVISOR_LIBRE", { SDD_SUPERVISOR_LIBRE: "1" }],
+  ];
+  if (process.platform === "win32") {
+    CASOS_SUPERVISOR.push([PERMITE, escribe("Write", join(supRaiz.toUpperCase(), "DOCS", "Plans", "a.md")), "Windows: sin distinguir mayusculas"]);
+  }
+  for (const [esperado, entradaCaso, nota, env = {}] of CASOS_SUPERVISOR) {
+    const r = evaluarSupervisor({ hook_event_name: "PreToolUse", cwd: supRaiz, ...entradaCaso }, supRaiz, env);
+    const real = r.codigo === 2 ? BLOQUEA : PERMITE;
+    const ok = real === esperado && (r.codigo !== 2 || JSON.parse(r.stdout).hookSpecificOutput.permissionDecision === "deny");
+    if (!ok) fallos += 1;
+    console.log(`  ${ok ? "[OK]  " : "[FALLA]"} ${esperado.padEnd(8)} ${nota}`);
+    if (!ok) console.log(`          esperado ${esperado}, obtenido ${real}. Salida: ${r.stderr.split("\n").slice(0, 3).join(" | ")}`);
+  }
+  const faltan = evaluarSupervisor(agente("revisor", "## Criterios\nC1"), supRaiz, {});
+  comprobar("brief incompleto: nombra el encabezado que falta", true, faltan.stderr.includes("## Rango") && faltan.stderr.includes("encargos.md"));
+  // El hook real, como proceso: mismo veredicto que en proceso.
+  comprobar("hook real: deniega escribir codigo en la sesion principal", 2,
+    ejecutar("supervisor.mjs", supRaiz, escribe("Write", join(supRaiz, "src", "a.js"))).codigo);
+  comprobar("hook real: permite un registro", 0,
+    ejecutar("supervisor.mjs", supRaiz, escribe("Write", join(supRaiz, "docs", "changes", "a.md"))).codigo);
+  comprobar("hook real: deniega una redireccion de Bash en la sesion principal", 2,
+    ejecutar("supervisor.mjs", supRaiz, shell("Bash", "echo x > src/a.js")).codigo);
+  comprobar("hook real: permite git status en Bash", 0,
+    ejecutar("supervisor.mjs", supRaiz, shell("Bash", "git status")).codigo);
+  comprobar("hook real: entrada ilegible bloquea (falla cerrado)", 2,
+    ejecutar("supervisor.mjs", supRaiz, "{ esto no es json", { crudo: true }).codigo);
+
+  console.log("\nrumbo.mjs (SessionStart)");
+  const rumbo = (dir) => spawnSync(process.execPath, [join(AQUI, "rumbo.mjs")], {
+    input: JSON.stringify({ hook_event_name: "SessionStart", source: "startup", cwd: dir }), encoding: "utf8", cwd: dir,
+    env: { ...process.env, CLAUDE_PROJECT_DIR: dir },
+  });
+  const proyecto = mkdtempSync(join(tmpdir(), "sdd-hooks-"));
+  temporales.push(proyecto);
+  mkdirSync(join(proyecto, "docs", "plans", "fase-01"), { recursive: true });
+  mkdirSync(join(proyecto, "docs", "changes"), { recursive: true });
+  writeFileSync(join(proyecto, "docs", "plans", "0_plan_maestro.md"), "# Plan maestro\n\nEstado: aprobado\n");
+  writeFileSync(join(proyecto, "docs", "plans", "fase-01", "plan.md"), [
+    "# Fase 01", "", "Estado: en curso", "",
+    "## Encargos", "", "| ID | Agente | Encargo | Estado | Resultado o bloqueo |", "| --- | --- | --- | --- | --- |",
+    "| E1 | ejecutor | Implementar login | en curso | |", "| E2 | revisor | Revisar esquema | hecho | sin hallazgos |", "| | | | | |", "",
+    "## Decisiones del usuario", "", "| ID | Pregunta | Opciones y recomendación | Estado | Respuesta del usuario |", "| --- | --- | --- | --- | --- |",
+    "| D1 | Que base de datos usar | SQLite (recomendada) o Postgres | abierta | |", "| D2 | Idioma de la interfaz | es o en | respondida | es |", "",
+  ].join("\n"));
+  writeFileSync(join(proyecto, "docs", "changes", "001-cerrado.md"), [
+    "# Cambio 001", "", "Estado: integrado", "", "## Encargos", "",
+    "| ID | Agente | Encargo | Estado | Resultado o bloqueo |", "| --- | --- | --- | --- | --- |", "| E9 | ejecutor | Olvidado | en curso | |", "",
+  ].join("\n"));
+  writeFileSync(join(proyecto, "docs", "changes", "002-plantilla.md"), "# Cambio\n\nEstado: propuesto | en curso | integrado\n");
+  const sinRepo = rumbo(proyecto);
+  const texto = sinRepo.stdout || "";
+  comprobar("sin Git: sale con 0", 0, sinRepo.status);
+  comprobar("sin Git: dice que el proyecto no esta arrancado", true, texto.includes("/iniciar"));
+  comprobar("muestra el estado del plan maestro", true, texto.includes("0_plan_maestro.md") && texto.includes("aprobado"));
+  comprobar("muestra la fase en curso", true, texto.includes("docs/plans/fase-01/plan.md: en curso"));
+  comprobar("muestra el encargo abierto E1", true, texto.includes("E1"));
+  comprobar("no muestra el encargo hecho E2", false, texto.includes("E2"));
+  comprobar("avisa de que los subagentes anteriores ya no existen", true, texto.includes("ya no existen"));
+  comprobar("muestra la decision abierta D1", true, texto.includes("D1"));
+  comprobar("no muestra la decision respondida D2", false, texto.includes("D2"));
+  comprobar("no muestra el cambio integrado ni sus encargos", false, texto.includes("001-cerrado") || texto.includes("E9"));
+  comprobar("no muestra una plantilla sin rellenar", false, texto.includes("002-plantilla"));
+  git(proyecto, "init", "-q", "-b", "main");
+  git(proyecto, "add", "-A");
+  git(proyecto, "commit", "-qm", "base");
+  writeFileSync(join(proyecto, "nuevo.txt"), "x");
+  const conRepo = rumbo(proyecto);
+  comprobar("con Git: muestra rama y cambios sin commit", true, (conRepo.stdout || "").includes("Rama: main. Archivos con cambios sin commit: 1."));
+  const vacio = mkdtempSync(join(tmpdir(), "sdd-hooks-"));
+  temporales.push(vacio);
+  const nada = rumbo(vacio);
+  comprobar("sin nada abierto: una sola linea lo dice", true, nada.status === 0 && (nada.stdout || "").includes("No hay trabajo"));
+
+  // Registros en ingles: Status:, ## Briefs y ## User decisions.
+  const ingles = mkdtempSync(join(tmpdir(), "sdd-hooks-"));
+  temporales.push(ingles);
+  mkdirSync(join(ingles, "docs", "plans", "phase-01"), { recursive: true });
+  mkdirSync(join(ingles, "docs", "changes"), { recursive: true });
+  writeFileSync(join(ingles, "docs", "plans", "0_plan_maestro.md"), "# Master plan\n\nStatus: approved\n");
+  writeFileSync(join(ingles, "docs", "plans", "phase-01", "plan.md"), [
+    "# Phase 01", "", "Status: ready locally", "",
+    "## Briefs", "", "| ID | Agent | Brief | Status | Result or blocker |", "| --- | --- | --- | --- | --- |",
+    "| B1 | executor | Implement parser | in progress | |", "| B2 | reviewer | Review schema | done | no findings |", "",
+    "## User decisions", "", "| ID | Question | Options and recommendation | Status | User answer |", "| --- | --- | --- | --- | --- |",
+    "| Q1 | Which database | SQLite (recommended) or Postgres | open | |", "| Q2 | UI language | es or en | answered | en |", "",
+  ].join("\n"));
+  writeFileSync(join(ingles, "docs", "changes", "001-closed.md"), [
+    "# Change 001", "", "Status: integrated", "", "## Briefs", "",
+    "| ID | Agent | Brief | Status | Result or blocker |", "| --- | --- | --- | --- | --- |", "| B9 | executor | Forgotten | in progress | |", "",
+  ].join("\n"));
+  const en = rumbo(ingles).stdout || "";
+  comprobar("ingles: lee Status del plan maestro", true, en.includes("Estado: approved"));
+  comprobar("ingles: muestra la fase con su Status", true, en.includes("docs/plans/phase-01/plan.md: ready locally"));
+  comprobar("ingles: muestra el brief abierto B1", true, en.includes("B1"));
+  comprobar("ingles: no muestra el brief done B2", false, en.includes("B2"));
+  comprobar("ingles: muestra la decision open Q1", true, en.includes("Q1"));
+  comprobar("ingles: no muestra la decision answered Q2", false, en.includes("Q2"));
+  comprobar("ingles: no muestra el cambio integrated ni sus briefs", false, en.includes("001-closed") || en.includes("B9"));
+
+  console.log("\nstop-gate.mjs (SubagentStop)");
+  // CLAUDE_PROJECT_DIR apunta a `pasa` (verde); el cwd del subagente, a `falla` (rojo).
+  comprobar("SubagentStop: evalua el cwd del subagente (worktree en rojo)", 2,
+    ejecutar("stop-gate.mjs", pasa, { hook_event_name: "SubagentStop", cwd: falla }).codigo);
+  comprobar("Stop: sigue mandando CLAUDE_PROJECT_DIR", 0,
+    ejecutar("stop-gate.mjs", pasa, { hook_event_name: "Stop", cwd: falla }).codigo);
 } finally {
   for (const d of temporales) rmSync(d, { recursive: true, force: true });
 }

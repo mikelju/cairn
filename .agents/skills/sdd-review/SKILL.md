@@ -5,7 +5,8 @@ description: Revisión adversarial en contexto limpio de un diff, rama, incremen
 # Revisión adversarial
 
 El autor no se revisa en su propio contexto: arrastra sus suposiciones y se ancla en ellas.
-La revisión la hacen revisores que no han visto la implementación y que buscan cómo falla, no si parece correcta.
+La revisión la hacen agentes `revisor` que no han visto la implementación y que buscan cómo falla, no si parece correcta.
+El supervisor los lanza con el brief de `../sdd-lite/references/encargos.md`, juzga sus hallazgos y encarga lo demás.
 
 ## Qué recibe cada revisor
 - Los criterios: `spec.md` de la fase o el contrato del cambio.
@@ -27,13 +28,14 @@ un escenario de fallo concreto (entrada o estado, resultado incorrecto) y el cri
 Sin escenario concreto no es un hallazgo. Una lista vacía es un resultado válido.
 
 ## Verificación, corrección y cierre
-1. El coordinador intenta reproducir cada bloqueante e importante: test, comando o lectura dirigida.
-   Marca confirmado, plausible o descartado; descartar exige motivo escrito.
-2. Corrige lo confirmado dentro del contrato, con regresión cuando aporte valor.
+1. Cada bloqueante e importante se intenta reproducir: test, comando o lectura dirigida.
+   La reproducción que exige ejecutar o leer mucho la hace un explorador; el supervisor marca confirmado, plausible o descartado,
+   y descartar exige motivo escrito.
+2. Un ejecutor corrige lo confirmado dentro del contrato, con regresión cuando aporte valor; el supervisor no corrige.
    Lo que cambia criterios es una desviación, no una corrección.
-3. Re-revisa solo el diff de las correcciones con una lente fresca. Máximo dos rondas;
+3. Re-revisa solo el diff de las correcciones con un revisor nuevo. Máximo dos rondas;
    lo que siga abierto pasa al usuario como pendiente.
-4. Registra cada ronda en la tabla "Revisión adversarial" del plan de fase o del cambio.
+4. El supervisor registra cada ronda en la tabla "Revisión adversarial" del plan de fase o del cambio.
 5. Hallazgos de seguridad que quedan abiertos o aplazados: una línea en `docs/security.md`, que se crea con el primero.
    Columnas: ID, severidad de seguridad (Critical, High, Medium, Low), dónde, qué pasa, estado y origen (fase o cambio).
    El ID sigue al mayor `SEC-NNN` usado en el repo, contando catálogos anteriores (`docs/security/`) aunque estén cerrados.

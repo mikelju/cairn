@@ -2,6 +2,8 @@
 .runtime/
 .lavish/
 .claude/settings.local.json
+.claude/worktrees/
+.claude/relevo/
 node_modules/
 __pycache__/
 *.py[cod]

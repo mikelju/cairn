@@ -458,7 +458,7 @@ function revisarComando(t, cwdBase) {
 /**
  * Evalua una entrada de PreToolUse y devuelve lo que el hook emite: `{ codigo, stdout, stderr }`.
  * Exportada para que la suite evalue en el mismo proceso: en Windows, con antivirus, cada
- * arranque de Node cuesta cientos de milisegundos (cambio 007). Cada llamada parte de cero.
+ * arranque de Node cuesta cientos de milisegundos. Cada llamada parte de cero.
  */
 export function evaluar(entrada, dirProyecto = process.env.CLAUDE_PROJECT_DIR) {
   RAMAS_PROTEGIDAS.clear();
