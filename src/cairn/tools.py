@@ -6,26 +6,8 @@ from typing import Any
 from pydantic import BaseModel
 
 from cairn.canonical import canonical_sha256
-from cairn.ingest import load_study
 from cairn.jobs import execute, inputs_hash
-
-
-class Group(BaseModel):
-    setcd: str
-    label: str
-    sex: str
-    dose: float
-    dose_unit: str
-    toxicokinetic: bool
-    animals: int
-
-
-class StudyDesign(BaseModel):
-    study_id: str
-    species: str
-    strain: str
-    route: str
-    groups: list[Group]
+from cairn.observation import Observation, build_observation, query
 
 
 def run_job(kind: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -39,34 +21,35 @@ def run_job(kind: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
     }
 
 
-def study_design() -> StudyDesign:
+STUDY_DESIGN_SQL = """SELECT tx.SETCD AS setcd, any_value(tx."SET") AS label,
+  max(CASE WHEN TXPARMCD = 'SEXPOP' THEN TXVAL END) AS sex,
+  CAST(max(CASE WHEN TXPARMCD = 'TRTDOS' THEN TXVAL END) AS DOUBLE) AS dose,
+  max(CASE WHEN TXPARMCD = 'TRTDOSU' THEN TXVAL END) AS dose_unit,
+  max(CASE WHEN TXPARMCD = 'TKDESC' THEN TXVAL END) = 'TK' AS toxicokinetic,
+  (SELECT count(*) FROM dm WHERE dm.SETCD = tx.SETCD) AS animals
+FROM tx GROUP BY tx.SETCD ORDER BY tx.SETCD"""
+STUDY_TERMS_SQL = """SELECT TSPARMCD AS code, TSVAL AS value FROM ts
+WHERE TSPARMCD IN ('SPREFID', 'SPECIES', 'STRAIN', 'ROUTE') ORDER BY TSPARMCD"""
+
+
+def study_design() -> Observation:
     """Return the design of the study: species, route and one entry per treatment set."""
-    frames, _, _ = load_study()
-    tx, dm, ts = frames["TX"], frames["DM"], frames["TS"]
-    wide = tx.pivot(index="SETCD", columns="TXPARMCD", values="TXVAL")
-    labels: dict[str, str] = dict(zip(tx["SETCD"].astype(str), tx["SET"].astype(str), strict=False))
-
-    def value(code: str) -> str:
-        return str(ts.loc[ts["TSPARMCD"] == code, "TSVAL"].iloc[0])
-
-    groups = [
-        Group(
-            setcd=str(setcd),
-            label=labels[str(setcd)],
-            sex=str(row["SEXPOP"]),
-            dose=float(row["TRTDOS"]),
-            dose_unit=str(row["TRTDOSU"]),
-            toxicokinetic=str(row["TKDESC"]) == "TK",
-            animals=int((dm["SETCD"] == setcd).sum()),
-        )
-        for setcd, row in wide.iterrows()
-    ]
-    return StudyDesign(
-        study_id=value("SPREFID"),
-        species=value("SPECIES"),
-        strain=value("STRAIN"),
-        route=value("ROUTE"),
-        groups=groups,
+    groups = query(STUDY_DESIGN_SQL)
+    terms = {row["code"]: row["value"] for row in query(STUDY_TERMS_SQL)}
+    return build_observation(
+        tool="study_design",
+        kind="study_design",
+        population="all animals",
+        n_examined=sum(int(group["animals"]) for group in groups),
+        values={
+            "study_id": terms["SPREFID"],
+            "species": terms["SPECIES"],
+            "strain": terms["STRAIN"],
+            "route": terms["ROUTE"],
+            "groups": groups,
+        },
+        sql=STUDY_DESIGN_SQL + "\n;\n" + STUDY_TERMS_SQL,
+        source_rows=[{"domain": "TX", "setcd": group["setcd"]} for group in groups],
     )
 
 

@@ -84,9 +84,9 @@ def test_registry_has_exactly_the_two_tools() -> None:
 
 def test_study_design_content() -> None:
     design = call_tool("study_design", {})
-    assert design["study_id"] == "PDS2014"
-    assert sum(group["animals"] for group in design["groups"]) == 124
-    assert {group["dose"] for group in design["groups"]} >= {0.0, 20.0}
+    assert design["values"]["study_id"] == "PDS2014"
+    assert sum(group["animals"] for group in design["values"]["groups"]) == 124
+    assert {group["dose"] for group in design["values"]["groups"]} >= {0.0, 20.0}
 
 
 def test_cli_prints_json_without_hash_flag() -> None:
