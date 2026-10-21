@@ -1,13 +1,17 @@
 """Command line: the same registry tools as MCP and REST."""
 
 import json
+from pathlib import Path
 from typing import Annotated, Any
 
 import typer
 import uvicorn
 from pydantic import ValidationError
 
+from cairn import live
 from cairn.canonical import canonical_json
+from cairn.gateway import GatewayError
+from cairn.recording import StaleRecording
 from cairn.tools import argument_problems, result_sha256
 from cairn.tools import call_tool as registry_call
 
@@ -76,6 +80,72 @@ def tk_summary_command(
 ) -> None:
     """Print the toxicokinetic AUCtau summary as canonical JSON."""
     _emit(call_tool("tk_summary", {"sex": sex, "dose": dose, "day": day}), hash_only)
+
+
+RECORDINGS = Path("recordings")
+
+
+@app.command("ask")
+def ask_command(
+    question: Annotated[str, typer.Argument(help="Question ID (Q2, Q6) or free text with --live")],
+    live_mode: Annotated[bool, typer.Option("--live", help="Call Bedrock")] = False,
+    model: str = "opus-5-5",
+    recordings: Path = RECORDINGS,
+) -> None:
+    """Answer a question: replay a recording, or call the model with --live."""
+    question_id, text = live.question_text(question)
+    try:
+        if live_mode:
+            typer.echo(f"ceiling: {live.record_ceiling(model, 1):.2f} USD")
+            result = live.ask_live(text, model)
+        elif question_id:
+            result = live.ask_replay(question_id, recordings, model)
+        else:
+            typer.echo("error: replay needs a question ID (Q2, Q6); use --live", err=True)
+            raise typer.Exit(2)
+    except (StaleRecording, GatewayError) as error:
+        typer.echo(f"error: {error}", err=True)
+        raise typer.Exit(1) from error
+    typer.echo(f"status: {result.status.value}")
+    if result.message:
+        typer.echo(result.message)
+    if result.rendered:
+        typer.echo(result.rendered)
+    if result.verdict is not None:
+        typer.echo(f"rules fired: {result.verdict.rules}")
+
+
+@app.command("record")
+def record_command(
+    questions: Annotated[list[str], typer.Argument(help="Question IDs, for example Q2 Q6")],
+    model: str = "opus-5-5",
+    recordings: Path = RECORDINGS,
+) -> None:
+    """Record questions against Bedrock (laptop only); stops before 10 USD."""
+    ids = [live.question_text(q)[0] for q in questions]
+    if not all(ids):
+        typer.echo("error: record takes question IDs (Q2, Q6)", err=True)
+        raise typer.Exit(2)
+    typer.echo(f"ceiling: {live.record_ceiling(model, len(ids)):.2f} USD of {live.BUDGET_USD:.2f}")
+    try:
+        report = live.record_questions(ids, recordings, model)
+    except GatewayError as error:
+        typer.echo(f"error: {error}", err=True)
+        raise typer.Exit(1) from error
+    for path in report.saved:
+        typer.echo(f"saved {path}")
+    typer.echo(f"spent: {report.spent:.4f} USD")
+    if report.stopped:
+        typer.echo(report.stopped)
+        raise typer.Exit(1)
+
+
+@app.command("smoke")
+def smoke_command(output: Path = live.SMOKE_PATH) -> None:
+    """Send question, draft and judge prompts to each profile (laptop only)."""
+    typer.echo(f"ceiling: {live.smoke_ceiling():.2f} USD of {live.BUDGET_USD:.2f}")
+    evidence = live.smoke(output)
+    typer.echo(f"wrote {output}; spent {evidence['total_cost_usd']:.4f} USD")
 
 
 @app.command()

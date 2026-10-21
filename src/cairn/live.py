@@ -1,0 +1,157 @@
+"""Laptop-only commands that can reach Bedrock: ask, record and smoke.
+
+Nothing in the web package imports this module (decision D8).
+"""
+
+import json
+from dataclasses import dataclass, field
+from datetime import date
+from pathlib import Path
+from typing import Any
+
+from cairn.gateway import MODEL_PROFILES, REGION, LLMGateway, Mode, Status, build_client
+from cairn.loop import MAX_CALLS, PROMPT, PROMPT_VERSION, LoopResult, ask, schema_hash
+from cairn.loop import tool_definitions as loop_tools
+from cairn.pricing import call_cost
+from cairn.questions import QUESTIONS
+from cairn.recording import RecordingClient, RecordingKey, ReplayClient, total_cost
+
+BUDGET_USD = 10.0
+# Ceiling for one model call: a generous prompt size and the largest reply the loop allows.
+CEILING_INPUT_TOKENS = 20_000
+CEILING_OUTPUT_TOKENS = 2_048
+SMOKE_CALLS_PER_PROFILE = 3
+SMOKE_MAX_TOKENS = 512
+SMOKE_PATH = Path("docs/adr/evidence/bedrock-smoke.json")
+JUDGE_TOOL = {
+    "name": "judge_verdict",
+    "description": "Judge whether a draft sentence is supported by the evidence given.",
+    "strict": True,
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "verdict": {"type": "string", "enum": ["supported", "unsupported"]},
+            "reason": {"type": "string"},
+        },
+        "required": ["verdict", "reason"],
+        "additionalProperties": False,
+    },
+}
+
+
+def make_client(mode: Mode) -> Any:
+    """Build the real Bedrock client; tests replace this with a fake."""
+    return build_client(mode)
+
+
+def call_ceiling(model: str) -> float:
+    return call_cost(model, CEILING_INPUT_TOKENS, CEILING_OUTPUT_TOKENS)
+
+
+def record_ceiling(model: str, count: int) -> float:
+    return count * MAX_CALLS * call_ceiling(model)
+
+
+def smoke_ceiling() -> float:
+    return sum(call_ceiling(model) for model in MODEL_PROFILES) * SMOKE_CALLS_PER_PROFILE
+
+
+def question_text(question: str) -> tuple[str, str]:
+    """Return (question id, text); a known ID maps to its predefined text."""
+    if question.upper() in QUESTIONS:
+        return question.upper(), QUESTIONS[question.upper()]
+    return "", question
+
+
+def ask_replay(question_id: str, directory: Path, model: str) -> LoopResult:
+    key = RecordingKey(question_id, PROMPT_VERSION, schema_hash(), model)
+    client = ReplayClient.load(directory, key)
+    return ask(QUESTIONS[question_id], LLMGateway(Mode.REPLAY, client=client), model)
+
+
+def ask_live(text: str, model: str) -> LoopResult:
+    return ask(text, LLMGateway(Mode.LIVE, client=make_client(Mode.LIVE)), model)
+
+
+@dataclass
+class RecordReport:
+    saved: list[Path] = field(default_factory=list)
+    spent: float = 0.0
+    stopped: str = ""
+
+
+def record_questions(
+    ids: list[str], directory: Path, model: str, budget: float = BUDGET_USD, spent: float = 0.0
+) -> RecordReport:
+    """Record each question; stop before the next one could pass the budget."""
+    report = RecordReport(spent=spent)
+    step = MAX_CALLS * call_ceiling(model)
+    for question_id in ids:
+        if report.spent + step > budget:
+            report.stopped = f"stopped before {question_id}: ceiling would pass {budget:.2f} USD"
+            break
+        key = RecordingKey(question_id, PROMPT_VERSION, schema_hash(), model)
+        recorder = RecordingClient(make_client(Mode.RECORD), key, REGION)
+        ask(QUESTIONS[question_id], LLMGateway(Mode.RECORD, client=recorder), model)
+        report.saved.append(recorder.save(directory))
+        report.spent += total_cost({"calls": recorder.calls}) or 0.0
+    return report
+
+
+def _smoke_call(
+    gateway: LLMGateway, model: str, name: str, messages: list[dict[str, Any]], **kwargs: Any
+) -> dict[str, Any]:
+    entry: dict[str, Any] = {"name": name, "error": None, "quota_error": False}
+    try:
+        reply = gateway.create(model, messages, max_tokens=SMOKE_MAX_TOKENS, **kwargs)
+    except Exception as error:  # the smoke test records every failure and goes on
+        status = getattr(error, "status_code", None)
+        entry["error"] = f"{type(error).__name__}: {error}"
+        entry["status_code"] = status
+        entry["quota_error"] = status == 429 or "Throttl" in type(error).__name__
+        return entry
+    uses = [b for b in reply.content if b.get("type") == "tool_use"]
+    entry.update(
+        stop_reason=reply.stop_reason,
+        status=reply.status.value,
+        refusal=reply.status is Status.DECLINED,
+        tool_calls=[b.get("name") for b in uses],
+        latency_s=round(reply.latency_s, 3),
+        input_tokens=reply.input_tokens,
+        output_tokens=reply.output_tokens,
+        cost_usd=call_cost(model, reply.input_tokens, reply.output_tokens),
+    )
+    return entry
+
+
+def smoke(path: Path = SMOKE_PATH, budget: float = BUDGET_USD) -> dict[str, Any]:
+    """Send question, draft and judge prompts to each profile and write the evidence file."""
+    gateway = LLMGateway(Mode.LIVE, client=make_client(Mode.LIVE))
+    evidence: dict[str, Any] = {"date": date.today().isoformat(), "region": REGION, "profiles": []}
+    spent = 0.0
+    for model, profile in MODEL_PROFILES.items():
+        record: dict[str, Any] = {"model": model, "profile": profile, "calls": []}
+        evidence["profiles"].append(record)
+        if spent + call_ceiling(model) * SMOKE_CALLS_PER_PROFILE > budget:
+            record["skipped"] = "ceiling would pass the budget"
+            continue
+        question = [{"role": "user", "content": QUESTIONS["Q2"]}]
+        draft = [{"role": "user", "content": "Write two plain sentences on rat liver findings."}]
+        judge = [
+            {
+                "role": "user",
+                "content": "Evidence: 3 of 10 animals had a finding. Draft: 'Some animals had "
+                "a finding.' Call judge_verdict.",
+            }
+        ]
+        calls = [
+            _smoke_call(gateway, model, "question", question, system=PROMPT, tools=loop_tools()),
+            _smoke_call(gateway, model, "draft", draft),
+            _smoke_call(gateway, model, "judge", judge, tools=[JUDGE_TOOL]),
+        ]
+        record["calls"] = calls
+        spent += sum(c.get("cost_usd", 0.0) for c in calls)
+    evidence["total_cost_usd"] = spent
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return evidence

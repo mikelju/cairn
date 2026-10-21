@@ -66,11 +66,39 @@ class LoopResult:
     latency_s: float = 0.0
 
 
+# Open-ended parameters the model never needs to set; strict schemas cannot express them.
+HIDDEN_PARAMETERS = {"run_job": ("params",)}
+
+
+def strictify(node: Any) -> Any:
+    """Make a JSON schema acceptable to strict tool use.
+
+    Every object closes with additionalProperties false and lists all its properties as
+    required; titles, defaults and the discriminator are dropped and oneOf becomes anyOf.
+    """
+    if isinstance(node, list):
+        return [strictify(item) for item in node]
+    if not isinstance(node, dict):
+        return node
+    out = {
+        key: strictify(value)
+        for key, value in node.items()
+        if key not in ("title", "default", "discriminator")
+    }
+    if "oneOf" in out:
+        out["anyOf"] = out.pop("oneOf")
+    if out.get("type") == "object":
+        out["additionalProperties"] = False
+        out["required"] = list(out.get("properties", {}))
+    return out
+
+
 def _definition(name: str) -> dict[str, Any]:
     function = REGISTRY[name]
     schema = TypeAdapter(function).json_schema()  # type: ignore[arg-type]
-    schema.pop("title", None)
-    schema["additionalProperties"] = False
+    for hidden in HIDDEN_PARAMETERS.get(name, ()):
+        schema["properties"].pop(hidden, None)
+    schema = strictify(schema)
     description = (function.__doc__ or name).strip().splitlines()[0]
     return {"name": name, "description": description, "strict": True, "input_schema": schema}
 
@@ -81,12 +109,9 @@ def tool_definitions() -> list[dict[str, Any]]:
         "name": ANSWER_TOOL,
         "description": "Give the final answer as a list of sentences made of text and ref parts.",
         "strict": True,
-        "input_schema": {
-            "type": "object",
-            "properties": {"sentences": SENTENCES.json_schema()},
-            "required": ["sentences"],
-            "additionalProperties": False,
-        },
+        "input_schema": strictify(
+            {"type": "object", "properties": {"sentences": SENTENCES.json_schema()}}
+        ),
     }
     return [*(_definition(name) for name in STUDY_TOOLS), answer]
 

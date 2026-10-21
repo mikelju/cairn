@@ -34,3 +34,23 @@ deploy: build
 		--containers "app={image=$$(aws lightsail get-container-images --service-name $(SERVICE) --region $(REGION) --query 'containerImages[0].image' --output text),ports={8000=HTTP}}" \
 		--public-endpoint "containerName=app,containerPort=8000,healthCheck={path=/healthz}"
 	aws lightsail get-container-services --service-name $(SERVICE) --region $(REGION) --query 'containerServices[0].[state,url]' --output text
+
+# Laptop-only commands that call Bedrock (decision D8). Each prints its estimated spending ceiling first.
+# Usage: make smoke AWS_PROFILE=<profile>; make record AWS_PROFILE=<profile> [MODEL=opus-4-8 QUESTIONS=Q6]
+MODEL ?= opus-5-5
+QUESTIONS ?= Q2 Q6
+QUESTION ?= Q2
+
+.PHONY: record live smoke
+
+record:
+	$(if $(AWS_PROFILE),,$(error set AWS_PROFILE=<profile>))
+	AWS_PROFILE=$(AWS_PROFILE) CAIRN_LLM_MODE=record uv run cairn record $(QUESTIONS) --model $(MODEL)
+
+live:
+	$(if $(AWS_PROFILE),,$(error set AWS_PROFILE=<profile>))
+	AWS_PROFILE=$(AWS_PROFILE) CAIRN_LLM_MODE=live uv run cairn ask "$(QUESTION)" --live --model $(MODEL)
+
+smoke:
+	$(if $(AWS_PROFILE),,$(error set AWS_PROFILE=<profile>))
+	AWS_PROFILE=$(AWS_PROFILE) CAIRN_LLM_MODE=live uv run cairn smoke
