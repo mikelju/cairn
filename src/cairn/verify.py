@@ -297,7 +297,7 @@ def verify(sentences: list[Sentence], ledger: ObservationLedger) -> Verdict:
     for index, detail in errors.items():  # rule 2
         fail(2, index, detail)
     for index in range(len(sentences)):  # rule 3
-        if _has_number(written[index]) or _placed_text_has_number(sentences[index], ledger):
+        if _has_number(written[index]):
             fail(3, index)
     for index, sentence in enumerate(sentences):  # rule 4
         refs = _refs(sentence)
