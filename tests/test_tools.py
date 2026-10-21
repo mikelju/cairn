@@ -122,6 +122,8 @@ BAD_ARGUMENTS: list[tuple[str, dict[str, Any]]] = [
     ("body_weight_change", {"sex": "F", "population": "all"}),
     ("body_weight_change", {"sex": "X", "population": "main"}),
     ("tk_summary", {"sex": "Q"}),
+    ("tk_summary", {"dose": "nan"}),
+    ("tk_summary", {"day": "inf"}),
     ("incidence", {"screen": "maybe"}),
 ]
 BAD_CLI: list[list[str]] = [
@@ -129,6 +131,8 @@ BAD_CLI: list[list[str]] = [
     ["body-weight-change", "--population", "tk_satellites"],
     ["body-weight-change", "--sex", "X"],
     ["tk-summary", "--sex", "Q"],
+    ["tk-summary", "--dose", "nan"],
+    ["tk-summary", "--day", "inf"],
 ]
 
 
@@ -159,3 +163,18 @@ def test_validation_rejects_tk_and_bad_values_on_the_cli(arguments: list[str]) -
     assert result.exit_code != 0
     assert "error:" in result.output
     assert "Traceback" not in result.output
+
+
+def test_rest_accepts_a_missing_body_as_no_arguments(server_url: str) -> None:
+    import httpx
+
+    response = httpx.post(f"{server_url}/api/tools/study_design", timeout=60)
+    assert response.status_code == 200
+    assert response.json()["kind"] == "study_design"
+
+
+def test_rest_tool_endpoint_runs_off_the_event_loop() -> None:
+    import inspect
+
+    route = next(r for r in create_app().routes if getattr(r, "path", "") == "/api/tools/{name}")
+    assert not inspect.iscoroutinefunction(route.endpoint)  # type: ignore[attr-defined]

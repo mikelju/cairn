@@ -53,6 +53,10 @@ class ObservationLedger:
             raise UnresolvedRef(f"unknown observation {obs_id}") from None
 
     @property
+    def observations(self) -> list[Observation]:
+        return list(self._observations.values())
+
+    @property
     def ids(self) -> list[str]:
         return list(self._observations)
 

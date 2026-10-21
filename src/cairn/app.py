@@ -1,9 +1,9 @@
-"""FastAPI application: jobs endpoints now, tools and web pages in later increments."""
+"""FastAPI application: jobs, REST tool endpoints, the MCP endpoint and the web pages."""
 
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Body, FastAPI, HTTPException
 from fastmcp import FastMCP
 from pydantic import BaseModel, Field, ValidationError
 
@@ -47,11 +47,13 @@ def create_app() -> FastAPI:
         return job
 
     @app.post("/api/tools/{name}")
-    async def api_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    def api_tool(
+        name: str, arguments: Annotated[dict[str, Any] | None, Body()] = None
+    ) -> dict[str, Any]:
         if name not in REGISTRY:
             raise HTTPException(status_code=404, detail="unknown tool")
         try:
-            return call_tool(name, arguments)
+            return call_tool(name, arguments or {})
         except ValidationError as error:
             raise HTTPException(status_code=422, detail=argument_problems(error)) from error
 

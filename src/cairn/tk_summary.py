@@ -1,8 +1,8 @@
 """The tk_summary tool: naive AUCtau mean in the TK satellite set, with and without quarantine."""
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import validate_call
+from pydantic import Field, validate_call
 
 from cairn.observation import ANIMALS_SQL, Observation, build_observation, query
 
@@ -28,7 +28,11 @@ def _summary(values: list[float]) -> dict[str, Any]:
 
 
 @validate_call
-def tk_summary(sex: Literal["F", "M"] = "M", dose: float = 20.0, day: float = 1.0) -> Observation:
+def tk_summary(
+    sex: Literal["F", "M"] = "M",
+    dose: Annotated[float, Field(allow_inf_nan=False)] = 20.0,
+    day: Annotated[float, Field(allow_inf_nan=False)] = 1.0,
+) -> Observation:
     """Naive AUCtau mean in the TK satellite set, with and without the quarantined value."""
     rows = query(TK_SUMMARY_SQL, [sex, dose, day, day])
     kept = [float(row["value"]) for row in rows if not row["quarantined"]]

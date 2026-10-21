@@ -5,10 +5,13 @@ not in configuration. A draft passes only when no rule reports a failure.
 """
 
 import re
+import unicodedata
+from collections.abc import Iterator
 from dataclasses import dataclass, field
+from typing import Any
 
 from cairn.content import ObservationLedger, Sentence, Text, UnresolvedRef, ValueRef
-from cairn.render import render_sentence
+from cairn.render import render, render_parts, render_sentence
 
 RULE_REASONS = {
     1: "every sentence needs at least one reference to a tool result",
@@ -20,7 +23,10 @@ RULE_REASONS = {
     7: "no study term written by hand and no expression from the wording list",
 }
 
-# Rule 6: safety claims and NOAEL statements (case-insensitive, whole words).
+# Matching is whole-word and case-insensitive on normalized text (NFKC, no invisible characters,
+# any Unicode space is a space, any dash is a hyphen). Inside an expression a space or hyphen
+# matches any run of spaces and hyphens, or nothing, and the last word accepts a plural.
+# Rule 6: safety claims and NOAEL statements.
 SAFETY_EXPRESSIONS = (
     "safe",
     "safely",
@@ -31,29 +37,34 @@ SAFETY_EXPRESSIONS = (
     "well tolerated",
     "no concern",
     "no adverse effect",
-    "no adverse effects",
     "NOAEL",
     "no observed adverse effect level",
 )
 # Rule 7: study terms that must go in as references, and wording that is never used.
+# Every text value of an Observation in the ledger is also a study term (see _ledger_terms).
 STUDY_TERMS = (
     "PDS2014",
     "rat",
-    "rats",
     "Sprague-Dawley",
-    "Sprague Dawley",
     "oral gavage",
     "gavage",
 )
 WORDING_LIST = (
     "lost",
     "lose",
-    "loses",
     "losing",
     "weight loss",
     "loss of weight",
     "loss of body weight",
 )
+# Text values the code itself places on purpose as fixed vocabulary, so the model may write them.
+VOCABULARY_KEYS = frozenset({"status", "wording", "screen_rule"})
+# Ledger values shorter than this many letters (sex codes, group numbers) are not study terms:
+# one or two letters would block ordinary words; three keeps tissues such as EYE.
+MIN_TERM_LETTERS = 3
+# Stands for a placed value in the text the model wrote (no digit, letter or space).
+REF_MARK = "\ue000"
+SENTENCE_END = re.compile(r"""[.!?]+["')\]]*\s+\S""")
 
 DATA_QUALITY_LEAD = "Data quality note: the value of animal "
 DATA_QUALITY_TAIL = (
@@ -101,14 +112,52 @@ class Verdict:
         return sorted({failure.rule for failure in self.failures})
 
 
-def _pattern(expressions: tuple[str, ...]) -> re.Pattern[str]:
-    alternatives = "|".join(re.escape(e) for e in sorted(expressions, key=len, reverse=True))
-    return re.compile(rf"(?<![\w-])(?:{alternatives})(?![\w-])", re.IGNORECASE)
+def _normalize(text: str) -> str:
+    text = unicodedata.normalize("NFKC", text)
+    kept = (ch for ch in text if unicodedata.category(ch) != "Cf")
+    return "".join(
+        " " if ch.isspace() else "-" if unicodedata.category(ch) == "Pd" or ch == "\u2212" else ch
+        for ch in kept
+    )
+
+
+def _expression(expression: str) -> str:
+    words = [word for word in re.split(r"[\s-]+", expression) if word]
+    return r"[\s-]*".join(re.escape(word) for word in words) + "(?:e?s)?"
+
+
+def _pattern(expressions: Iterator[str] | tuple[str, ...]) -> re.Pattern[str]:
+    ordered = sorted(set(expressions), key=len, reverse=True)
+    alternatives = "|".join(_expression(e) for e in ordered)
+    return re.compile(rf"(?<!\w)(?:{alternatives})(?!\w)", re.IGNORECASE)
 
 
 SAFETY_PATTERN = _pattern(SAFETY_EXPRESSIONS)
-STUDY_TERM_PATTERN = _pattern(STUDY_TERMS)
 WORDING_PATTERN = _pattern(WORDING_LIST)
+
+
+def _text_values(value: Any, key: str = "") -> Iterator[tuple[str, str]]:
+    if isinstance(value, dict):
+        for name, item in value.items():
+            if name not in VOCABULARY_KEYS:
+                yield from _text_values(item, str(name))
+    elif isinstance(value, list):
+        for item in value:
+            yield from _text_values(item, key)
+    elif isinstance(value, str):
+        yield key, value
+
+
+def _ledger_terms(ledger: ObservationLedger) -> set[str]:
+    """Text values of the ledger's Observations (tissues, findings, labels...) as study terms."""
+    terms: set[str] = set()
+    for observation in ledger.observations:
+        for key, text in _text_values(observation.values):
+            candidates = [text] if key == "label" else [text, *text.split(",")]
+            terms.update(
+                c.strip() for c in candidates if sum(ch.isalpha() for ch in c) >= MIN_TERM_LETTERS
+            )
+    return terms
 
 
 def _refs(sentence: Sentence) -> list[ValueRef]:
@@ -116,7 +165,12 @@ def _refs(sentence: Sentence) -> list[ValueRef]:
 
 
 def _model_text(sentence: Sentence) -> str:
-    return " ".join(part.text for part in sentence.parts if isinstance(part, Text))
+    """What the model wrote, joined as the renderer joins it, with a mark where a value goes."""
+    return render_parts(sentence, lambda ref: REF_MARK)
+
+
+def _has_number(text: str) -> bool:
+    return any(unicodedata.category(ch).startswith("N") for ch in text)
 
 
 def _is_incidence_count(ref: ValueRef) -> bool:
@@ -124,9 +178,8 @@ def _is_incidence_count(ref: ValueRef) -> bool:
 
 
 def _has_denominator(ref: ValueRef, refs: list[ValueRef]) -> bool:
-    prefix = ref.field[: -len("affected")]
-    wanted = {f"{prefix}examined", "n_examined"}
-    return any(other.obs_id == ref.obs_id and other.field in wanted for other in refs)
+    wanted = f"{ref.field[: -len('affected')]}examined"
+    return any(other.obs_id == ref.obs_id and other.field == wanted for other in refs)
 
 
 def _cites_quarantine(ref: ValueRef, ledger: ObservationLedger) -> bool:
@@ -144,16 +197,21 @@ def verify(sentences: list[Sentence], ledger: ObservationLedger) -> Verdict:
         reason = RULE_REASONS[rule] + (f": {detail}" if detail else "")
         failures.append(Failure(rule, reason, index))
 
+    written = [_model_text(sentence) for sentence in sentences]
     for index, sentence in enumerate(sentences):  # rule 1
         if not _refs(sentence):
             fail(1, index)
+        elif SENTENCE_END.search(written[index]):
+            fail(1, index, "one Sentence must be one sentence, each with its own reference")
+    rendered: list[str] = []
     for index, sentence in enumerate(sentences):  # rule 2
         try:
-            render_sentence(sentence, ledger)
+            rendered.append(render_sentence(sentence, ledger))
         except UnresolvedRef as error:
+            rendered.append(written[index].replace(REF_MARK, ""))
             fail(2, index, str(error))
-    for index, sentence in enumerate(sentences):  # rule 3
-        if re.search(r"\d", _model_text(sentence)):
+    for index in range(len(sentences)):  # rule 3
+        if _has_number(written[index]):
             fail(3, index)
     for index, sentence in enumerate(sentences):  # rule 4
         refs = _refs(sentence)
@@ -167,16 +225,17 @@ def verify(sentences: list[Sentence], ledger: ObservationLedger) -> Verdict:
             note = data_quality_note(obs_id)
             if note not in sentences[index : index + 2]:
                 fail(5, index)
-    for index, sentence in enumerate(sentences):  # rule 6
-        match = SAFETY_PATTERN.search(_model_text(sentence))
+    for index in range(len(sentences)):  # rule 6, on the final rendered text
+        match = SAFETY_PATTERN.search(_normalize(rendered[index]))
         if match:
             fail(6, index, f'"{match.group(0)}"')
-    for index, sentence in enumerate(sentences):  # rule 7
-        match = STUDY_TERM_PATTERN.search(_model_text(sentence)) or WORDING_PATTERN.search(
-            _model_text(sentence)
+    study_pattern = _pattern((*STUDY_TERMS, *_ledger_terms(ledger)))
+    for index in range(len(sentences)):  # rule 7: study terms by hand, wording in the final text
+        match = study_pattern.search(_normalize(written[index])) or WORDING_PATTERN.search(
+            _normalize(rendered[index])
         )
         if match:
             fail(7, index, f'"{match.group(0)}"')
     if failures:
         return Verdict(failures=failures)
-    return Verdict(text=" ".join(render_sentence(s, ledger) for s in sentences))
+    return Verdict(text=render(sentences, ledger))

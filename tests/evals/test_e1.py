@@ -63,12 +63,12 @@ SCREEN_ROWS = [
     ("F", "GLAND, ADRENAL", "Vacuolization", [(0, 10), (2, 10), (7, 10), (10, 10)]),
     ("M", "GLAND, ADRENAL", "Vacuolization", [(1, 10), (1, 10), (1, 10), (9, 10)]),
     ("F", "GLAND, MAMMARY", "Atrophy fat", [(0, 10), (0, 10), (5, 10), (5, 10)]),
-    ("M", "KIDNEY", "Necrosis", [(0, 10), (None, 0), (0, 1), (3, 10)]),
+    ("M", "KIDNEY", "Necrosis", [(0, 10), (None, None), (0, 1), (3, 10)]),
     ("F", "LIVER", "Vacuolization", [(0, 10), (0, 10), (0, 10), (3, 10)]),
     ("M", "LIVER", "Vacuolization", [(0, 10), (0, 10), (0, 10), (3, 10)]),
     ("F", "LIVER", "Hypertrophy hepatocellular", [(0, 10), (0, 10), (0, 10), (3, 10)]),
-    ("M", "PANCREAS", "Inflammation", [(0, 10), (None, 0), (None, 0), (3, 10)]),
-    ("F", "SPLEEN", "Congestion", [(5, 10), (None, 0), (None, 0), (8, 10)]),
+    ("M", "PANCREAS", "Inflammation", [(0, 10), (None, None), (None, None), (3, 10)]),
+    ("F", "SPLEEN", "Congestion", [(5, 10), (None, None), (None, None), (8, 10)]),
 ]
 
 
@@ -78,7 +78,7 @@ def test_e1_screen_has_exactly_nine_rows() -> None:
 
 @pytest.mark.parametrize(("sex", "tissue", "finding", "counts"), SCREEN_ROWS)
 def test_e1_screen_row_counts(
-    sex: str, tissue: str, finding: str, counts: list[tuple[int | None, int]]
+    sex: str, tissue: str, finding: str, counts: list[tuple[int | None, int | None]]
 ) -> None:
     rows = [
         row

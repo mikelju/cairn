@@ -7,9 +7,10 @@ from cairn.observation import ANIMALS_SQL, NOT_EXAMINED, Observation, build_obse
 MIN_EXAMINED = 5
 MIN_EXCESS = 3
 SCREEN_RULE = (
-    "Screen: a finding enters, by sex, if in any dose group with "
+    "Screen: a finding enters, by sex, if in any dose group above zero with "
     f"{MIN_EXAMINED} or more examined animals at least {MIN_EXCESS} more are affected than in "
-    "control. It is a screen, not a statistical test nor a treatment-relatedness decision."
+    "control; it never enters when control has no examined animal. "
+    "It is a screen, not a statistical test nor a treatment-relatedness decision."
 )
 
 INCIDENCE_SQL = f"""WITH {ANIMALS_SQL},
@@ -51,11 +52,11 @@ WHERE NOT a.is_tk AND NOT a.is_recovery AND COALESCE(mi.MISTAT, '') <> 'NOT DONE
 
 def _passes(groups: list[dict[str, Any]]) -> bool:
     control = next(group for group in groups if group["dose"] == 0)
-    if control["examined"] == 0:
+    if not control["examined"]:
         return False
     return any(
         group["dose"] > 0
-        and group["examined"] >= MIN_EXAMINED
+        and (group["examined"] or 0) >= MIN_EXAMINED
         and group["affected"] - control["affected"] >= MIN_EXCESS
         for group in groups
     )
@@ -69,7 +70,7 @@ def incidence(screen: bool = True) -> Observation:
         examined = int(row["examined"])
         group = {
             "dose": float(row["dose"]),
-            "examined": examined,
+            "examined": examined if examined else None,
             "affected": int(row["affected"]) if examined else None,
             "status": "examined" if examined else NOT_EXAMINED,
         }
