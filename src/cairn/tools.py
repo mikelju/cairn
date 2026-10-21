@@ -6,6 +6,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from cairn.canonical import canonical_sha256
+from cairn.incidence import incidence
 from cairn.jobs import execute, inputs_hash
 from cairn.observation import Observation, build_observation, query
 
@@ -53,7 +54,11 @@ def study_design() -> Observation:
     )
 
 
-REGISTRY: dict[str, Callable[..., Any]] = {"run_job": run_job, "study_design": study_design}
+REGISTRY: dict[str, Callable[..., Any]] = {
+    "run_job": run_job,
+    "study_design": study_design,
+    "incidence": incidence,
+}
 
 
 def call_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:

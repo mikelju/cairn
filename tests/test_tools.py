@@ -78,8 +78,8 @@ def test_same_hash_over_mcp_rest_and_cli(
     assert over_mcp == over_rest == cli_hash(name, arguments) == direct
 
 
-def test_registry_has_exactly_the_two_tools() -> None:
-    assert sorted(REGISTRY) == ["run_job", "study_design"]
+def test_registry_has_exactly_the_registered_tools() -> None:
+    assert sorted(REGISTRY) == ["incidence", "run_job", "study_design"]
 
 
 def test_study_design_content() -> None:
