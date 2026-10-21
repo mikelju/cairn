@@ -14,3 +14,4 @@ docs/PRD_Cairn.pdf
 .coverage
 .mypy_cache/
 .ruff_cache/
+data/raw/

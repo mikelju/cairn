@@ -1,0 +1,51 @@
+{
+  "files": {
+    "bw.xpt": {
+      "bytes": 570000,
+      "domain": "BW",
+      "sha256": "9b4b7cd1018caa5136ed34eb420390a748c20a9363e125ce8e4d017fa9d34726"
+    },
+    "dm.xpt": {
+      "bytes": 16800,
+      "domain": "DM",
+      "sha256": "22030661b8204aec4d656fe51b2d86fad36f125c151ccb68f1c8b356537c1862"
+    },
+    "ds.xpt": {
+      "bytes": 13920,
+      "domain": "DS",
+      "sha256": "908a7dfdb1d5974c0a504abe9c85dde5bf5be0a119a3fa61ecb399e85a03af00"
+    },
+    "mi.xpt": {
+      "bytes": 814640,
+      "domain": "MI",
+      "sha256": "faa3c5d52ec7743519d047bd302e95ceabc914e612fdc60a69ff30ee83483462"
+    },
+    "pc.xpt": {
+      "bytes": 56320,
+      "domain": "PC",
+      "sha256": "84480a5963ec10d1421c204a1f105ed258382e745ee609a70fca6e1c35750b28"
+    },
+    "pp.xpt": {
+      "bytes": 28000,
+      "domain": "PP",
+      "sha256": "49849c3e84cf113e34374008dd5622293d3fe8a09a8635c8677f7b56e4d9aa14"
+    },
+    "ts.xpt": {
+      "bytes": 6160,
+      "domain": "TS",
+      "sha256": "f2415ef2c39ff39f92af8d69b25d1c05104d4b1dd775193205a00c6320a06499"
+    },
+    "tx.xpt": {
+      "bytes": 30880,
+      "domain": "TX",
+      "sha256": "e4e3638359e36605d24d59143cd3e4b4ed505f2e9580a9ef06811e3677b531b7"
+    }
+  },
+  "licence": "MIT, see data/pds2014/LICENSE.md",
+  "source": {
+    "base_url": "https://raw.githubusercontent.com/phuse-org/phuse-scripts",
+    "commit": "398a6d33ced9359ffb58c46650a6d488811176b1",
+    "path": "data/send/PDS/Xpt",
+    "study": "PDS2014"
+  }
+}

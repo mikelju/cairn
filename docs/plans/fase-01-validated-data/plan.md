@@ -8,8 +8,8 @@ Base: branch `fase-01-validated-data` from `inicio-cairn` (no remote yet)
 Each increment leaves the product working and covers specific criteria.
 This file is the durable state: a new session resumes from here and from Git.
 
-- [x] 1. Python skeleton: `pyproject.toml` with uv, Apache-2.0 licence, `src/cairn` package, ruff, strict mypy, pytest-cov at 85%, pre-commit and `npm run check` chaining them with the hook suite (C1) - evidence: `npm run check` green (ruff, mypy strict, pytest 1 passed at 100% coverage, hook suite all OK); commit in increment 1 log.
-- [ ] 2. Data fetch and manifest: script that fetches the 8 PDS2014 XPT files, pins their SHA-256 in a versioned manifest and computes the snapshot hash; canonical JSON helper (C2) - evidence:
+- [x] 1. Python skeleton: `pyproject.toml` with uv, Apache-2.0 licence, `src/cairn` package, ruff, strict mypy, pytest-cov at 85%, pre-commit and `npm run check` chaining them with the hook suite (C1) - evidence: `npm run check` green (ruff, mypy strict, pytest 1 passed at 100% coverage, hook suite all OK); commit e6d15cb.
+- [x] 2. Data fetch and manifest: script that fetches the 8 PDS2014 XPT files, pins their SHA-256 in a versioned manifest and computes the snapshot hash; canonical JSON helper (C2) - evidence: `uv run python -m cairn.fetch` pinned 8 files, refetch verified 0 new, snapshot hash `9b981329b14d5bab53d71737d5f2cac514055045307adc10156ba6d7d33b534c`; the 8 XPT files (1.5 MB) are vendored in `data/pds2014` with the MIT notice; `npm run check` green, 11 passed, 100% coverage; commit in the next increment's evidence.
 - [ ] 3. Ingestion and validation: `read_sas`, zero normalisation, pandera schemas, cross rules, quarantine table, read-only DuckDB and JSON report; E1 phase 01 assertions (C2, C3, C4, C5) - evidence:
 - [ ] 4. Jobs: `validate_study` as an in-process asyncio task behind `POST /jobs` and `GET /jobs/{id}` with the `Job` contract (C6) - evidence:
 - [ ] 5. Tool registry: `run_job` and `study_design` in one registry served by FastMCP at `/mcp`, FastAPI at `/api` and `/docs`, and the Typer CLI; same-hash test over the three surfaces (C7) - evidence:
