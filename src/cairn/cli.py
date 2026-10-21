@@ -1,0 +1,43 @@
+"""Command line: the same registry tools as MCP and REST."""
+
+import json
+from typing import Annotated, Any
+
+import typer
+import uvicorn
+
+from cairn.canonical import canonical_json
+from cairn.tools import call_tool, result_sha256
+
+app = typer.Typer(help="Cairn: traceable agentic demo for drug safety science.")
+
+
+def _emit(result: dict[str, Any], show_hash: bool) -> None:
+    if show_hash:
+        typer.echo(result_sha256(result))
+    else:
+        typer.echo(canonical_json(result).decode("utf-8"))
+
+
+@app.command("run-job")
+def run_job_command(
+    kind: str,
+    params: Annotated[str, typer.Option(help="JSON object with job parameters")] = "{}",
+    hash_only: Annotated[bool, typer.Option("--hash", help="Print only the result hash")] = False,
+) -> None:
+    """Run a job and print its result as canonical JSON."""
+    _emit(call_tool("run_job", {"kind": kind, "params": json.loads(params)}), hash_only)
+
+
+@app.command("study-design")
+def study_design_command(
+    hash_only: Annotated[bool, typer.Option("--hash", help="Print only the result hash")] = False,
+) -> None:
+    """Print the study design as canonical JSON."""
+    _emit(call_tool("study_design", {}), hash_only)
+
+
+@app.command()
+def serve(host: str = "127.0.0.1", port: int = 8000) -> None:  # pragma: no cover
+    """Serve the web app, REST API and MCP endpoint."""
+    uvicorn.run("cairn.app:create_app", factory=True, host=host, port=port)

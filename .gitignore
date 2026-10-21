@@ -11,3 +11,9 @@ __pycache__/
 .env.*
 !.env.example
 docs/PRD_Cairn.pdf
+docs/PRD_Cairn_demo_share.pdf
+.coverage
+.mypy_cache/
+.ruff_cache/
+data/raw/
+data/build/

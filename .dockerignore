@@ -1,0 +1,17 @@
+.git
+.github
+.claude
+.agents
+.lavish
+.runtime
+.venv
+.mypy_cache
+.pytest_cache
+.ruff_cache
+.coverage
+node_modules
+docs
+tests
+data/raw
+data/build
+**/__pycache__

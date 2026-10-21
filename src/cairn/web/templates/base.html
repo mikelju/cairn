@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cairn</title>
+<link rel="stylesheet" href="/static/cairn.css">
+<script src="/static/vendor/htmx.min.js"></script>
+</head>
+<body>
+<header>
+  <a class="brand" href="/">Cairn</a>
+  <nav class="steps" aria-label="Steps">
+    {% for name in steps %}
+      {% set n = loop.index %}
+      {% if n == 1 %}
+        <a href="/step/1"{% if current == 1 %} aria-current="step"{% endif %}>{{ n }} {{ name }}</a>
+      {% else %}
+        <span class="locked" aria-disabled="true">{{ n }} {{ name }}</span>
+      {% endif %}
+    {% endfor %}
+  </nav>
+  <span class="role">Role: {{ role }} (simulated)</span>
+</header>
+<main>{% block main %}{% endblock %}</main>
+<footer>
+  <span>Public sample data · fictional compound · not GxP-validated</span>
+  <span>v{{ footer.version }} · commit {{ footer.commit }} · snapshot {{ footer.snapshot[:12] }}</span>
+</footer>
+</body>
+</html>

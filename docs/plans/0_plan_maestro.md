@@ -20,7 +20,7 @@ It works if a person with no context finishes the 7-step web walkthrough in 5 mi
 ## Phases
 | Phase | One-sentence goal | Depends on | Status |
 |---|---|---|---|
-| 01 | Validated data and skeleton: Python repo with quality tooling and CI, SEND ingestion with quarantine, `validate_study`, MCP/REST/CLI registry, landing page and step 1, offline `make demo` and Lightsail deployment | - | spec approved |
+| 01 | Validated data and skeleton: Python repo with quality tooling and CI, SEND ingestion with quarantine, `validate_study`, MCP/REST/CLI registry, landing page and step 1, offline `make demo` and Lightsail deployment | - | ready locally |
 | 02 | Tools and an agent that writes no numbers: Observation, the four study tools, LLMGateway (replay, record, live), renderer, rules 1-7, full E1, E2, bad PR blocked and step 2 | 01 | pending |
 | 03 | RAG over public guidelines: 4 guidelines with pinned SHA-256, hybrid index with reranker, `search_guidance`, QuoteRef, rule 8, highlighted page, E3, E4, Explore with recorded questions and step 3 | 02 | pending |
 | 04 | People decide: `nonclinical-summary` workflow in LangGraph with two pauses, DecisionRef, decision form and model-free NOAEL rule, 403 and 409, E6 and steps 4 and 5 without judge | 03 | pending |

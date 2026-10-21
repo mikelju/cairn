@@ -1,36 +1,62 @@
 # Phase 01 - Validated data and skeleton: plan and results
 
-Status: pending spec approval
-Spec: `spec.md` (draft)
-Base: branch `fase-01-validated-data` from `main` once the start PR is merged
+Status: ready locally
+Spec: `spec.md` (approved, frozen)
+Base: branch `fase-01-validated-data` from `inicio-cairn` (no remote yet)
 
 ## Increments
 Each increment leaves the product working and covers specific criteria.
 This file is the durable state: a new session resumes from here and from Git.
 
-- [ ] 1. Python skeleton: `pyproject.toml` with uv, Apache-2.0 licence, `src/cairn` package, ruff, strict mypy, pytest-cov at 85%, pre-commit and `npm run check` chaining them with the hook suite (C1) - evidence:
-- [ ] 2. Data fetch and manifest: script that fetches the 8 PDS2014 XPT files, pins their SHA-256 in a versioned manifest and computes the snapshot hash; canonical JSON helper (C2) - evidence:
-- [ ] 3. Ingestion and validation: `read_sas`, zero normalisation, pandera schemas, cross rules, quarantine table, read-only DuckDB and JSON report; E1 phase 01 assertions (C2, C3, C4, C5) - evidence:
-- [ ] 4. Jobs: `validate_study` as an in-process asyncio task behind `POST /jobs` and `GET /jobs/{id}` with the `Job` contract (C6) - evidence:
-- [ ] 5. Tool registry: `run_job` and `study_design` in one registry served by FastMCP at `/mcp`, FastAPI at `/api` and `/docs`, and the Typer CLI; same-hash test over the three surfaces (C7) - evidence:
-- [ ] 6. Web: Jinja2, local HTMX and plain CSS; landing page, step bar, header, footer, badges, `/healthz` and step 1 with the "Inject a negative concentration" switch (C8, C9) - evidence:
-- [ ] 7. Word-cap test over the step templates, including a failing case (C10) - evidence:
-- [ ] 8. Docker multi-stage linux/amd64 image that builds DuckDB at build time; `make demo` with the network off (C11) - evidence:
-- [ ] 9. CI: GitHub Actions workflow with the required `evals` check, no network, no keys, no deploy (C13) - evidence:
-- [ ] 10. `make deploy` to Lightsail eu-west-1 with HTTPS and `/healthz` (C12); needs open decisions 2 and 3 - evidence:
-- [ ] 11. Brand grep and adversarial review before the PR (C14) - evidence:
+- [x] 1. Python skeleton: `pyproject.toml` with uv, Apache-2.0 licence, `src/cairn` package, ruff, strict mypy, pytest-cov at 85%, pre-commit and `npm run check` chaining them with the hook suite (C1) - evidence: `npm run check` green (ruff, mypy strict, pytest 1 passed at 100% coverage, hook suite all OK); commit e6d15cb.
+- [x] 2. Data fetch and manifest: script that fetches the 8 PDS2014 XPT files, pins their SHA-256 in a versioned manifest and computes the snapshot hash; canonical JSON helper (C2) - evidence: `uv run python -m cairn.fetch` pinned 8 files, refetch verified 0 new, snapshot hash `9b981329b14d5bab53d71737d5f2cac514055045307adc10156ba6d7d33b534c`; the 8 XPT files (1.5 MB) are vendored in `data/pds2014` with the MIT notice; `npm run check` green, 11 passed, 100% coverage; commit in the next increment's evidence.
+- [x] 3. Ingestion and validation: `read_sas`, zero normalisation, pandera schemas, cross rules, quarantine table, read-only DuckDB and JSON report; E1 phase 01 assertions (C2, C3, C4, C5) - evidence: `npm run check` green, 19 passed, 98.8% coverage; observed 12 negative AUC (AUCIFO 10 of 16, AUCTAU 2 of 36), 0 of 226 concentrations negative, DM.AGE mismatch 124 of 124, terminology malformed, death PDS2014-0119 day 3, naive mean 2820.67 (n=3) vs 15956 (n=2); commit 7a169fc.
+- [x] 4. Jobs: `validate_study` as an in-process asyncio task behind `POST /jobs` and `GET /jobs/{id}` with the `Job` contract (C6) - evidence: covered by `test_post_job_reaches_done_and_get_returns_report_with_inputs_hash` and the other tests of the Job contract in `tests/test_jobs.py`; on 2026-10-21 the live service answered `POST /jobs` with 202 and a Job.
+- [x] 5. Tool registry: `run_job` and `study_design` in one registry served by FastMCP at `/mcp`, FastAPI at `/api` and `/docs`, and the Typer CLI; same-hash test over the three surfaces (C7) - evidence: `npm run check` green (ruff, strict mypy, 29 tests, coverage 99.25%, hook suite); C7 test_same_hash_over_mcp_rest_and_cli passes with the official mcp Client against uvicorn on a free port; commit 2aacfc5
+- [x] 6. Web: Jinja2, local HTMX and plain CSS; landing page, step bar, header, footer, badges, `/healthz` and step 1 with the "Inject a negative concentration" switch (C8, C9) - evidence: `npm run check` green (34 tests, coverage 98.93%); tests cover routes, badges, disclaimer, step 1 with 12 quarantined and means 2,821 (n=3) and 15,956 (n=2) computed by code, the switch (13th row, rule pc_concentration_positive, DuckDB file bytes unchanged) and the no-literal grep on templates; HTMX 2.0.4 from unpkg, SHA-256 e209dda5c8235479f3166defc7750e1dbcd5a5c1808b7792fc2e6733768fb447, notice in `static/vendor/htmx.NOTICE.txt`; commit bdef72b. Browser walkthrough at 1440x900 pending (C9). Browser walkthrough at commit 98d9bc5, headless Edge 1440x900 (C8, C9): landing page and `/step/1` have scrollHeight 900 and scrollWidth 1440, so no scroll, even after running validation with the inject switch on (footer top 867px, last table bottom 468px); landing shows the REAL, RECORDED and SIMULATED badges and the footer "Public sample data · fictional compound · not GxP-validated"; step 1 shows "SIMULATED job runner: in process. In production → a queue with workers."; with the switch on the UI showed "13 quarantined, including the injected row." with rule pc_concentration_positive, PDS2014-0031, STDRG, -1.0, plus the 12 AUC rows, and naive mean 2,821 (n=3) versus 15,956 (n=2). Screenshots: `evidence/landing-1440x900.png` and `evidence/step1-1440x900.png`. Limitation, open review point: the C8 "DuckDB file untouched" test hashes a temporary file because the app does not open DuckDB at all, so it shows the switch writes nothing to a file it is given, not that the app's real DuckDB file is protected.
+- [x] 7. Word-cap test over the step templates, including a failing case (C10) - evidence: `npm run check` green (38 tests, coverage 98.93%); step 1 has 66 visible words against a cap of 93 per step (about 650 for 7) and one sentence of at most 25 words; `test_cap_fails_on_an_over_cap_sample` proves the failure; commit 772f3a2.
+- [x] 8. Docker multi-stage linux/amd64 image that builds DuckDB at build time; `make demo` with the network off (C11) - evidence: written in commit 212adbe, NOT yet verified: Dockerfile (python:3.12-slim, uv 0.10.9, `uv sync --frozen --no-dev` then `python -m cairn.ingest` builds the DuckDB file from the vendored XPT snapshot, runtime stage as non-root user running uvicorn `cairn.app:create_app --factory` on 8000), `.dockerignore` and a Makefile with `build`, `demo` (publishes 127.0.0.1:8000, the app makes no outbound calls) and `demo-offline-check` (`--network none`, fetches `/`, `/step/1` and `/healthz` from inside the container, because Docker cannot publish ports with no network). The `cryptography<=46.0.3` constraint is already resolved in uv.lock and the lock lists manylinux x86_64 wheels for 46.0.3 (6 matches), so it should not break linux/amd64. Verified on 2026-10-21 at 8163584 on the Windows ARM64 laptop (Docker 28.4.0, GNU Make 4.4.1): the amd64 build fails there with `exec format error` because the engine has no amd64 emulation, so commit 8163584 drops the constant `FROM --platform` and adds `PLATFORM ?= linux/amd64` to the Makefile. `make demo-offline-check PLATFORM=linux/arm64` built the image and, with `--network none`, returned 200 for `/`, `/step/1` and `/healthz`. `make demo PLATFORM=linux/arm64` served 127.0.0.1:8000; in the browser step 1 ran validation and showed "12 quarantined." and the naive mean 2,821 (n=3) versus 15,956 (n=2); `/healthz` returned 200. Not done: walking through with the host Wi-Fi off (the in-container `--network none` check stands in for it), and an amd64 build, which is still open for increment 10. On 2026-10-21, with amd64 emulation, `make demo-offline-check` (default PLATFORM linux/amd64) failed because the fixed 5 s sleep was shorter than the 24 s emulated start-up; commit e07cb42 waits for the port for up to 120 s and the amd64 run then returned 200 for `/`, `/step/1` and `/healthz`.
+- [ ] 9. CI: GitHub Actions workflow with the required `evals` check, no network, no keys, no deploy (C13) - evidence: written in commit 410ea27, NOT yet verified on GitHub: `.github/workflows/ci.yml` with one job named `evals` on push and pull_request, `permissions: contents read`, no secrets, no deploy, actions pinned to checkout v4.2.2 and setup-uv v6.8.0 with uv 0.10.9; steps `uv sync --frozen`, ruff check, ruff format --check, mypy, pytest (coverage gate 85% comes from pyproject addopts). The Node hook suite (`node .claude/hooks/test-hooks.mjs`) and `npm ls` are left out: the hooks are Windows-local guardrails for the agent session, not product code, and the suite has not been shown to run on ubuntu. Only network use is dependency install. Checked: the YAML parses with PyYAML and has the single job `evals`. First run on GitHub: run 39548747297 on push of `fase-01-validated-data` at 4d03531, job `evals` green in 37 s. Annotations to follow up: Node.js 20 deprecation for both pinned actions, and the ubuntu-latest move to Ubuntu 26. The branch rule on `main` requiring `evals` was set by the user and confirmed with `gh api` on 2026-10-21. Pending: the green check on the phase PR; this increment closes with the green `evals` check on the PR.
+- [x] 10. `make deploy` to Lightsail eu-west-1 with HTTPS and `/healthz` (C12); needs open decisions 2 and 3 - evidence: Makefile target `deploy` (variables SERVICE, REGION, POWER) creates the container service only if missing, builds the amd64 image, pushes it with `aws lightsail push-container-image` and creates a deployment with port 8000 and health check `/healthz`; `MSYS_NO_PATHCONV=1` stops Git Bash from rewriting `/healthz` into a Windows path. Laptop setup on 2026-10-21: amd64 emulation with `docker run --privileged --rm tonistiigi/binfmt:qemu-v8.1.5 --install amd64` (the default qemu v10.2.3 segfaults on `import duckdb` during the build; the registration may need repeating after a Docker Desktop restart), lightsailctl v1.0.8 from the official AWS download, AWS CLI v2 as IAM user `cairn-deploy`. The first create-container-service call failed with the service limit while the new AWS account was still being verified, and succeeded once it was. Verified on 2026-10-21: service `cairn`, medium, scale 1, eu-west-1; `make deploy` ran end to end in 9 s with a cached build; the deployment reached RUNNING / ACTIVE with image `:cairn.app.1`; over HTTPS at https://cairn.v2m8ts8nv4tzc.eu-west-1.cs.amazonlightsail.com `/`, `/step/1` and `/healthz` returned 200 and `POST /step/1/run` returned `<strong>12</strong> quarantined`. Open: `deploy` does not wait for RUNNING, it prints the state right after submitting. Review found the live footer said "commit unknown"; commit 7d2fb7d bakes the commit into the image (`ARG COMMIT` / `CAIRN_COMMIT`, test `test_footer_uses_baked_commit`). Redeployed as image `:cairn.app.2`, RUNNING / ACTIVE; the live footer shows `commit 7d2fb7d`, `/`, `/step/1` and `/healthz` returned 200 and `POST /step/1/run` shows 12 quarantined.
+- [x] 11. Brand grep and adversarial review before the PR (C14) - evidence: brand grep of 14 PRD company, person and place terms over all tracked files, the `main...HEAD` diff and the commit messages, 0 hits (binary XPT and PNG files not searched); independent adversarial review with sdd-review on 2026-10-21 at 29cbb54, findings in the table below.
 
 ## Deviations
 | ID | Summary | Affects criteria | Status |
 |---|---|---|---|
+| none | None beyond the decisions recorded in the spec: the Bedrock smoke test and ADR-001 moved to phase 02 by user decision on 2026-10-21 (spec decision 1). | - | - |
+| D1 | The Docker platform became the Makefile variable `PLATFORM` (default linux/amd64) because the ARM64 laptop cannot run amd64 without emulation. | C11, C12 | applied |
 
 ## Adversarial review
 | Round | Backend | Range | Lenses | Findings | Status |
 |---|---|---|---|---|---|
+| 1 | sdd-review, independent | main...29cbb54 | correctness, criteria, security, plan hygiene | Footer showed "commit unknown" on the live service | fixed in 7d2fb7d |
+| 1 | same | same | same | C8 proof is weak: the hash test covers a temp file, not the app's DuckDB file | recorded in Results |
+| 1 | same | same | same | Plan hygiene gaps (empty evidence, corrupted text, empty sections) | fixed in this plan |
+| 1 | same | same | same | Public unauthenticated `POST /jobs` with unbounded in-memory jobs | logged as SEC-001 in `docs/security.md`, deferred to phase 06 |
+| 1 | same | same | same | Blocking file reads in an async handler on the inject path | minor, deferred |
+| 1 | same | same | same | `make deploy` does not wait for RUNNING | minor, open |
+| 1 | same | same | same | qemu v8.1.5 note | moved into the Makefile |
+| 1 | same | same | same | CI action Node 20 deprecation and ubuntu-latest move | warning, open |
+| 1 | same | same | same | `/favicon.ico` returns 404 | cosmetic, open |
 
 ## Results
 Per criterion: command or walkthrough run, observed result and reference to the evidence.
 Pending items, limitations and what could not be checked, stated plainly.
+
+- C1 met: `npm run check` green (ruff, format, mypy, 39 tests, coverage about 99%). Not re-run from a fresh clone; CI runs the Python part on a fresh checkout.
+- C2 met: ingestion and manifest tests (increments 2 and 3), same snapshot hash twice.
+- C3 met: E1 phase 01 assertions with exact equality (increment 3).
+- C4 met: quarantine tests, rows absent from domain tables, present in quarantine with the rule and unchanged values.
+- C5 met: naive mean 2,821 (n=3) versus 15,956 (n=2) computed by code, plus the no-literal grep test on templates.
+- C6 met: `tests/test_jobs.py`, plus the live `POST /jobs` answering 202 with a Job.
+- C7 met: `test_same_hash_over_mcp_rest_and_cli`.
+- C8 met on the XPT path that the app uses: the switch revalidates in memory and shows rule `pc_concentration_positive` and the 13 rows. The app never opens the DuckDB file, so the hash test over a temporary file only shows that the inject path writes nothing to a file it is given; it does not prove the app's own DuckDB file is protected.
+- C9 met: screenshots at 1440x900 in `evidence/`, footer with version, commit and snapshot; the live footer was fixed in 7d2fb7d.
+- C10 met: word-cap test with a failing case, 66 words in step 1 against a cap of 93.
+- C11 met with `--network none` inside the container on amd64 and arm64. Not walked through with the host Wi-Fi off.
+- C12 met: https://cairn.v2m8ts8nv4tzc.eu-west-1.cs.amazonlightsail.com serves `/`, `/step/1` and `/healthz` with 200.
+- C13 pending until the phase PR shows the `evals` check green. The branch rule on `main` requires `evals`; push run 39548747297 is green; the workflow has no deploy and read-only permissions.
+- C14 met: brand grep with 0 hits (binary XPT and PNG files not searched).
 
 ## Candidate learnings
 Only reusable lessons with a verbatim quote from the session; consolidated when the phase closes.

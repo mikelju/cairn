@@ -1,0 +1,62 @@
+[project]
+name = "cairn"
+version = "0.1.0"
+description = "Traceable agentic demo for drug safety science: from a public SEND study to a draft nonclinical summary."
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "duckdb>=1.5.6",
+    "fastapi>=0.156.4",
+    "fastmcp>=4.1.3",
+    "jinja2>=3.1.6",
+    "mcp>=2.3.0",
+    "pandas>=3.0.6",
+    "pandera>=0.34.1",
+    "typer>=0.27.3",
+    "uvicorn>=0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "mypy>=2.4.0",
+    "pandas-stubs>=3.0.5.260914",
+    "pre-commit>=4.7.0",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.17.1",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cairn"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--cov=cairn --cov-report=term-missing --cov-fail-under=85"
+
+[tool.coverage.run]
+source = ["cairn"]
+branch = false
+
+[tool.uv]
+# Cryptography after 46.0.3 has no win-arm64 wheel; the development laptop is Windows on ARM.
+constraint-dependencies = ["cryptography<=46.0.3"]
