@@ -4,9 +4,11 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
+from fastmcp import FastMCP
 from pydantic import BaseModel, Field
 
 from cairn.jobs import Job, JobRunner
+from cairn.tools import REGISTRY, call_tool
 
 
 class JobRequest(BaseModel):
@@ -15,10 +17,16 @@ class JobRequest(BaseModel):
 
 
 def create_app() -> FastAPI:
+    mcp = FastMCP("Cairn")
+    for tool in REGISTRY.values():
+        mcp.tool(tool)
+    mcp_app = mcp.http_app(path="/mcp")
+
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> Any:
         app.state.runner = JobRunner()
-        yield
+        async with mcp_app.lifespan(app):
+            yield
 
     app = FastAPI(title="Cairn", lifespan=lifespan)
 
@@ -37,4 +45,13 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404, detail="job not found")
         return job
 
+    @app.post("/api/tools/run_job")
+    async def api_run_job(request: JobRequest) -> dict[str, Any]:
+        return call_tool("run_job", request.model_dump())
+
+    @app.post("/api/tools/study_design")
+    async def api_study_design() -> dict[str, Any]:
+        return call_tool("study_design", {})
+
+    app.mount("/", mcp_app)
     return app
