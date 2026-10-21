@@ -1,0 +1,3 @@
+htmx 2.0.4 (htmx.min.js), vendored unmodified from https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js
+SHA-256 of htmx.min.js: e209dda5c8235479f3166defc7750e1dbcd5a5c1808b7792fc2e6733768fb447
+Licence: Zero-Clause BSD (0BSD), https://github.com/bigskysoftware/htmx/blob/master/LICENSE

@@ -1,0 +1,16 @@
+<p><strong>{{ r.total }}</strong> quarantined{% if r.injected %}, including the injected row{% endif %}.</p>
+{% if r.fired %}
+<table>
+  <tr><th>Rule</th><th>Animal</th><th>Test</th><th>Value</th></tr>
+  {% for f in r.fired %}
+  <tr class="new"><td>{{ f.rule }}</td><td>{{ f.usubjid }}</td><td>{{ f.test }}</td><td>{{ f.value }}</td></tr>
+  {% endfor %}
+</table>
+{% endif %}
+<table>
+  <tr><th>Rule</th><th>Animal</th><th>Test</th><th>Day</th><th>Value</th></tr>
+  {% for q in r.rows %}
+  <tr><td>{{ q.rule }}</td><td>{{ q.usubjid }}</td><td>{{ q.test }}</td><td>{{ q.visit_day|int }}</td><td>{{ q.value }}</td></tr>
+  {% endfor %}
+</table>
+<p>Naive mean AUCtau, males 20 mg/kg/day, day 1: {{ r.with_bad }} with the bad value (n={{ r.n_with }}), {{ r.without_bad }} without it (n={{ r.n_without }}).</p>

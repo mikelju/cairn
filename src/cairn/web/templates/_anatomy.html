@@ -1,0 +1,8 @@
+{% macro badge(kind) %}<span class="badge {{ kind|lower }}">{{ kind }}</span>{% endmacro %}
+{% macro step(number, title, kind, sentence) %}
+<section class="step">
+  <h1><span class="num">{{ number }}</span> {{ title }} {{ badge(kind) }}</h1>
+  <p class="lede">{{ sentence }}</p>
+  {{ caller() }}
+</section>
+{% endmacro %}

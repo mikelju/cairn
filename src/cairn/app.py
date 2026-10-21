@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from cairn.jobs import Job, JobRunner
 from cairn.tools import REGISTRY, call_tool
+from cairn.web import mount_web
 
 
 class JobRequest(BaseModel):
@@ -53,5 +54,6 @@ def create_app() -> FastAPI:
     async def api_study_design() -> dict[str, Any]:
         return call_tool("study_design", {})
 
+    mount_web(app)
     app.mount("/", mcp_app)
     return app
