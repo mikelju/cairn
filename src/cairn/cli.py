@@ -37,6 +37,36 @@ def study_design_command(
     _emit(call_tool("study_design", {}), hash_only)
 
 
+@app.command("incidence")
+def incidence_command(
+    full: Annotated[bool, typer.Option("--full", help="All findings, not only the screen")] = False,
+    hash_only: Annotated[bool, typer.Option("--hash", help="Print only the result hash")] = False,
+) -> None:
+    """Print histopathology incidence as canonical JSON."""
+    _emit(call_tool("incidence", {"screen": not full}), hash_only)
+
+
+@app.command("body-weight-change")
+def body_weight_change_command(
+    sex: str = "F",
+    population: str = "main_and_recovery",
+    hash_only: Annotated[bool, typer.Option("--hash", help="Print only the result hash")] = False,
+) -> None:
+    """Print the body weight change by dose group as canonical JSON."""
+    _emit(call_tool("body_weight_change", {"sex": sex, "population": population}), hash_only)
+
+
+@app.command("tk-summary")
+def tk_summary_command(
+    sex: str = "M",
+    dose: float = 20.0,
+    day: float = 1.0,
+    hash_only: Annotated[bool, typer.Option("--hash", help="Print only the result hash")] = False,
+) -> None:
+    """Print the toxicokinetic AUCtau summary as canonical JSON."""
+    _emit(call_tool("tk_summary", {"sex": sex, "dose": dose, "day": day}), hash_only)
+
+
 @app.command()
 def serve(host: str = "127.0.0.1", port: int = 8000) -> None:  # pragma: no cover
     """Serve the web app, REST API and MCP endpoint."""

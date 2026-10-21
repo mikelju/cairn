@@ -46,13 +46,14 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404, detail="job not found")
         return job
 
-    @app.post("/api/tools/run_job")
-    async def api_run_job(request: JobRequest) -> dict[str, Any]:
-        return call_tool("run_job", request.model_dump())
-
-    @app.post("/api/tools/study_design")
-    async def api_study_design() -> dict[str, Any]:
-        return call_tool("study_design", {})
+    @app.post("/api/tools/{name}")
+    async def api_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        if name not in REGISTRY:
+            raise HTTPException(status_code=404, detail="unknown tool")
+        try:
+            return call_tool(name, arguments)
+        except TypeError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
 
     mount_web(app)
     app.mount("/", mcp_app)
