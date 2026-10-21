@@ -15,3 +15,4 @@ docs/PRD_Cairn.pdf
 .mypy_cache/
 .ruff_cache/
 data/raw/
+data/build/
