@@ -10,3 +10,4 @@ __pycache__/
 .env
 .env.*
 !.env.example
+docs/PRD_Cairn.pdf
