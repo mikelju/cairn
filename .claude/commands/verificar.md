@@ -1,1 +1,1 @@
-Lee `.agents/skills/sdd-delivery/SKILL.md` y verifica en modo verificación, con revisión adversarial y sin corregir ni publicar: $ARGUMENTS.
+Lee `.agents/skills/sdd-delivery/SKILL.md` y, como supervisor, verifica en modo verificación con revisores y un explorador, sin corregir ni publicar: $ARGUMENTS.

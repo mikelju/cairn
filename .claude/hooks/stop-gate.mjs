@@ -1,4 +1,4 @@
-// Puerta de calidad en Stop: el agente no da por terminado un turno con las
+// Puerta de calidad en Stop y SubagentStop: el agente no da por terminado un turno con las
 // comprobaciones del proyecto en rojo. Pasa de "parece hecho" a "comprobado".
 //
 // Contrato (docs oficiales de hooks): en Stop, salir con 2 impide parar y entrega
@@ -23,7 +23,10 @@ function salirConError(texto) {
 const entrada = await leerEntrada().catch(() => ({}));
 if (entrada.stop_hook_active) process.exit(0);
 
-const raiz = process.env.CLAUDE_PROJECT_DIR || entrada.cwd || process.cwd();
+// En SubagentStop manda el cwd del subagente: el ejecutor puede trabajar en un worktree.
+const raiz = entrada.hook_event_name === "SubagentStop"
+  ? entrada.cwd || process.env.CLAUDE_PROJECT_DIR || process.cwd()
+  : process.env.CLAUDE_PROJECT_DIR || entrada.cwd || process.cwd();
 
 // Precedencia: configuracion del aporte > `.sdd-lite.json` del proyecto > `check` de package.json.
 // En modo aporte nunca se cae a package.json: seria el del repo ajeno.
