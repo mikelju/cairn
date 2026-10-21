@@ -1,7 +1,7 @@
 # Phase 01 - Validated data and skeleton: specification
 
-Status: draft
-Approved by the user: pending
+Status: approved (frozen)
+Approved by the user: 2026-10-21
 Master plan: `../0_plan_maestro.md`
 
 ## Objective
@@ -54,14 +54,14 @@ Frozen on approval. Changing them requires a deviation approved by the user.
 ## Constraints and risks
 - Data source: the PRD names the PhUSE SEND sample datasets (MIT licence) but no URL or checksums; the XPT files are pinned by SHA-256 in the repo the first time they are fetched.
 - If the published PDS2014 files differ from the PRD's expected facts, C3 and C5 cannot pass as written and a deviation is needed.
-- Lightsail medium (1 vCPU, 4 GB) has a monthly cost on the user's AWS account.
+- Lightsail container service, medium power (1 vCPU, 2 GB RAM), one node: about 40 USD per month on the user's AWS account, billed hourly, with 500 GB of transfer included.
 - `make deploy` needs the user's local AWS credentials; CI never holds them.
 - If the AWS skeleton fails persistently, the PRD's fallback is to drop AWS hosting; that would change C12 and needs a deviation.
 - New dependencies, all Apache-2.0 compatible: duckdb, pandas, pandera, pyreadstat or pandas `read_sas`, fastapi, uvicorn, jinja2, fastmcp, mcp, typer, pydantic, plus dev tools.
 
-## Open decisions
-Questions the user must resolve before approval.
-1. Bedrock: the PRD puts the first-use form, the first call to each profile and the smoke test with ADR-001 on day 1. Proposal: you submit the form now because it has lead time, and the smoke test with ADR-001 moves to phase 02, where the first model call lives. Agree?
-2. Public repo: you create the public GitHub repo, add it as `origin` and set the branch rule that requires `evals`, or you authorize me to do it with `gh`. Which one?
-3. Lightsail: do you authorize creating the medium container service in eu-west-1, with its monthly cost, using your local AWS credentials?
-4. Coverage threshold: 85% on `src/cairn` (the PRD gives none). Agree?
+## Decisions
+Resolved by the user on 2026-10-21.
+1. Bedrock: the user submits the first-use form now; the first call to each profile, the smoke test and ADR-001 move to phase 02.
+2. Public repo: the agent creates the public GitHub repo `cairn` with `gh` on the user's account, adds it as `origin` and sets the branch rule that requires `evals` once the workflow exists.
+3. Lightsail: authorized to create the medium container service in eu-west-1 with the user's local AWS credentials.
+4. Coverage threshold: 85% of lines in `src/cairn`.
