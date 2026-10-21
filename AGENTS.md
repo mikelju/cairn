@@ -33,6 +33,7 @@ Work follows SDD Lite: master plan, phases with frozen criteria, delegated and s
 - Plain hyphens; in long Markdown, one sentence per line; Python output without special symbols.
 - One source per decision; reusable learnings go to the most specific file.
 - Everything versioned is written in English; talk to the user in Spanish.
+  Records use English headings, translated from the Spanish templates in `docs/templates/`: `Status:`, `## Briefs` and `## User decisions`, with English status values (`in progress`, `ready locally`, `integrated`, `done`, `open`); the session-start hook reads both languages.
 - This file has a 5,000-token cap and is not edited mid-session; a new rule needs evidence and, if it does not fit, another one goes.
 
 ## Ask first

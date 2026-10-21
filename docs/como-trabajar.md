@@ -1,119 +1,123 @@
-# Cómo trabajar con SDD Lite
+# How to work with SDD Lite
 
-Guía de uso del marco de trabajo, para la persona que dirige el proyecto.
-El README describe el producto; este archivo describe cómo se trabaja con el agente, y es igual en todos los proyectos.
+Guide to the working method, for the person who leads the project.
+The README describes the product; this file describes how to work with the agents, and it is the same in every project.
 
-## Reparto de papeles
+## Division of roles
 
-Tú decides qué se construye y con qué criterios; el agente decide cómo y lo demuestra con evidencia.
-Apruebas en tres momentos: el plan maestro, la spec de cada fase y la PR.
-Entre medias, el agente trabaja solo.
+You decide what gets built and against which criteria.
+You talk to a single agent, the supervisor: it does not write code, it briefs other agents, judges their evidence and brings you results and decisions.
+- `ejecutor`: implements, fixes, drafts specs and plans and delivers the branch or the PR.
+- `explorador`: investigates and reproduces failures without touching anything.
+- `revisor`: looks for how the work fails, without fixing it.
+You never talk to them or hand out work to them.
+You approve at three points: the master plan, each phase's spec and the PR.
+In between, the supervisor and its agents work on their own and only interrupt you for decisions that are yours.
 
-## Crear un proyecto
+## Starting a session
 
-1. Crea una carpeta vacía y ábrela en VS Code.
-2. Escribe `/nuevo-proyecto` en Claude Code (se instala una vez con `node "<ruta a SDD-lite>/scripts/instalar-comandos.mjs"`).
-   Es un comando de usuario (`~/.claude/commands/nuevo-proyecto.md`) que ejecuta `scripts/crear-proyecto.mjs` de la plantilla.
-   Hace `git init` en `main`, copia la plantilla, instala las herramientas auxiliares, pasa las comprobaciones y hace el primer commit.
-   Sin el comando, desde la carpeta: `node "C:\Python Projects\PEIA\SDD-lite\scripts\crear-proyecto.mjs"`.
-3. Abre una sesión nueva, para que cargue las reglas y los hooks del proyecto, y escribe `/iniciar <de qué va el proyecto>`.
-4. Opcional: crea el remoto con `gh repo create <usuario>/<proyecto> --private --source . --push` para recibir las entregas como PR.
+Cairn is already set up: open the repository root in VS Code and start a new Claude Code session.
+On start, the supervisor receives the bearing: branch, open work, unclosed briefs and decisions it owes you.
+Deliveries arrive as PRs to `main` on the `origin` remote.
 
-## Los cuatro comandos
+## The four commands
 
-| Comando | Cuándo | Qué obtienes |
+| Command | When | What you get |
 |---|---|---|
-| `/iniciar <idea>` | Una vez, al empezar | Plan maestro con las fases, para aprobar |
-| `/planear <qué>` | Antes de cada fase o de un cambio suelto | Spec de fase o documento de cambio, para aprobar |
-| `/ejecutar <qué>` | Con la spec aprobada | Implementación, revisión adversarial y PR |
-| `/verificar <qué>` | Cuando quieras una segunda opinión | Solo hallazgos: no corrige ni publica |
+| `/iniciar <idea>` | Once, at the start | Master plan with the phases, to approve |
+| `/planear <what>` | Before each phase or a standalone change | Phase spec or change document, to approve |
+| `/ejecutar <what>` | With the spec approved | Implementation, adversarial review and PR |
+| `/verificar <what>` | When you want a second opinion | Findings only: it neither fixes nor publishes |
 
-Las skills de `.agents/skills/` no se llaman a mano: cada comando carga las que necesita.
-Los comandos son atajos; pedirlo en lenguaje natural funciona igual.
+The skills in `.agents/skills/` are not called by hand: each command loads the ones it needs.
+The commands are shortcuts; asking in natural language works the same.
 
-## El ciclo de una fase
+## The cycle of a phase
 
-1. `/planear fase 01`: el agente escribe `docs/plans/fase-01-nombre/spec.md` con criterios de aceptación y dudas abiertas.
-   Respondes las dudas y dices "spec aprobada"; desde ese momento los criterios quedan congelados.
-2. `/ejecutar fase 01`: crea la rama, implementa por incrementos, pasa las comprobaciones, se somete a revisión adversarial,
-   corrige lo confirmado y abre la PR a `main` con la evidencia por criterio.
-   Solo te interrumpe si hay una desviación, un coste nuevo o una decisión tuya.
-3. Revisas la PR en GitHub.
-   Si hay que cambiar algo, díselo en el chat ("en la PR, el criterio C3 no me convence porque...") y actualiza la PR.
-4. Fusionas tú; el agente no puede fusionar ni aprobar.
-   Después, en local: `git switch main` y `git pull`.
-5. Al cerrar la fase propone como máximo cinco aprendizajes para sus reglas; aceptas o descartas.
-6. Siguiente fase: `/planear fase 02`.
+1. `/planear fase 01`: the supervisor briefs `docs/plans/fase-01-name/spec.md` with acceptance criteria and open questions.
+   You answer the questions and say "spec approved"; from then on the criteria are frozen.
+2. `/ejecutar fase 01`: the supervisor creates the branch and briefs the increments; the agents implement, pass the checks,
+   go through adversarial review, fix what is confirmed and open the PR to `main` with evidence per criterion.
+   It only interrupts you for a deviation, a new cost or a decision of yours.
+3. You review the PR on GitHub.
+   If something must change, say so in the chat ("in the PR, criterion C3 does not convince me because...") and it updates the PR.
+4. You merge; no agent can merge or approve.
+   Then, locally: `git switch main` and `git pull`.
+5. When the phase closes it proposes at most five learnings for its rules; you accept or discard them.
+6. Next phase: `/planear fase 02`.
 
-## Situaciones habituales
+## Common situations
 
-- Bug o ajuste pequeño: `/planear arreglar X` y después `/ejecutar cambio NNN`; si es trivial, basta con "arregla X".
-- Retomar otro día: "continúa la fase 02" en una sesión nueva; el estado está en `plan.md` y en Git, no en la conversación.
-- Cambiar un criterio ya aprobado: el agente abre una desviación en la carpeta de la fase y te la propone; no lo cambia solo.
-- Revisar algo sin tocarlo: `/verificar fase 02` o `/verificar rama X`.
-- Auditoría de seguridad, por ejemplo antes de publicar o desplegar: `/verificar seguridad completo`.
-  Da hallazgos por gravedad y no toca nada; los alcances posibles están en `.agents/skills/sdd-delivery/SKILL.md`.
+- Small bug or tweak: `/planear fix X` and then `/ejecutar cambio NNN`; if it is trivial, "fix X" is enough.
+- Resuming another day: "continue phase 02" in a new session; the state lives in `plan.md` and in Git, not in the conversation.
+  On start the supervisor receives the bearing: open work, unclosed briefs and decisions it owes you.
+- Seeing what is going on: ask "how is it going?"; briefs and decisions are in the tables of their plan or change.
+- Changing an approved criterion: the supervisor opens a deviation in the phase folder and proposes it to you; it does not change it alone.
+- Reviewing something without touching it: `/verificar fase 02` or `/verificar rama X`.
+- Security audit, for example before publishing or deploying: `/verificar seguridad completo`.
+  It gives findings by severity and touches nothing; the possible scopes are in `.agents/skills/sdd-delivery/SKILL.md`.
 
-## Adoptar SDD Lite en un repositorio propio ya empezado
+## Adopting SDD Lite in an existing repository of your own
 
-Para seguir con el marco completo un proyecto tuyo que empezó sin él, por ejemplo con el SDD-WAT antiguo.
-Al contrario que el modo aporte, el marco se queda en el repo, versionado.
+To continue with the full method in a project of yours that started without it, for example with the old SDD-WAT.
+Unlike contribution mode, the method stays in the repo, versioned.
 
-1. Con el árbol limpio, abre la raíz del repo y escribe `/sdd-adoptar`.
-   Crea la rama `adoptar-sdd-lite`, copia lo que no choca y fusiona `.claude/settings.json` y `.gitignore`.
-   Crea `.sdd-lite.json`, con el comando de comprobación, el de formato y la rama por defecto.
-2. El agente reconoce el repo y fusiona tu `CLAUDE.md` en `AGENTS.md`, conservando lo propio del proyecto.
-   También sustituye el flujo antiguo: retira los comandos de proceso y conserva las skills de dominio, `workflows/` y `tools/`.
-   Y escribe un plan maestro que empieza con la fase 00, "estado heredado".
-3. Te propone con qué comando comprobar y formatear, y todo llega como una PR con la tabla de qué se retira y adónde va cada cosa.
-4. Tras fusionar, en una sesión nueva: `/planear fase 01` y el ciclo normal.
+1. With a clean tree, open the repo root and type `/sdd-adoptar`.
+   It creates the `adoptar-sdd-lite` branch, copies what does not clash and merges `.claude/settings.json` and `.gitignore`.
+   It creates `.sdd-lite.json`, with the check command, the format command and the default branch.
+2. The agent surveys the repo and merges your `CLAUDE.md` into `AGENTS.md`, keeping what is specific to the project.
+   It also replaces the old flow: it retires the process commands and keeps the domain skills, `workflows/` and `tools/`.
+   And it writes a master plan that starts with phase 00, "inherited state".
+3. It proposes the check and format commands, and everything arrives as a PR with a table of what is retired and where each thing goes.
+4. After merging, in a new session: `/planear fase 01` and the normal cycle.
 
-## Contribuir a un repositorio existente (modo aporte)
+## Contributing to an existing repository (contribution mode)
 
-Para trabajar con este método en un repo que no se creó con SDD Lite, como un fork o un proyecto ya empezado, en cualquier lenguaje.
-No se copia nada al repo: las skills y los hooks se ejecutan desde la plantilla, y al salir el repo queda como estaba.
+To work with this method in a repo that was not created with SDD Lite, such as a fork or a project already under way, in any language.
+Nothing is copied into the repo: the skills and hooks run from the template, and on exit the repo is left as it was.
 
-1. Abre en VS Code la raíz del repo (no una subcarpeta) y escribe `/sdd-entrar`.
-   Activa los hooks y crea tres cosas locales que Git no ve: `.sdd/`, `CLAUDE.local.md` y `.claude/settings.local.json`.
-   Su configuración y la foto del estado previo van dentro de `.git/`, donde ninguna rama del repo puede tocarlas.
-   Si no sabe cuál es la rama por defecto del repo, te la pregunta.
-   Subagentes reconocen el repo y dejan un mapa en `.sdd/mapa.md`, y te propone con qué comando comprobar el trabajo.
-2. `/sdd-planear <tu aporte>`: contrato en `.sdd/cambio.md` para que lo apruebes.
-3. `/sdd-ejecutar`: rama desde la base del proyecto, implementación con sus convenciones, revisión adversarial y push a tu fork.
-   Te enseña el texto de la PR y solo la abre, como borrador, cuando lo confirmas; Claude Code también te lo pregunta.
-4. `/sdd-verificar` pide una revisión sin tocar nada; `/sdd-verificar seguridad`, una auditoría de seguridad.
-5. `/sdd-salir` cuando termines: archiva tus documentos en `~/.sdd-lite/archivo/<repo>/<fecha>/`,
-   restaura el repo byte a byte y comprueba que no queda rastro, tampoco en los commits.
+1. Open the repo root (not a subfolder) in VS Code and type `/sdd-entrar`.
+   It activates the hooks and creates three local things Git does not see: `.sdd/`, `CLAUDE.local.md` and `.claude/settings.local.json`.
+   Their configuration and the snapshot of the previous state go inside `.git/`, where no branch of the repo can touch them.
+   If it does not know the repo's default branch, it asks you.
+   Subagents survey the repo and leave a map in `.sdd/mapa.md`, and it proposes the command to check the work.
+2. `/sdd-planear <your contribution>`: contract in `.sdd/cambio.md` for you to approve.
+3. `/sdd-ejecutar`: branch from the project's base, implementation with its conventions, adversarial review and push to your fork.
+   It shows you the PR text and only opens it, as a draft, when you confirm; Claude Code asks you too.
+4. `/sdd-verificar` asks for a review without touching anything; `/sdd-verificar seguridad`, for a security audit.
+5. `/sdd-salir` when you finish: it archives your documents in `~/.sdd-lite/archivo/<repo>/<date>/`,
+   restores the repo byte for byte and checks that no trace is left, in the commits either.
 
-Las normas del repo (`CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`) mandan sobre las del marco.
-No muevas ni cambies de rama la plantilla con un aporte abierto: los hooks se ejecutan desde ella.
-Si ya ha pasado, sal desde una terminal: `node "<ruta nueva>/scripts/salir.mjs"` en la raíz del repo.
-Los comandos `/sdd-*` y `/nuevo-proyecto` se instalan con `node "<ruta a SDD-lite>/scripts/instalar-comandos.mjs"`.
-Vuelve a ejecutarlo si mueves la plantilla.
+The repo's rules (`CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`) take precedence over the method's.
+Do not move the template or switch its branch with a contribution open: the hooks run from it.
+If that already happened, exit from a terminal: `node "<new path>/scripts/salir.mjs"` at the repo root.
+The `/sdd-*` and `/nuevo-proyecto` commands are installed with `node "<path to SDD-lite>/scripts/instalar-comandos.mjs"`.
+Run it again if you move the template.
 
-## Lavish en cualquier repositorio
+## Lavish in any repository
 
-Para que el agente te pida decisiones o comentarios en el navegador en un repo que no tiene SDD Lite, sin adoptarlo ni entrar en modo aporte.
-Escribe `/sdd-lavish` seguido de lo que quieres decidir o revisar.
-Las páginas y su estado se guardan en `~/.sdd-lite/lavish/`, una carpeta por repo, fuera de él: el repo queda como estaba.
-En Lavish van decisiones y comentarios; los informes, en el chat.
+For the agent to ask you for decisions or comments in the browser in a repo without SDD Lite, without adopting it or entering contribution mode.
+Type `/sdd-lavish` followed by what you want to decide or review.
+The pages and their state are saved in `~/.sdd-lite/lavish/`, one folder per repo, outside it: the repo is left as it was.
+Lavish is for decisions and comments; reports go in the chat.
 
-## Dónde está cada cosa
+## Where everything is
 
-| Qué | Dónde |
+| What | Where |
 |---|---|
-| Plan maestro | `docs/plans/0_plan_maestro.md` |
-| Spec, plan y resultados de una fase | `docs/plans/fase-NN-nombre/` |
-| Cambios sueltos | `docs/changes/NNN-nombre.md` |
-| Reglas que el agente carga siempre | `AGENTS.md` |
-| Comando de comprobación, de formato y rama por defecto (proyectos que no son Node) | `.sdd-lite.json` |
-| Procedimientos del agente | `.agents/skills/` |
-| Hallazgos de seguridad abiertos o aplazados | `docs/security.md` (se crea con el primero) |
-| Bloqueos automáticos (push a `main`, secretos, fusionar) | `.claude/settings.json` y `.claude/hooks/` |
+| Master plan | `docs/plans/0_plan_maestro.md` |
+| Spec, plan and results of a phase | `docs/plans/fase-NN-name/` |
+| Standalone changes | `docs/changes/NNN-name.md` |
+| Rules the agent always loads | `AGENTS.md` |
+| Procedures of the supervisor and the agents | `.agents/skills/` |
+| Agent definitions | `.claude/agents/` |
+| Open or deferred security findings | `docs/security.md` (created with the first one) |
+| Automatic blocks (push to `main`, secrets, merging) | `.claude/settings.json` and `.claude/hooks/` |
 
-## Consejos
+## Tips
 
-- Una fase por sesión: el contexto se mantiene limpio, sale más barato y el agente trabaja mejor.
-- Criterios observables en la spec ("el informe marca las facturas con sobrecoste mayor del 5 %"), no deseos ("que funcione bien").
-- Si el agente se atasca dos veces, parará y te explicará la decisión que necesita.
-- Tu primer commit lo hace el script; a partir de ahí nadie escribe directamente en `main`, solo por PR.
+- One phase per session: the context stays clean, it is cheaper and the agents work better.
+- Observable criteria in the spec ("the report flags invoices with an overrun above 5 %"), not wishes ("it should work well").
+- If an agent gets stuck, the supervisor corrects or relaunches it; if that fails, it explains the decision it needs from you.
+- To change something yourself with Claude without the supervisor, start the session with the variable `SDD_SUPERVISOR_LIBRE=1`.
+- Nobody writes directly to `main`; everything goes through a PR.

@@ -4,7 +4,6 @@ description: Pedir decisiones y comentarios al usuario, o que revise planes, alt
 ---
 # Lavish
 
-- Fuera de un proyecto SDD Lite (sin `.agents/skills/lavish/` en el repo), usa solo la última sección.
 - En cada llamada a Lavish, también las que sugiere su propia salida (`next_step`), fija en ese mismo comando
   `LAVISH_AXI_STATE_DIR` (ruta absoluta de `.runtime/lavish` de este repo) y `LAVISH_AXI_TELEMETRY=0`:
   Lavish envía por defecto estadísticas de uso, los proyectos son privados y el shell no conserva variables entre llamadas.

@@ -5,13 +5,16 @@
 //
 // Lee Git, el plan maestro y los planes y cambios abiertos con sus tablas de encargos
 // y de decisiones del usuario. Solo lectura, sin red.
+// Acepta los registros en espanol o en ingles: `Estado:` o `Status:`, `## Encargos` o `## Briefs`,
+// `## Decisiones del usuario` o `## User decisions`, y los valores de estado de los dos idiomas.
 
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const MAX_LINEAS = 40;
-const CERRADOS = new Set(["hecho", "fallido", "cancelado"]);
+const CERRADOS = new Set(["hecho", "fallido", "cancelado", "done", "failed", "cancelled", "canceled"]);
+const DECISION_ABIERTA = new Set(["abierta", "open"]);
 
 function git(raiz, ...args) {
   return execFileSync("git", args, { cwd: raiz, encoding: "utf8", timeout: 5000, stdio: ["ignore", "pipe", "ignore"] }).trim();
@@ -25,16 +28,17 @@ function leer(ruta) {
   }
 }
 
-/** Valor de la primera linea `Estado:` del documento, o null. */
+/** Valor de la primera linea `Estado:` o `Status:` del documento, o null. */
 function estado(texto) {
-  const m = texto.match(/^Estado:\s*(.*)$/m);
+  const m = texto.match(/^(?:Estado|Status):\s*(.*)$/m);
   return m ? m[1].trim() : null;
 }
 
-/** Filas de datos de la tabla bajo `## <titulo>`, como listas de celdas. */
-function filasDeTabla(texto, titulo) {
+/** Filas de datos de la tabla bajo `## <titulo>` (cualquiera de los titulos), como listas de celdas. */
+function filasDeTabla(texto, ...titulos) {
   const lineas = texto.split(/\r?\n/);
-  const inicio = lineas.findIndex((l) => l.trim().toLowerCase() === `## ${titulo}`.toLowerCase());
+  const buscados = titulos.map((t) => `## ${t}`.toLowerCase());
+  const inicio = lineas.findIndex((l) => buscados.includes(l.trim().toLowerCase()));
   if (inicio < 0) return [];
   const filas = [];
   for (const l of lineas.slice(inicio + 1)) {
@@ -68,7 +72,7 @@ function documentosAbiertos(raiz) {
   for (const ruta of candidatos.sort()) {
     const texto = leer(join(raiz, ruta));
     const e = estado(texto);
-    if (!e || e.includes("|") || /^integrad[ao]\b/i.test(e)) continue;
+    if (!e || e.includes("|") || /^(integrad[ao]|integrated)\b/i.test(e)) continue;
     abiertos.push({ ruta, estado: e, texto });
   }
   return abiertos;
@@ -93,12 +97,12 @@ function rumbo(raiz) {
   const encargos = [];
   const decisiones = [];
   for (const doc of abiertos) {
-    for (const f of filasDeTabla(doc.texto, "Encargos")) {
+    for (const f of filasDeTabla(doc.texto, "Encargos", "Briefs")) {
       const est = (f[3] || "").toLowerCase();
       if (!CERRADOS.has(est)) encargos.push(`- ${doc.ruta}: ${f[0]} (${f[1] || "?"}) ${f[2] || ""} [${f[3] || "sin estado"}]`);
     }
-    for (const f of filasDeTabla(doc.texto, "Decisiones del usuario")) {
-      if ((f[3] || "").toLowerCase() === "abierta") decisiones.push(`- ${doc.ruta}: ${f[0]} ${f[1] || ""}`);
+    for (const f of filasDeTabla(doc.texto, "Decisiones del usuario", "User decisions")) {
+      if (DECISION_ABIERTA.has((f[3] || "").toLowerCase())) decisiones.push(`- ${doc.ruta}: ${f[0]} ${f[1] || ""}`);
     }
   }
 

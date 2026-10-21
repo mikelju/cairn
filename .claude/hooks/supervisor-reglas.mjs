@@ -38,8 +38,13 @@ const BRIEF = ".agents/skills/sdd-lite/references/encargos.md";
 // Bash y PowerShell en la sesion principal: lista de denegacion conservadora, no un clasificador.
 // Deniega escribir, mover o borrar archivos e instalar cosas, sea cual sea el destino:
 // el supervisor escribe sus registros con Write o Edit, que si distinguen la ruta.
-// Sigue permitido: leer, git (salvo los subcomandos de abajo), gh, npm run, node script.
+// Tambien deniega los formateadores y arreglos que reescriben archivos (`ruff format`, `ruff check --fix`,
+// `black`, `isort`) y analiza el comando interior de `uv run` y `uvx`; `uv run --with` instala.
+// Sigue permitido: leer, git (salvo los subcomandos de abajo), gh, npm run, node script,
+// `uv run pytest`, `uv run mypy` y `ruff check` sin `--fix`.
 // NO cubre (lo frena el contrato de AGENTS.md, no este hook):
+// - Write y Edit fuera de CLAUDE_PROJECT_DIR, como un worktree hermano: solo se vigila el proyecto abierto;
+// - `uvx` de una herramienta no instalada, que la descarga a la cache como `npx`;
 // - codigo que escribe archivos desde un interprete: `node -e`, `python -c`, scripts propios, `npm run <script>`;
 // - herramientas no listadas que escriben como efecto (tar x, unzip, curl -o, make, docker);
 // - git que integra commits ya hechos en el arbol: merge, pull, rebase, cherry-pick, revert, switch o checkout de rama,
@@ -69,7 +74,7 @@ const INSTALA = {
   pip: new Set(["install", "uninstall"]),
   pip3: new Set(["install", "uninstall"]),
   pipx: new Set(["install", "uninstall"]),
-  uv: new Set(["add", "remove", "sync", "pip", "tool"]),
+  uv: new Set(["add", "remove", "sync", "lock", "pip", "tool", "venv", "init"]),
   poetry: new Set(["add", "remove", "install"]),
   cargo: new Set(["add", "install"]),
   go: new Set(["get", "install"]),
@@ -78,6 +83,11 @@ const INSTALA = {
 const NPM_ACCION_ESCRIBE = { pkg: ["set", "delete", "fix"], audit: ["fix"], config: ["set", "delete", "edit"] };
 // Opciones globales de npm que llevan valor: `npm --prefix sub install`.
 const NPM_FLAGS_CON_VALOR = new Set(["--prefix", "-C", "--workspace", "-w", "--registry", "--cache", "--userconfig"]);
+// Opciones de `uv run` y `uvx` que llevan valor, para encontrar el comando interior que se analiza.
+const UV_FLAGS_CON_VALOR = new Set([
+  "--python", "-p", "--project", "--directory", "--package", "--env-file", "--group", "--extra",
+  "--from", "--index", "--default-index", "--index-url", "--extra-index-url", "--cache-dir", "--config-file",
+]);
 // `python -m <modulo>`: los gestores de INSTALA y los que crean entornos.
 const PYTHON = new Set(["python", "python3", "py"]);
 const PYTHON_MODULO_ESCRIBE = new Set(["venv", "ensurepip"]);
@@ -224,28 +234,72 @@ function shellEscribe(comando) {
   const destino = redireccionAArchivo(separarCuerpos(comando).fuera);
   if (destino) return `una redireccion a ${destino}`;
   for (const t of comandosAnalizables(comando)) {
-    if (t[0] === "__codigo__") continue;
-    const verbo = verboDe(t[0]);
-    const sub = (t.find((a, i) => i > 0 && !a.startsWith("-")) || "").toLowerCase();
-    if (VERBOS_ESCRITURA.has(verbo)) return `\`${verbo}\``;
-    if (VERBOS_INSTALA_ENVUELTOS.has(verbo)) return `\`${verbo}\` de un gestor de paquetes`;
-    if (verbo === "npm") {
-      const n = subNpm(t);
-      if (INSTALA.npm.has(n.sub)) return `\`npm ${n.sub}\``;
-      if (NPM_ACCION_ESCRIBE[n.sub]?.includes(n.accion)) return `\`npm ${n.sub} ${n.accion}\``;
-    } else if (INSTALA[verbo]?.has(sub)) return `\`${verbo} ${sub}\``;
-    if (PYTHON.has(verbo)) {
-      const m = t.indexOf("-m");
-      const modulo = m > 0 ? (t[m + 1] || "").toLowerCase() : "";
-      const accion = m > 0 ? (t.slice(m + 2).find((a) => !a.startsWith("-")) || "").toLowerCase() : "";
-      if (PYTHON_MODULO_ESCRIBE.has(modulo)) return `\`${verbo} -m ${modulo}\``;
-      if (INSTALA[modulo]?.has(accion)) return `\`${verbo} -m ${modulo} ${accion}\``;
-    }
-    if ((verbo === "sed" || verbo === "perl") && t.some((a) => /^-[a-z]*i|^--in-place/i.test(a))) return `\`${verbo} -i\``;
-    if (verbo === "git") {
-      const m = gitEscribe(t);
-      if (m) return m;
-    }
+    const m = tokensEscriben(t);
+    if (m) return m;
+  }
+  return null;
+}
+
+/** Comando interior de `uv run` o `uvx`, o el motivo si instala con `--with`; null si no es uno de ellos. */
+function interiorUv(t) {
+  const verbo = verboDe(t[0]);
+  let i;
+  if (verbo === "uvx") i = 1;
+  else if (verbo === "uv") {
+    const k = t.findIndex((a, j) => j > 0 && !a.startsWith("-"));
+    if (k < 0 || t[k].toLowerCase() !== "run") return null;
+    i = k + 1;
+  } else return null;
+  while (i < t.length && t[i].startsWith("-")) {
+    const op = t[i].split("=")[0];
+    if (/^--with(-requirements|-editable)?$/.test(op)) return { motivo: `\`${verbo} ${op}\`, que instala paquetes` };
+    if (!t[i].includes("=") && UV_FLAGS_CON_VALOR.has(op)) i += 1;
+    i += 1;
+  }
+  return { interior: t.slice(i) };
+}
+
+/** Motivo por el que un formateador o un arreglo automatico reescribe archivos, o null. */
+function formateaEscribe(verbo, t, sub) {
+  const args = t.slice(1);
+  const solo = (...ops) => args.some((a) => ops.includes(a.split("=")[0]));
+  if (verbo === "ruff" && sub === "format" && !solo("--check", "--diff")) return "`ruff format`";
+  if (verbo === "ruff" && sub === "check" && solo("--fix", "--fix-only") && !solo("--diff")) return "`ruff check --fix`";
+  if (verbo === "black" && !solo("--check", "--diff")) return "`black`";
+  if (verbo === "isort" && !solo("--check", "--check-only", "-c", "--diff")) return "`isort`";
+  return null;
+}
+
+/** Motivo por el que un comando ya tokenizado escribe o instala, o null. */
+function tokensEscriben(t, profundidad = 0) {
+  if (!t.length || t[0] === "__codigo__" || profundidad > 5) return null;
+  const verbo = verboDe(t[0]);
+  const sub = (t.find((a, i) => i > 0 && !a.startsWith("-")) || "").toLowerCase();
+  const uv = interiorUv(t);
+  if (uv?.motivo) return uv.motivo;
+  if (uv) return tokensEscriben(uv.interior, profundidad + 1);
+  const formato = formateaEscribe(verbo, t, sub);
+  if (formato) return formato;
+  if (VERBOS_ESCRITURA.has(verbo)) return `\`${verbo}\``;
+  if (VERBOS_INSTALA_ENVUELTOS.has(verbo)) return `\`${verbo}\` de un gestor de paquetes`;
+  if (verbo === "npm") {
+    const n = subNpm(t);
+    if (INSTALA.npm.has(n.sub)) return `\`npm ${n.sub}\``;
+    if (NPM_ACCION_ESCRIBE[n.sub]?.includes(n.accion)) return `\`npm ${n.sub} ${n.accion}\``;
+  } else if (INSTALA[verbo]?.has(sub)) return `\`${verbo} ${sub}\``;
+  if (PYTHON.has(verbo)) {
+    const m = t.indexOf("-m");
+    const modulo = m > 0 ? (t[m + 1] || "").toLowerCase() : "";
+    const accion = m > 0 ? (t.slice(m + 2).find((a) => !a.startsWith("-")) || "").toLowerCase() : "";
+    if (PYTHON_MODULO_ESCRIBE.has(modulo)) return `\`${verbo} -m ${modulo}\``;
+    if (INSTALA[modulo]?.has(accion)) return `\`${verbo} -m ${modulo} ${accion}\``;
+    const formatoModulo = formateaEscribe(modulo, t.slice(m + 1), accion);
+    if (formatoModulo) return formatoModulo;
+  }
+  if ((verbo === "sed" || verbo === "perl") && t.some((a) => /^-[a-z]*i|^--in-place/i.test(a))) return `\`${verbo} -i\``;
+  if (verbo === "git") {
+    const m = gitEscribe(t);
+    if (m) return m;
   }
   return null;
 }

@@ -486,6 +486,21 @@ try {
     [BLOQUEA, shell("Bash", "npm ci"), "Bash: npm ci"],
     [BLOQUEA, shell("Bash", "pip install requests"), "Bash: pip install"],
     [BLOQUEA, shell("Bash", "uv add httpx"), "Bash: uv add"],
+    [BLOQUEA, shell("Bash", "uv run pip install x"), "Bash: uv run pip install"],
+    [BLOQUEA, shell("Bash", "uv run python -m pip install x"), "Bash: pip dentro de uv run python -m"],
+    [BLOQUEA, shell("Bash", "uv run --with x pytest"), "Bash: uv run --with"],
+    [BLOQUEA, shell("Bash", "uv run --with=x pytest"), "Bash: uv run --with="],
+    [BLOQUEA, shell("Bash", "uv lock"), "Bash: uv lock"],
+    [BLOQUEA, shell("Bash", "uv sync"), "Bash: uv sync"],
+    [BLOQUEA, shell("Bash", "uv pip install x"), "Bash: uv pip install"],
+    [BLOQUEA, shell("Bash", "uv run ruff format"), "Bash: ruff format dentro de uv run"],
+    [BLOQUEA, shell("Bash", "uv run --project sub ruff format src"), "Bash: uv run con opcion y valor"],
+    [BLOQUEA, shell("Bash", "uv run ruff check --fix"), "Bash: ruff check --fix dentro de uv run"],
+    [BLOQUEA, shell("Bash", "ruff format src"), "Bash: ruff format"],
+    [BLOQUEA, shell("Bash", "uvx ruff format"), "Bash: ruff format dentro de uvx"],
+    [BLOQUEA, shell("Bash", "black ."), "Bash: black"],
+    [BLOQUEA, shell("Bash", "python -m black src"), "Bash: python -m black"],
+    [BLOQUEA, shell("Bash", "isort src"), "Bash: isort"],
     [BLOQUEA, shell("Bash", "pnpm add zod"), "Bash: pnpm add"],
     [BLOQUEA, shell("Bash", "winget install Git.Git"), "Bash: winget"],
     [BLOQUEA, shell("Bash", "bash -c \"rm src/a.js\""), "Bash: anidado en bash -c"],
@@ -521,6 +536,13 @@ try {
     [BLOQUEA, shell("PowerShell", "Remove-Item -Recurse build"), "PowerShell: Remove-Item"],
     [BLOQUEA, shell("PowerShell", "powershell -Command \"Set-Content a.js x\""), "PowerShell: anidado en powershell -Command"],
     [PERMITE, shell("Bash", "git status && git log --oneline -5"), "Bash: git status y log"],
+    [PERMITE, shell("Bash", "uv run pytest"), "Bash: uv run pytest"],
+    [PERMITE, shell("Bash", "uv run --python 3.12 pytest -q"), "Bash: uv run con opcion y valor"],
+    [PERMITE, shell("Bash", "uv run ruff check"), "Bash: ruff check sin --fix"],
+    [PERMITE, shell("Bash", "uvx ruff check src"), "Bash: uvx ruff check"],
+    [PERMITE, shell("Bash", "uv run mypy src"), "Bash: uv run mypy"],
+    [PERMITE, shell("Bash", "uv run ruff format --check"), "Bash: ruff format --check"],
+    [PERMITE, shell("Bash", "black --check ."), "Bash: black --check"],
     [PERMITE, shell("Bash", "git diff main...HEAD -- src"), "Bash: git diff"],
     [PERMITE, shell("Bash", "git add docs/changes/001-x.md && git commit -m \"Registro: cambio 001 > borrador\""), "Bash: add y commit de registros; > entre comillas"],
     [PERMITE, shell("Bash", "git checkout -b trabajo/001 && git push -u origin trabajo/001"), "Bash: rama nueva y push"],
@@ -613,6 +635,32 @@ try {
   temporales.push(vacio);
   const nada = rumbo(vacio);
   comprobar("sin nada abierto: una sola linea lo dice", true, nada.status === 0 && (nada.stdout || "").includes("No hay trabajo"));
+
+  // Registros en ingles: Status:, ## Briefs y ## User decisions.
+  const ingles = mkdtempSync(join(tmpdir(), "sdd-hooks-"));
+  temporales.push(ingles);
+  mkdirSync(join(ingles, "docs", "plans", "phase-01"), { recursive: true });
+  mkdirSync(join(ingles, "docs", "changes"), { recursive: true });
+  writeFileSync(join(ingles, "docs", "plans", "0_plan_maestro.md"), "# Master plan\n\nStatus: approved\n");
+  writeFileSync(join(ingles, "docs", "plans", "phase-01", "plan.md"), [
+    "# Phase 01", "", "Status: ready locally", "",
+    "## Briefs", "", "| ID | Agent | Brief | Status | Result or blocker |", "| --- | --- | --- | --- | --- |",
+    "| B1 | executor | Implement parser | in progress | |", "| B2 | reviewer | Review schema | done | no findings |", "",
+    "## User decisions", "", "| ID | Question | Options and recommendation | Status | User answer |", "| --- | --- | --- | --- | --- |",
+    "| Q1 | Which database | SQLite (recommended) or Postgres | open | |", "| Q2 | UI language | es or en | answered | en |", "",
+  ].join("\n"));
+  writeFileSync(join(ingles, "docs", "changes", "001-closed.md"), [
+    "# Change 001", "", "Status: integrated", "", "## Briefs", "",
+    "| ID | Agent | Brief | Status | Result or blocker |", "| --- | --- | --- | --- | --- |", "| B9 | executor | Forgotten | in progress | |", "",
+  ].join("\n"));
+  const en = rumbo(ingles).stdout || "";
+  comprobar("ingles: lee Status del plan maestro", true, en.includes("Estado: approved"));
+  comprobar("ingles: muestra la fase con su Status", true, en.includes("docs/plans/phase-01/plan.md: ready locally"));
+  comprobar("ingles: muestra el brief abierto B1", true, en.includes("B1"));
+  comprobar("ingles: no muestra el brief done B2", false, en.includes("B2"));
+  comprobar("ingles: muestra la decision open Q1", true, en.includes("Q1"));
+  comprobar("ingles: no muestra la decision answered Q2", false, en.includes("Q2"));
+  comprobar("ingles: no muestra el cambio integrated ni sus briefs", false, en.includes("001-closed") || en.includes("B9"));
 
   console.log("\nstop-gate.mjs (SubagentStop)");
   // CLAUDE_PROJECT_DIR apunta a `pasa` (verde); el cwd del subagente, a `falla` (rojo).
