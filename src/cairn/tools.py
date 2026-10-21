@@ -5,6 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from cairn.body_weight import body_weight_change
 from cairn.canonical import canonical_sha256
 from cairn.incidence import incidence
 from cairn.jobs import execute, inputs_hash
@@ -58,6 +59,7 @@ REGISTRY: dict[str, Callable[..., Any]] = {
     "run_job": run_job,
     "study_design": study_design,
     "incidence": incidence,
+    "body_weight_change": body_weight_change,
 }
 
 

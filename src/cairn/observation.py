@@ -54,11 +54,13 @@ def connect(path: Path | None = None) -> duckdb.DuckDBPyConnection:
     return duckdb.connect(str(path or DEFAULT_DB), read_only=True)
 
 
-def query(sql: str, path: Path | None = None) -> list[dict[str, Any]]:
+def query(
+    sql: str, params: list[Any] | None = None, path: Path | None = None
+) -> list[dict[str, Any]]:
     """Run one fixed SQL statement and return its rows as dicts."""
     connection = connect(path)
     try:
-        cursor = connection.execute(sql)
+        cursor = connection.execute(sql, params or [])
         names = [column[0] for column in cursor.description]
         return [dict(zip(names, row, strict=True)) for row in cursor.fetchall()]
     finally:

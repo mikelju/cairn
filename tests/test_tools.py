@@ -79,7 +79,12 @@ def test_same_hash_over_mcp_rest_and_cli(
 
 
 def test_registry_has_exactly_the_registered_tools() -> None:
-    assert sorted(REGISTRY) == ["incidence", "run_job", "study_design"]
+    assert sorted(REGISTRY) == [
+        "body_weight_change",
+        "incidence",
+        "run_job",
+        "study_design",
+    ]
 
 
 def test_study_design_content() -> None:
