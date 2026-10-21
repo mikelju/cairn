@@ -1,0 +1,22 @@
+{
+  "source": "fixture",
+  "question_id": "QFIX",
+  "prompt_version": "fixture-1",
+  "tool_schema_sha256": "fixture",
+  "model": "fixture",
+  "region": "none",
+  "date": "2026-10-21",
+  "calls": [
+    {
+      "latency_s": 0,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "cost_usd": null,
+      "response": {
+        "stop_reason": "end_turn",
+        "content": [{"type": "text", "text": "fixture reply"}],
+        "usage": {"input_tokens": 0, "output_tokens": 0}
+      }
+    }
+  ]
+}
