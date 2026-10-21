@@ -1,14 +1,14 @@
 # Phase 01 - Validated data and skeleton: plan and results
 
-Status: pending spec approval
-Spec: `spec.md` (draft)
-Base: branch `fase-01-validated-data` from `main` once the start PR is merged
+Status: in progress
+Spec: `spec.md` (approved, frozen)
+Base: branch `fase-01-validated-data` from `inicio-cairn` (no remote yet)
 
 ## Increments
 Each increment leaves the product working and covers specific criteria.
 This file is the durable state: a new session resumes from here and from Git.
 
-- [ ] 1. Python skeleton: `pyproject.toml` with uv, Apache-2.0 licence, `src/cairn` package, ruff, strict mypy, pytest-cov at 85%, pre-commit and `npm run check` chaining them with the hook suite (C1) - evidence:
+- [x] 1. Python skeleton: `pyproject.toml` with uv, Apache-2.0 licence, `src/cairn` package, ruff, strict mypy, pytest-cov at 85%, pre-commit and `npm run check` chaining them with the hook suite (C1) - evidence: `npm run check` green (ruff, mypy strict, pytest 1 passed at 100% coverage, hook suite all OK); commit in increment 1 log.
 - [ ] 2. Data fetch and manifest: script that fetches the 8 PDS2014 XPT files, pins their SHA-256 in a versioned manifest and computes the snapshot hash; canonical JSON helper (C2) - evidence:
 - [ ] 3. Ingestion and validation: `read_sas`, zero normalisation, pandera schemas, cross rules, quarantine table, read-only DuckDB and JSON report; E1 phase 01 assertions (C2, C3, C4, C5) - evidence:
 - [ ] 4. Jobs: `validate_study` as an in-process asyncio task behind `POST /jobs` and `GET /jobs/{id}` with the `Job` contract (C6) - evidence:
