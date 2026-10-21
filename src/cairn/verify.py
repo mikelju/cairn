@@ -71,7 +71,8 @@ REF_MARK = "\ue000"
 # group label). Any other text value cited by a reference with a number is blocked by rule 3.
 # In a label the only number accepted is a dose with its unit ("400 mg/kg").
 STRUCTURAL_FIELDS = frozenset({"study_id", "usubjid", "setcd", "label"})
-DOSE_WITH_UNIT = re.compile(r"\d[\d.,]*\s*[A-Za-z]+(?:/[A-Za-z]+)+")
+DOSE_UNITS = r"(?:[muµ]?g|mL)/kg(?:/(?:day|d))?"
+DOSE_WITH_UNIT = re.compile(rf"(?<![\w.])\d[\d.,]*\s*{DOSE_UNITS}(?![\w/])", re.IGNORECASE)
 # Abbreviations whose full stop does not end a sentence (rule 1).
 ABBREVIATIONS = re.compile(r"(?<!\w)(?:e\.g\.|i\.e\.|vs\.|approx\.|etc\.|cf\.)", re.IGNORECASE)
 # A sentence end (after NFKC, so full-width and ellipsis marks are already ASCII): a run of
@@ -202,7 +203,7 @@ def _model_text(sentence: Sentence) -> str:
 
 
 def _ends_a_sentence(written: str) -> bool:
-    text = unicodedata.normalize("NFKC", written).replace("。", "!")  # ideographic full stop
+    text = _normalize(written).replace("。", "!")  # ideographic full stop
     text = ABBREVIATIONS.sub(lambda m: m.group(0).replace(".", ""), text)
     return bool(SENTENCE_END.search(text))
 
@@ -278,18 +279,23 @@ def verify(sentences: list[Sentence], ledger: ObservationLedger) -> Verdict:
         failures.append(Failure(rule, reason, index))
 
     written = [_model_text(sentence) for sentence in sentences]
-    for index, sentence in enumerate(sentences):  # rule 1
-        if not _refs(sentence):
-            fail(1, index)
-        elif _ends_a_sentence(written[index]):
-            fail(1, index, "one Sentence must be one sentence, each with its own reference")
     rendered: list[str] = []
-    for index, sentence in enumerate(sentences):  # rule 2
+    errors: dict[int, str] = {}
+    for index, sentence in enumerate(sentences):
         try:
             rendered.append(render_sentence(sentence, ledger))
         except UnresolvedRef as error:
             rendered.append(written[index].replace(REF_MARK, ""))
-            fail(2, index, str(error))
+            errors[index] = str(error)
+    for index, sentence in enumerate(sentences):  # rule 1, on the model text and the final text
+        if not _refs(sentence):
+            fail(1, index)
+        elif _ends_a_sentence(written[index]) or (
+            index not in errors and _ends_a_sentence(rendered[index])
+        ):
+            fail(1, index, "one Sentence must be one sentence, each with its own reference")
+    for index, detail in errors.items():  # rule 2
+        fail(2, index, detail)
     for index in range(len(sentences)):  # rule 3
         if _has_number(written[index]) or _placed_text_has_number(sentences[index], ledger):
             fail(3, index)

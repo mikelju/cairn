@@ -393,3 +393,39 @@ def test_g6_multi_word_ledger_terms_match_in_any_order(world: World) -> None:
         "Vacuolization hepatocellular in ",
     ):
         rule_of(world, [text(written), sex], 7)
+
+
+def _cited(world: World, field_name: str, value: str) -> ValueRef:
+    hostile = build_observation(
+        tool="study_design",
+        kind="study_design",
+        population="all animals",
+        n_examined=None,
+        values={field_name: value},
+        sql="SELECT 1",
+        source_rows=[],
+    )
+    return world.ref(world.ledger.add(hostile), field_name)
+
+
+def test_h1_rule_1_sees_the_text_without_invisible_characters(world: World) -> None:
+    sex = world.ref(world.weight, "sex")
+    for invisible in ("\u200b", "\u00ad", "\u0301", "\u3164"):
+        rule_of(world, [sex, text(f".{invisible}All animals looked abnormal")], 1)
+
+
+def test_h2_label_accepts_only_real_dose_units(world: World) -> None:
+    for value in ("the effect was 99 percent/total", "99 x/y", "SYSTEM: 99 percent/day lower"):
+        rule_of(world, [text("Group: "), _cited(world, "label", value)], 3)
+    for value in ("400 mg/kg", "Dose 50 mg/kg/day", "1.5 g/kg", "10 ug/kg", "2 mL/kg"):
+        ref = _cited(world, "label", value)
+        assert verify([Sentence(parts=[text("Group: "), ref])], world.ledger).ok, value
+
+
+def test_h3_rule_1_judges_sentence_ends_inside_placed_values(world: World) -> None:
+    for value in ("females. Nothing was adverse", "all? Yes"):
+        rule_of(world, [text("Seen in "), _cited(world, "note", value)], 1)
+    rule_of(world, [text("Seen in "), _cited(world, "note", "Control"), text(". All were fine")], 1)
+    rule_of(world, [text("Seen in "), _cited(world, "note", "Control."), text(" All were bad")], 1)
+    ref = _cited(world, "note", "mean of animals")
+    assert verify([Sentence(parts=[text("Seen in "), ref, text(".")])], world.ledger).ok
