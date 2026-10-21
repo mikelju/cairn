@@ -60,14 +60,14 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | E4 | ejecutor (Sonnet) | Increment 4: question loop, prompt and Q2/Q6 texts | done | f414330; 11 loop tests re-run by the supervisor; final answer via strict `write_answer` tool; risk: open `dict` params may break `strict: true` |
 | E5 | ejecutor (Sonnet) | Increment 5: CLI ask, record, smoke and Makefile targets; strict-compatible tool schemas | failed | context budget; work left uncommitted in the tree, mypy pending |
 | E6 | ejecutor (Sonnet) | Finish increment 5: check green, mark plan, commit | done | c34cd79; 230 tests green; mypy import fixed; 0 live-client imports in the web |
-| E7 | ejecutor (Sonnet) | Increment 6: step 2 of the web in replay over fixtures | in progress | |
+| E7 | ejecutor (Sonnet) | Increment 6: step 2 of the web in replay over fixtures | done | 92a3f2d; 237 tests green; step 2 at 46 words of 93; nav "Design" renamed "Ask"; browser walkthrough left to increment 9 |
 
 ## User decisions
 Questions the supervisor raises with the user. Statuses: open, answered, deferred; each closes with the user's literal answer.
 
 | ID | Question | Options and recommendation | Status | User answer |
 |---|---|---|---|---|
-| U1 | Go-ahead for the only steps that use AWS: you run on the laptop, with the AWS user limited to invoking the model, `make smoke` (Opus 5.5, Sonnet 5.5 and Opus 4.8 EU inference profiles in eu-west-1, about 9 calls), then `make record` for Q2 and Q6 (Opus 5.5, Opus 4.8 only for a question Opus 5.5 refuses, at most 6 calls per question, up to three attempts each), then `make deploy` with the phase 01 deploy profile; estimated Bedrock spend under 3 USD, hard stop at 10 USD; no agent touches the credentials | A: approve as described (recommended); B: approve the smoke test only and decide recordings after ADR-001; C: not now, the phase stops at increment 6 | open | |
+| U1 | Go-ahead for the only steps that use AWS: you run on the laptop, with the AWS user limited to invoking the model, `make smoke` (Opus 5.5, Sonnet 5.5 and Opus 4.8 EU inference profiles in eu-west-1, about 9 calls), then `make record` for Q2 and Q6 (Opus 5.5, Opus 4.8 only for a question Opus 5.5 refuses, at most 6 calls per question, up to three attempts each), then `make deploy` with the phase 01 deploy profile; estimated Bedrock spend under 3 USD, hard stop at 10 USD; no agent touches the credentials | A: approve as described (recommended); B: approve the smoke test only and decide recordings after ADR-001; C: not now, the phase stops at increment 6 | answered | "A: aprobar todo (Recomendada)" (2026-10-21; asked with ceilings from `pricing.py`: smoke 9 calls max, 1.4 USD; record 12 calls max, 1.8 USD) |
 
 ## Deviations
 | ID | Summary | Affects criteria | Status |
