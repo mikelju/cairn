@@ -1,14 +1,14 @@
-"""FastAPI application: jobs endpoints now, tools and web pages in later increments."""
+"""FastAPI application: jobs, REST tool endpoints, the MCP endpoint and the web pages."""
 
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Body, FastAPI, HTTPException
 from fastmcp import FastMCP
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from cairn.jobs import Job, JobRunner
-from cairn.tools import REGISTRY, call_tool
+from cairn.tools import REGISTRY, argument_problems, call_tool
 from cairn.web import mount_web
 
 
@@ -46,13 +46,16 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404, detail="job not found")
         return job
 
-    @app.post("/api/tools/run_job")
-    async def api_run_job(request: JobRequest) -> dict[str, Any]:
-        return call_tool("run_job", request.model_dump())
-
-    @app.post("/api/tools/study_design")
-    async def api_study_design() -> dict[str, Any]:
-        return call_tool("study_design", {})
+    @app.post("/api/tools/{name}")
+    def api_tool(
+        name: str, arguments: Annotated[dict[str, Any] | None, Body()] = None
+    ) -> dict[str, Any]:
+        if name not in REGISTRY:
+            raise HTTPException(status_code=404, detail="unknown tool")
+        try:
+            return call_tool(name, arguments or {})
+        except ValidationError as error:
+            raise HTTPException(status_code=422, detail=argument_problems(error)) from error
 
     mount_web(app)
     app.mount("/", mcp_app)

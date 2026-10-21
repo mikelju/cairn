@@ -19,6 +19,9 @@ from cairn.tools import REGISTRY, call_tool, result_sha256
 CASES: list[tuple[str, dict[str, Any]]] = [
     ("run_job", {"kind": "validate_study", "params": {}}),
     ("study_design", {}),
+    ("incidence", {"screen": True}),
+    ("body_weight_change", {"sex": "F", "population": "main_and_recovery"}),
+    ("tk_summary", {"sex": "M", "dose": 20.0, "day": 1.0}),
 ]
 
 
@@ -61,6 +64,12 @@ def rest_call(url: str, name: str, arguments: dict[str, Any]) -> dict[str, Any]:
 def cli_hash(name: str, arguments: dict[str, Any]) -> str:
     if name == "run_job":
         args = ["run-job", arguments["kind"], "--hash"]
+    elif name == "incidence":
+        args = ["incidence", "--hash"]
+    elif name == "body_weight_change":
+        args = ["body-weight-change", "--sex", "F", "--hash"]
+    elif name == "tk_summary":
+        args = ["tk-summary", "--sex", "M", "--dose", "20", "--day", "1", "--hash"]
     else:
         args = ["study-design", "--hash"]
     result = CliRunner().invoke(cli_app, args)
@@ -69,7 +78,7 @@ def cli_hash(name: str, arguments: dict[str, Any]) -> str:
 
 
 @pytest.mark.parametrize(("name", "arguments"), CASES)
-def test_same_hash_over_mcp_rest_and_cli(
+def test_registry_same_hash_over_mcp_rest_and_cli(
     server_url: str, name: str, arguments: dict[str, Any]
 ) -> None:
     direct = result_sha256(call_tool(name, arguments))
@@ -78,18 +87,94 @@ def test_same_hash_over_mcp_rest_and_cli(
     assert over_mcp == over_rest == cli_hash(name, arguments) == direct
 
 
-def test_registry_has_exactly_the_two_tools() -> None:
-    assert sorted(REGISTRY) == ["run_job", "study_design"]
+def test_registry_has_exactly_the_registered_tools() -> None:
+    assert sorted(REGISTRY) == [
+        "body_weight_change",
+        "incidence",
+        "run_job",
+        "study_design",
+        "tk_summary",
+    ]
 
 
 def test_study_design_content() -> None:
     design = call_tool("study_design", {})
-    assert design["study_id"] == "PDS2014"
-    assert sum(group["animals"] for group in design["groups"]) == 124
-    assert {group["dose"] for group in design["groups"]} >= {0.0, 20.0}
+    assert design["values"]["study_id"] == "PDS2014"
+    assert sum(group["animals"] for group in design["values"]["groups"]) == 124
+    assert {group["dose"] for group in design["values"]["groups"]} >= {0.0, 20.0}
 
 
 def test_cli_prints_json_without_hash_flag() -> None:
     result = CliRunner().invoke(cli_app, ["study-design"])
     assert result.exit_code == 0
     assert '"study_id":"PDS2014"' in result.stdout
+
+
+def test_rest_rejects_unknown_tool_and_bad_arguments(server_url: str) -> None:
+    import httpx
+
+    assert httpx.post(f"{server_url}/api/tools/nope", json={}).status_code == 404
+    assert httpx.post(f"{server_url}/api/tools/incidence", json={"bogus": 1}).status_code == 422
+
+
+BAD_ARGUMENTS: list[tuple[str, dict[str, Any]]] = [
+    ("body_weight_change", {"sex": "F", "population": "tk"}),
+    ("body_weight_change", {"sex": "F", "population": "all"}),
+    ("body_weight_change", {"sex": "X", "population": "main"}),
+    ("tk_summary", {"sex": "Q"}),
+    ("tk_summary", {"dose": "nan"}),
+    ("tk_summary", {"day": "inf"}),
+    ("incidence", {"screen": "maybe"}),
+]
+BAD_CLI: list[list[str]] = [
+    ["body-weight-change", "--population", "tk"],
+    ["body-weight-change", "--population", "tk_satellites"],
+    ["body-weight-change", "--sex", "X"],
+    ["tk-summary", "--sex", "Q"],
+    ["tk-summary", "--dose", "nan"],
+    ["tk-summary", "--day", "inf"],
+]
+
+
+@pytest.mark.parametrize(("name", "arguments"), BAD_ARGUMENTS)
+def test_validation_rejects_bad_arguments_over_mcp_and_rest(
+    server_url: str, name: str, arguments: dict[str, Any]
+) -> None:
+    import httpx
+
+    response = httpx.post(f"{server_url}/api/tools/{name}", json=arguments, timeout=60)
+    assert response.status_code == 422
+    assert isinstance(response.json()["detail"], str)
+
+    async def rejected() -> bool:
+        async with Client(f"{server_url}/mcp") as client:
+            try:
+                result = await client.call_tool(name, arguments)
+            except Exception:
+                return True
+        return bool(result.is_error)
+
+    assert anyio.run(rejected)
+
+
+@pytest.mark.parametrize("arguments", BAD_CLI)
+def test_validation_rejects_tk_and_bad_values_on_the_cli(arguments: list[str]) -> None:
+    result = CliRunner().invoke(cli_app, arguments)
+    assert result.exit_code != 0
+    assert "error:" in result.output
+    assert "Traceback" not in result.output
+
+
+def test_rest_accepts_a_missing_body_as_no_arguments(server_url: str) -> None:
+    import httpx
+
+    response = httpx.post(f"{server_url}/api/tools/study_design", timeout=60)
+    assert response.status_code == 200
+    assert response.json()["kind"] == "study_design"
+
+
+def test_rest_tool_endpoint_runs_off_the_event_loop() -> None:
+    import inspect
+
+    route = next(r for r in create_app().routes if getattr(r, "path", "") == "/api/tools/{name}")
+    assert not inspect.iscoroutinefunction(route.endpoint)  # type: ignore[attr-defined]
