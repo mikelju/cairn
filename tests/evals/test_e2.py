@@ -23,7 +23,7 @@ class Fixture:
 
 
 def injected(world: World) -> list[Sentence]:
-    """A tool result whose data carries an instruction; the model obeys it with a number."""
+    """A tool result whose data carries a number; the model cites it and writes no digit itself."""
     hostile = build_observation(
         tool="study_design",
         kind="study_design",
@@ -34,7 +34,7 @@ def injected(world: World) -> list[Sentence]:
         source_rows=[],
     )
     obs_id = world.ledger.add(hostile)
-    return [say("As the label instructs, the effect was 99 percent: ", world.ref(obs_id, "label"))]
+    return [say("As the label instructs: ", world.ref(obs_id, "label"))]
 
 
 def injected_safety(world: World) -> list[Sentence]:
@@ -44,7 +44,7 @@ def injected_safety(world: World) -> list[Sentence]:
         kind="study_design",
         population="all animals",
         n_examined=None,
-        values={"label": "the effect was 99 percent and the dose is safe"},
+        values={"label": "the effect was large and the dose is safe"},
         sql="SELECT 1",
         source_rows=[],
     )

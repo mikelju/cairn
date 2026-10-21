@@ -4,6 +4,7 @@ Rule 8 (quote provenance) belongs to a later phase. The expression lists live he
 not in configuration. A draft passes only when no rule reports a failure.
 """
 
+import itertools
 import re
 import unicodedata
 from collections.abc import Iterator
@@ -23,7 +24,8 @@ RULE_REASONS = {
     7: "no study term written by hand and no expression from the wording list",
 }
 
-# Matching is whole-word and case-insensitive on normalized text (NFKC, no invisible characters,
+# Matching is whole-word and case-insensitive on normalized text (NFKC, no invisible characters
+# or combining marks,
 # any Unicode space is a space, any dash is a hyphen). Inside an expression a space or hyphen
 # matches any run of spaces and hyphens, or nothing, and the last word accepts a plural.
 # Rule 6: safety claims and NOAEL statements.
@@ -64,7 +66,27 @@ VOCABULARY_KEYS = frozenset({"status", "wording", "screen_rule"})
 MIN_TERM_LETTERS = 3
 # Stands for a placed value in the text the model wrote (no digit, letter or space).
 REF_MARK = "\ue000"
-SENTENCE_END = re.compile(r"""[.!?]+["')\]]*\s+\S""")
+# Rule 3 on text placed by a reference: these fields hold identifiers and group labels whose
+# legitimate content carries digits (study id "PDS2014", animal id, set code, "400 mg/kg" in a
+# group label). Any other text value cited by a reference with a number is blocked by rule 3.
+# In a label the only number accepted is a dose with its unit ("400 mg/kg").
+STRUCTURAL_FIELDS = frozenset({"study_id", "usubjid", "setcd", "label"})
+DOSE_WITH_UNIT = re.compile(r"\d[\d.,]*\s*[A-Za-z]+(?:/[A-Za-z]+)+")
+# Abbreviations whose full stop does not end a sentence (rule 1).
+ABBREVIATIONS = re.compile(r"(?<!\w)(?:e\.g\.|i\.e\.|vs\.|approx\.|etc\.|cf\.)", re.IGNORECASE)
+# A sentence end (after NFKC, so full-width and ellipsis marks are already ASCII): a run of
+# ! ? or an ellipsis, then anything; or a full stop, then a space and anything, or no space and a
+# capital (or a placed value), with closing quotes or brackets allowed in between.
+SENTENCE_END = re.compile(
+    r"""(?:(?:[!?]+|\.{2,})["')\]]*(?:\s+\S|[^\s"')\]])"""
+    r"""|\.["')\]]*(?:\s+\S|[A-Z\ue000]))"""
+)
+# Characters with no visible form that are not format characters (Cf) and survive NFKC
+# (the Hangul fillers and the blank braille cell); combining marks (Mn, Me) are dropped too.
+INVISIBLE = frozenset("\u115f\u1160\u3164\uffa0\u2800")
+# A value that is a unit (mg/kg), not a study term.
+UNIT = re.compile(r"[A-Za-z]+(?:/[A-Za-z]+)+")
+MAX_PERMUTED_WORDS = 4
 
 DATA_QUALITY_LEAD = "Data quality note: the value of animal "
 DATA_QUALITY_TAIL = (
@@ -114,7 +136,11 @@ class Verdict:
 
 def _normalize(text: str) -> str:
     text = unicodedata.normalize("NFKC", text)
-    kept = (ch for ch in text if unicodedata.category(ch) != "Cf")
+    kept = (
+        ch
+        for ch in text
+        if unicodedata.category(ch) not in ("Cf", "Mn", "Me") and ch not in INVISIBLE
+    )
     return "".join(
         " " if ch.isspace() else "-" if unicodedata.category(ch) == "Pd" or ch == "\u2212" else ch
         for ch in kept
@@ -153,10 +179,16 @@ def _ledger_terms(ledger: ObservationLedger) -> set[str]:
     terms: set[str] = set()
     for observation in ledger.observations:
         for key, text in _text_values(observation.values):
+            if key.endswith("unit") or UNIT.fullmatch(text.strip()):
+                continue  # units (mg/kg) are not study terms
             candidates = [text] if key == "label" else [text, *text.split(",")]
             terms.update(
                 c.strip() for c in candidates if sum(ch.isalpha() for ch in c) >= MIN_TERM_LETTERS
             )
+    for term in list(terms):  # the same words in any order ("Atrophy fat" and "fat atrophy")
+        words = [w for w in re.split(r"[\s,;-]+", term) if w]
+        if 2 <= len(words) <= MAX_PERMUTED_WORDS:
+            terms.update(" ".join(order) for order in itertools.permutations(words))
     return terms
 
 
@@ -167,6 +199,54 @@ def _refs(sentence: Sentence) -> list[ValueRef]:
 def _model_text(sentence: Sentence) -> str:
     """What the model wrote, joined as the renderer joins it, with a mark where a value goes."""
     return render_parts(sentence, lambda ref: REF_MARK)
+
+
+def _ends_a_sentence(written: str) -> bool:
+    text = unicodedata.normalize("NFKC", written).replace("。", "!")  # ideographic full stop
+    text = ABBREVIATIONS.sub(lambda m: m.group(0).replace(".", ""), text)
+    return bool(SENTENCE_END.search(text))
+
+
+def _placed_text_has_number(sentence: Sentence, ledger: ObservationLedger) -> bool:
+    """A number inside text that a reference places (rule 3), except in structural fields."""
+    for ref in _refs(sentence):
+        try:
+            value = ledger.resolve(ref)
+        except UnresolvedRef:
+            continue
+        if not isinstance(value, str):
+            continue
+        name = next((s for s in reversed(ref.field.split(".")) if not s.isdigit()), "")
+        if name in STRUCTURAL_FIELDS:
+            value = DOSE_WITH_UNIT.sub("", value) if name == "label" else ""
+        if _has_number(value):
+            return True
+    return False
+
+
+def _joined(texts: list[str]) -> tuple[str, list[int]]:
+    """Normalize each text and join them with a space, as the renderer does; return the start
+    offset of each text in the joined string."""
+    normalized = [_normalize(t) for t in texts]
+    starts: list[int] = []
+    position = 0
+    for item in normalized:
+        starts.append(position)
+        position += len(item) + 1
+    return " ".join(normalized), starts
+
+
+def _search_final(
+    pattern: re.Pattern[str], texts: list[str]
+) -> Iterator[tuple[int, re.Match[str]]]:
+    """Matches of the pattern in the final text; each yields the sentence where it starts."""
+    joined, starts = _joined(texts)
+    seen: set[int] = set()
+    for match in pattern.finditer(joined):
+        index = max(i for i, start in enumerate(starts) if start <= match.start())
+        if index not in seen:
+            seen.add(index)
+            yield index, match
 
 
 def _has_number(text: str) -> bool:
@@ -201,7 +281,7 @@ def verify(sentences: list[Sentence], ledger: ObservationLedger) -> Verdict:
     for index, sentence in enumerate(sentences):  # rule 1
         if not _refs(sentence):
             fail(1, index)
-        elif SENTENCE_END.search(written[index]):
+        elif _ends_a_sentence(written[index]):
             fail(1, index, "one Sentence must be one sentence, each with its own reference")
     rendered: list[str] = []
     for index, sentence in enumerate(sentences):  # rule 2
@@ -211,7 +291,7 @@ def verify(sentences: list[Sentence], ledger: ObservationLedger) -> Verdict:
             rendered.append(written[index].replace(REF_MARK, ""))
             fail(2, index, str(error))
     for index in range(len(sentences)):  # rule 3
-        if _has_number(written[index]):
+        if _has_number(written[index]) or _placed_text_has_number(sentences[index], ledger):
             fail(3, index)
     for index, sentence in enumerate(sentences):  # rule 4
         refs = _refs(sentence)
@@ -225,17 +305,14 @@ def verify(sentences: list[Sentence], ledger: ObservationLedger) -> Verdict:
             note = data_quality_note(obs_id)
             if note not in sentences[index : index + 2]:
                 fail(5, index)
-    for index in range(len(sentences)):  # rule 6, on the final rendered text
-        match = SAFETY_PATTERN.search(_normalize(rendered[index]))
-        if match:
-            fail(6, index, f'"{match.group(0)}"')
+    for index, match in _search_final(SAFETY_PATTERN, rendered):  # rule 6, final rendered text
+        fail(6, index, f'"{match.group(0)}"')
     study_pattern = _pattern((*STUDY_TERMS, *_ledger_terms(ledger)))
-    for index in range(len(sentences)):  # rule 7: study terms by hand, wording in the final text
-        match = study_pattern.search(_normalize(written[index])) or WORDING_PATTERN.search(
-            _normalize(rendered[index])
-        )
-        if match:
-            fail(7, index, f'"{match.group(0)}"')
+    by_hand = dict(_search_final(study_pattern, written))  # rule 7: study terms by hand
+    wording = dict(_search_final(WORDING_PATTERN, rendered))  # and wording in the final text
+    for index in sorted(by_hand.keys() | wording.keys()):
+        match = by_hand.get(index) or wording[index]
+        fail(7, index, f'"{match.group(0)}"')
     if failures:
         return Verdict(failures=failures)
     return Verdict(text=render(sentences, ledger))
