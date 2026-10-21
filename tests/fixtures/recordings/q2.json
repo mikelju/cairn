@@ -1,0 +1,117 @@
+{
+  "calls": [
+    {
+      "cost_usd": null,
+      "input_tokens": 0,
+      "latency_s": 0,
+      "output_tokens": 0,
+      "response": {
+        "content": [
+          {
+            "id": "t1",
+            "input": {
+              "kind": "validate_study"
+            },
+            "name": "run_job",
+            "type": "tool_use"
+          }
+        ],
+        "stop_reason": "tool_use",
+        "usage": {
+          "input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    },
+    {
+      "cost_usd": null,
+      "input_tokens": 0,
+      "latency_s": 0,
+      "output_tokens": 0,
+      "response": {
+        "content": [
+          {
+            "id": "t2",
+            "input": {},
+            "name": "study_design",
+            "type": "tool_use"
+          }
+        ],
+        "stop_reason": "tool_use",
+        "usage": {
+          "input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    },
+    {
+      "cost_usd": null,
+      "input_tokens": 0,
+      "latency_s": 0,
+      "output_tokens": 0,
+      "response": {
+        "content": [
+          {
+            "id": "t3",
+            "input": {},
+            "name": "incidence",
+            "type": "tool_use"
+          }
+        ],
+        "stop_reason": "tool_use",
+        "usage": {
+          "input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    },
+    {
+      "cost_usd": null,
+      "input_tokens": 0,
+      "latency_s": 0,
+      "output_tokens": 0,
+      "response": {
+        "content": [
+          {
+            "id": "t4",
+            "input": {
+              "sentences": [
+                {
+                  "parts": [
+                    {
+                      "text": "The screen examined ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "n_examined",
+                      "obs_id": "O2",
+                      "type": "ref"
+                    },
+                    {
+                      "text": " animals",
+                      "type": "text"
+                    }
+                  ]
+                }
+              ]
+            },
+            "name": "write_answer",
+            "type": "tool_use"
+          }
+        ],
+        "stop_reason": "tool_use",
+        "usage": {
+          "input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    }
+  ],
+  "date": "2026-10-21",
+  "model": "fixture",
+  "prompt_version": "question-1",
+  "question_id": "Q2",
+  "region": "none",
+  "source": "fixture",
+  "tool_schema_sha256": "5f5a76ac56de8bc779f9b036f4559c0e2f428cfd34cccbba778d0452b7dae38b"
+}

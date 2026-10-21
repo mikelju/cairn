@@ -21,7 +21,7 @@ demo: build
 # Docker cannot publish ports with --network none, so this target proves the offline claim
 # by fetching the landing page and step 1 from inside a container that has no network.
 demo-offline-check: build
-	docker run --rm --platform $(PLATFORM) --network none $(IMAGE) python -c "import urllib.request as u, socket, subprocess, time; p = subprocess.Popen(['uvicorn', 'cairn.app:create_app', '--factory', '--port', '8000']); [time.sleep(1) for _ in range(120) if socket.socket().connect_ex(('127.0.0.1', 8000))]; [print(x, u.urlopen('http://127.0.0.1:8000' + x).status) for x in ('/', '/step/1', '/healthz')]; p.terminate()"
+	docker run --rm --platform $(PLATFORM) --network none $(IMAGE) python -c "import urllib.request as u, socket, subprocess, time; p = subprocess.Popen(['uvicorn', 'cairn.app:create_app', '--factory', '--port', '8000']); [time.sleep(1) for _ in range(120) if socket.socket().connect_ex(('127.0.0.1', 8000))]; [print(x, u.urlopen('http://127.0.0.1:8000' + x).status) for x in ('/', '/step/1', '/step/2', '/healthz')]; p.terminate()"
 
 # Deploys the image to one Lightsail container service (created on first run) and prints its state and URL.
 # Needs the AWS CLI with Lightsail permissions and the lightsailctl plugin on PATH.

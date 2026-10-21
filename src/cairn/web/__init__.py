@@ -1,26 +1,32 @@
-"""Web pages: landing page, step 1 and /healthz, rendered with Jinja2 and local HTMX."""
+"""Web pages: landing page, steps 1 and 2 and /healthz, rendered with Jinja2 and local HTMX."""
 
+import json
 import os
 import subprocess
 from pathlib import Path
 from typing import Annotated, Any
 
 import pandas as pd
-from fastapi import APIRouter, FastAPI, Form, Request
+from fastapi import APIRouter, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from cairn import __version__
+from cairn.content import Text, ValueRef
+from cairn.gateway import MODEL_PROFILES, LLMGateway, Mode
 from cairn.ingest import build_report, load_study
 from cairn.jobs import JobRunner
+from cairn.loop import PROMPT_VERSION, LoopResult, LoopStatus, ask, schema_hash
+from cairn.questions import QUESTIONS
+from cairn.recording import RecordingKey, ReplayClient, StaleRecording, recording_path, total_cost
 from cairn.validate import RULE_AUC, RULE_CONC, validate_study
 
 HERE = Path(__file__).parent
 templates = Jinja2Templates(directory=HERE / "templates")
 router = APIRouter()
 ROLE = "Study toxicologist"
-STEPS = ["Validate", "Design", "Explore", "Analyse", "Draft", "Check", "Review"]
+STEPS = ["Validate", "Ask", "Explore", "Analyse", "Draft", "Check", "Review"]
 
 
 def _commit() -> str:
@@ -112,6 +118,122 @@ async def step1_run(request: Request, inject: Annotated[str | None, Form()] = No
     return templates.TemplateResponse(
         request, "step1_result.html", {"r": _result(report, injected)}
     )
+
+
+DEFAULT_MODEL = "opus-5-5"
+SCREEN_KIND = "incidence_screen"
+SHOWN_STEPS = ("run_job", "study_design", "incidence", "body_weight_change", "tk_summary")
+
+
+def _recordings_dir() -> Path:
+    return Path(os.environ.get("CAIRN_RECORDINGS", "recordings"))
+
+
+def _marker(field: str) -> str:
+    """A marker for a reference: the last field name, with no digit."""
+    last = field.rsplit(".", 1)[-1]
+    return "[" + "".join(ch for ch in last if not ch.isdigit()).strip("_") + "]"
+
+
+def _written(result: LoopResult) -> str:
+    return " ".join(
+        "".join(part.text if isinstance(part, Text) else _marker(part.field) for part in s.parts)
+        for s in result.sentences
+        if all(isinstance(part, Text | ValueRef) for part in s.parts)
+    )
+
+
+def _screen(result: LoopResult) -> tuple[list[str], list[dict[str, Any]]]:
+    """The screening table from the last incidence Observation: dose headers and printed rows."""
+    for observation in reversed(result.ledger.observations):
+        if observation.kind != SCREEN_KIND:
+            continue
+        findings = observation.values["findings"]
+        doses = [f"{g['dose']:g}" for g in findings[0]["groups"]] if findings else []
+        rows = [
+            {
+                "sex": f["sex"],
+                "tissue": f["tissue"],
+                "finding": f["finding"],
+                "cells": [
+                    f"{g['affected']}/{g['examined']}" if g["examined"] else "not examined"
+                    for g in f["groups"]
+                ],
+            }
+            for f in findings
+        ]
+        return doses, rows
+    return [], []
+
+
+def _evidence(result: LoopResult) -> list[dict[str, str]]:
+    evidence = []
+    for o in result.ledger.observations:
+        ids = [str(row["usubjid"]) for row in o.source_rows if "usubjid" in row]
+        evidence.append(
+            {
+                "tool": o.tool.name,
+                "population": o.population,
+                "n": "n/a" if o.n_examined is None else str(o.n_examined),
+                "sources": f"{len(ids)} animals, from {ids[0]}" if ids else "none",
+            }
+        )
+    return evidence
+
+
+def _step2_context(question_id: str, directory: Path) -> dict[str, Any]:
+    path = recording_path(directory, question_id)
+    model = DEFAULT_MODEL
+    if path.is_file():
+        recorded = str(json.loads(path.read_text(encoding="utf-8")).get("model"))
+        model = recorded if recorded in MODEL_PROFILES else DEFAULT_MODEL
+    key = RecordingKey(question_id, PROMPT_VERSION, schema_hash(), model)
+    client = ReplayClient.load(directory, key)
+    recording = client.recording
+    result = ask(QUESTIONS[question_id], LLMGateway(Mode.REPLAY, client=client), model)
+    verdict = result.verdict
+    cost = total_cost(recording)
+    fixture = recording.get("source") == "fixture"
+    doses, rows = _screen(result)
+    trace = " -> ".join(step.tool for step in result.steps if step.tool in SHOWN_STEPS)
+    return {
+        "badge": "FIXTURE" if fixture else "RECORDED",
+        "meta": (
+            f"{recording['date']} | {recording['region']} | {recording['model']} | "
+            f"{result.latency_s:.1f} s | " + ("cost n/a" if cost is None else f"{cost:.2f} USD")
+        ),
+        "trace": trace,
+        "status": result.status.value,
+        "message": result.message,
+        "answered": result.status is LoopStatus.ANSWERED,
+        "text": result.rendered,
+        "failures": [str(f) for f in verdict.failures] if verdict else [],
+        "rules": ", ".join(str(r) for r in verdict.rules) if verdict and verdict.rules else "none",
+        "written": _written(result),
+        "doses": doses,
+        "rows": rows,
+        "rule": next(
+            (o.values["screen_rule"] for o in result.ledger.observations if o.kind == SCREEN_KIND),
+            "",
+        ),
+        "evidence": _evidence(result),
+    }
+
+
+@router.get("/step/2", response_class=HTMLResponse)
+async def step2(request: Request) -> HTMLResponse:
+    return _page(request, "step2.html", current=2, questions=QUESTIONS)
+
+
+@router.post("/step/2/run", response_class=HTMLResponse)
+def step2_run(request: Request, question: Annotated[str, Form()]) -> HTMLResponse:
+    if question not in QUESTIONS:
+        raise HTTPException(status_code=422, detail="unknown question")
+    try:
+        context = _step2_context(question, _recordings_dir())
+    except StaleRecording as error:
+        return templates.TemplateResponse(request, "step2_result.html", {"stale": str(error)})
+    return templates.TemplateResponse(request, "step2_result.html", {"r": context})
 
 
 def mount_web(app: FastAPI) -> None:
