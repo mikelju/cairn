@@ -5,10 +5,10 @@ from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastmcp import FastMCP
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 from cairn.jobs import Job, JobRunner
-from cairn.tools import REGISTRY, call_tool
+from cairn.tools import REGISTRY, argument_problems, call_tool
 from cairn.web import mount_web
 
 
@@ -52,8 +52,8 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404, detail="unknown tool")
         try:
             return call_tool(name, arguments)
-        except TypeError as error:
-            raise HTTPException(status_code=422, detail=str(error)) from error
+        except ValidationError as error:
+            raise HTTPException(status_code=422, detail=argument_problems(error)) from error
 
     mount_web(app)
     app.mount("/", mcp_app)

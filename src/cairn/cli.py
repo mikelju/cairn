@@ -5,11 +5,22 @@ from typing import Annotated, Any
 
 import typer
 import uvicorn
+from pydantic import ValidationError
 
 from cairn.canonical import canonical_json
-from cairn.tools import call_tool, result_sha256
+from cairn.tools import argument_problems, result_sha256
+from cairn.tools import call_tool as registry_call
 
 app = typer.Typer(help="Cairn: traceable agentic demo for drug safety science.")
+
+
+def call_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+    """Call a tool; bad arguments end the command with a plain message and a non-zero exit."""
+    try:
+        return registry_call(name, arguments)
+    except ValidationError as error:
+        typer.echo(f"error: {argument_problems(error)}", err=True)
+        raise typer.Exit(2) from error
 
 
 def _emit(result: dict[str, Any], show_hash: bool) -> None:

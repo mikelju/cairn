@@ -115,3 +115,47 @@ def test_rest_rejects_unknown_tool_and_bad_arguments(server_url: str) -> None:
 
     assert httpx.post(f"{server_url}/api/tools/nope", json={}).status_code == 404
     assert httpx.post(f"{server_url}/api/tools/incidence", json={"bogus": 1}).status_code == 422
+
+
+BAD_ARGUMENTS: list[tuple[str, dict[str, Any]]] = [
+    ("body_weight_change", {"sex": "F", "population": "tk"}),
+    ("body_weight_change", {"sex": "F", "population": "all"}),
+    ("body_weight_change", {"sex": "X", "population": "main"}),
+    ("tk_summary", {"sex": "Q"}),
+    ("incidence", {"screen": "maybe"}),
+]
+BAD_CLI: list[list[str]] = [
+    ["body-weight-change", "--population", "tk"],
+    ["body-weight-change", "--population", "tk_satellites"],
+    ["body-weight-change", "--sex", "X"],
+    ["tk-summary", "--sex", "Q"],
+]
+
+
+@pytest.mark.parametrize(("name", "arguments"), BAD_ARGUMENTS)
+def test_validation_rejects_bad_arguments_over_mcp_and_rest(
+    server_url: str, name: str, arguments: dict[str, Any]
+) -> None:
+    import httpx
+
+    response = httpx.post(f"{server_url}/api/tools/{name}", json=arguments, timeout=60)
+    assert response.status_code == 422
+    assert isinstance(response.json()["detail"], str)
+
+    async def rejected() -> bool:
+        async with Client(f"{server_url}/mcp") as client:
+            try:
+                result = await client.call_tool(name, arguments)
+            except Exception:
+                return True
+        return bool(result.is_error)
+
+    assert anyio.run(rejected)
+
+
+@pytest.mark.parametrize("arguments", BAD_CLI)
+def test_validation_rejects_tk_and_bad_values_on_the_cli(arguments: list[str]) -> None:
+    result = CliRunner().invoke(cli_app, arguments)
+    assert result.exit_code != 0
+    assert "error:" in result.output
+    assert "Traceback" not in result.output

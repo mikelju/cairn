@@ -3,7 +3,7 @@
 from collections.abc import Callable
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError, validate_call
 
 from cairn.body_weight import body_weight_change
 from cairn.canonical import canonical_sha256
@@ -66,10 +66,22 @@ REGISTRY: dict[str, Callable[..., Any]] = {
 
 
 def call_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
-    """Call a registered tool and return a plain JSON-ready dict."""
-    result = REGISTRY[name](**arguments)
+    """Call a registered tool and return a plain JSON-ready dict.
+
+    Arguments are validated against the tool's own type annotations, the same schema MCP
+    publishes, so REST and the CLI reject what MCP rejects (pydantic ValidationError).
+    """
+    result = validate_call(REGISTRY[name])(**arguments)
     return result.model_dump(mode="json") if isinstance(result, BaseModel) else dict(result)
 
 
 def result_sha256(result: dict[str, Any]) -> str:
     return canonical_sha256(result)
+
+
+def argument_problems(error: ValidationError) -> str:
+    """Plain-language list of what is wrong with the arguments of a tool call."""
+    return "; ".join(
+        f"{'.'.join(str(step) for step in problem['loc']) or 'arguments'}: {problem['msg']}"
+        for problem in error.errors(include_url=False, include_context=False, include_input=False)
+    )
