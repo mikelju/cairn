@@ -52,7 +52,8 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 
 | ID | Agent | Brief | Status | Result or blocker |
 |---|---|---|---|---|
-| E1 | ejecutor (Opus) | Write this plan | done | this commit |
+| E1 | ejecutor (Opus) | Write this plan | done | 19be184; accepted by the supervisor: all criteria covered, AWS steps isolated behind U1 |
+| E2 | ejecutor (Sonnet) | Batch A: increments 1-4 (gateway, stop_reason, recordings, loop) over a fake client | in progress | |
 
 ## User decisions
 Questions the supervisor raises with the user. Statuses: open, answered, deferred; each closes with the user's literal answer.
