@@ -1,6 +1,6 @@
 # Phase 02a - Tools and rules that write no numbers: plan and results
 
-Status: in progress
+Status: ready locally
 Spec: `spec.md` (approved, frozen)
 Base: branch `fase-02-tools-agent` from `main` at 70eebd1
 
@@ -18,7 +18,7 @@ Every increment closes with `npm run check` green (C1) and a commit on `fase-02-
 - [x] 7. Verifier rules 1-7: new `src/cairn/verify.py` applying the rules in order on the rendered text, with the fixed expression lists (safety claims, NOAEL, wording such as "lost") in the module, and a failure that carries the rule number and a plain-language reason; rule 5 reads the quarantine state from phase 01 and its note text is fixed in code (C9) - verification: `uv run pytest tests/test_rules.py` with `test_rule_N_*` for N = 1..7, one passing and one failing fixture each - evidence: `uv run pytest tests/test_rules.py` 16 passed (one passing and one failing `test_rule_N_*` for N = 1..7, plus a clean draft and the in-order check); rule 5 fixed note built by `data_quality_note`; `npm run check` green
 - [x] 8. Evaluations: `tests/evals/test_e1.py` with about 35 exact-equality assertions as fixed by decision D3 (phase 01 validation facts, the 9 screening rows with examined counts, female body weight with n, 2,821 versus 15,956 and 5.7) and `tests/evals/test_e2.py` with about 14 adversarial fixtures as fixed by decision D4, each blocked with the rule that fires, including a number coming from an instruction hidden in the data; both run in the existing `evals` job of `.github/workflows/ci.yml` because pytest collects `tests/` (C10) - verification: `uv run pytest tests/evals` at 100%, with no network and no keys, then `npm run check` - evidence: `uv run pytest tests/evals` 50 passed offline (E1 34 tests over the frozen literals: 14 validation facts, death, 9 screen rows plus row count, female weight, TK; E2 14 fixtures, rules fired: 1 x2, 2 x1, 3 x3, 4 x1, 5 x2, 6 x3, 7 x2, plus the has-14 and fixed-draft checks); `npm run check` green, 151 tests, coverage 99%
 - [x] 9. Clean clone, brand grep and adversarial review before the PR: fresh clone with `uv sync` and `npm run check`; brand grep of the PRD company, person and place terms over tracked files, the `main...HEAD` diff and the commit messages; no GxP validation claim added; independent review with sdd-review, findings in the table below (C1, C21) - verification: fresh clone output green, grep with 0 hits, review table filled - evidence: E8 clean clone at dd57697 green (151 passed, coverage 99.19%), PRD term grep 0 hits, GxP only "not GxP-validated" notices; three review rounds in the table below, closed; clean clone and grep repeated at the tip before the push (increment 10)
-- [ ] 10. Delivery and the bad PR: push `fase-02-tools-agent` and open the phase PR to `main`, not merged, with the required `evals` check green; then branch `bad-pr-relax-rule-3` from the phase tip with a single commit that relaxes rule 3, opened as a draft PR labelled "do not merge" whose `evals` check is red because E2 fixtures stop being blocked; while the phase PR is open the bad PR targets `fase-02-tools-agent` so its diff is that one change, and it is retargeted to `main` once the user merges the phase PR (C19, C21) - verification: `gh pr checks` on both PRs (phase green, bad PR red on `evals` with failing E2 fixtures), `gh pr view` showing draft and the label, branch protection of `main` read with `gh api` still requiring `evals` - evidence:
+- [x] 10. Delivery and the bad PR: push `fase-02-tools-agent` and open the phase PR to `main`, not merged, with the required `evals` check green; then branch `bad-pr-relax-rule-3` from the phase tip with a single commit that relaxes rule 3, opened as a draft PR labelled "do not merge" whose `evals` check is red because E2 fixtures stop being blocked; while the phase PR is open the bad PR targets `fase-02-tools-agent` so its diff is that one change, and it is retargeted to `main` once the user merges the phase PR (C19, C21) - verification: `gh pr checks` on both PRs (phase green, bad PR red on `evals` with failing E2 fixtures), `gh pr view` showing draft and the label, branch protection of `main` read with `gh api` still requiring `evals` - evidence: phase PR https://github.com/mikelju/cairn/pull/5, `gh pr checks 5` `evals` pass; bad PR https://github.com/mikelju/cairn/pull/6, draft, label "do not merge", base `fase-02-tools-agent`, one commit d9c2e64, `gh pr checks 6` `evals` fail on E2 "number from an instruction hidden in the data" and `test_g3_digits_in_cited_text_are_blocked_but_structural_fields_pass`; `gh api` protection of `main`: required contexts `["evals"]` (`enforce_admins` false); retarget of the bad PR to `main` left until the user merges the phase PR
 
 ## Briefs
 Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, failed, cancelled.
@@ -36,6 +36,7 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | E11 | ejecutor (Sonnet) | Fix round 2 findings G1-G6 with regressions (U1) | done | 09bbbcb; 184 tests, coverage 99.40%; G3 exempt fields `study_id`, `usubjid`, `setcd`, `label` (label only a dose with unit) |
 | R6 | revisor (Opus) | Round 3, correctness lens over `git diff 9e2b7ad..09bbbcb` | done | Round 3 in the table below; `npm run check` green, 184 passed; relaxed rule 3 turns E2 red; each G test fails without its fix |
 | E13 | ejecutor (Sonnet) | Fix round 3 findings H1-H3 with regressions (U3) | done | 23318c7; 187 tests, coverage 99.40%; each H test fails on 09bbbcb; R6 probes for H1-H3 blocked; relaxed rule 3 still turns E2 red; side effect: a placed value with a sentence end now fails rule 1, a label number with a non-dose unit now fails rule 3 |
+| E14 | ejecutor (Sonnet) | Increment 10: pre-push checks, push, phase PR, bad PR, CI and branch protection | done | Clean clone at c954033 green, 187 passed, coverage 99.40%; PRD term grep 0 hits; phase PR https://github.com/mikelju/cairn/pull/5 `evals` green; bad PR https://github.com/mikelju/cairn/pull/6 (d9c2e64) draft, "do not merge", `evals` red; `main` requires `evals` |
 
 ## User decisions
 Questions the supervisor raises with the user. Statuses: open, answered, deferred; each closes with the user's literal answer.
@@ -64,7 +65,7 @@ Pending items, limitations and what could not be checked, stated plainly.
 
 | Criterion | Run | Observed | Evidence |
 |---|---|---|---|
-| C1 | `npm run check` at 23318c7; clean clone at dd57697 (E8) | green, 187 passed, coverage 99.40% | E13, E8; repeated on a clean clone at the tip in increment 10 |
+| C1 | `npm run check` on a clean clone at c954033 | green, 187 passed, coverage 99.40% | E14 |
 | C2 | `test_observation_*`, `test_tools_duckdb_read_only` | pass | increment 1 |
 | C3, C4 | `tests/test_incidence.py` | 9 screen rows match the Data check; full table; single screen rule text | increment 2 |
 | C5 | `tests/test_body_weight.py` | 9.3/17.6/20.7, n 15/10/10/15, PDS2014-0165 -5.3 g | increment 3 |
@@ -73,11 +74,14 @@ Pending items, limitations and what could not be checked, stated plainly.
 | C8 | `tests/test_renderer.py` | numbers placed from fields | increment 6 |
 | C9 | `tests/test_rules.py` | passing and failing fixture per rule, 34 passed | increment 7, E9, E11, E13 |
 | C10 | `uv run pytest tests/evals --no-cov` | 51 passed offline; relaxed rule 3 turns E2 red | E13 |
-| C19 | bad PR checks | pending | increment 10 |
-| C21 | PRD term grep, GxP grep | 0 hits at dd57697 | E8; repeated before the push |
+| C19 | `gh pr checks` on PRs 5 and 6, `gh api` protection of `main` | phase green, bad PR red on `evals`, `evals` required | increment 10, E14 |
+| C21 | PRD term grep, GxP grep | 0 hits at c954033; only "not GxP-validated" notices | E14 |
 
 Pending for 02b, stated plainly: number words pass rule 3 (U2); H4 non-Latin sentence ends, "etc." ending a sentence, newline and ".all"; H5 letters/letters findings dropped from study terms; homoglyphs; round 1 plausible items (two IDs per Observation, two AUCtau implementations, duplicated SQL and `TKDESC`, double validation and rounding); FastMCP sync tools on the event loop not reviewed.
 This is a demo (U4): the pattern-based verifier keeps showing new edges each round, so these are accepted limits, not hidden failures.
 
 ## Candidate learnings
+- A pattern-based verifier shows new edges every review round; in 02b, judge rules on one normalized rendered text built once, and consider a more structural design.
+- Cap review rounds up front and decide in advance what is deferred, so the review does not become a loop.
+- The bad PR also turns a unit test red, not only E2; a stronger demo would make E2 the only failing check.
 Only reusable lessons with a verbatim quote from the session; consolidated when the phase closes.
