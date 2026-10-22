@@ -159,6 +159,7 @@ LEAKS = {
     "badge": re.compile(r"class=\"[^\"]*\bbadge\b"),
     "trace": re.compile(r"class=\"[^\"]*\btrace\b"),
     "callout": re.compile(r"class=\"[^\"]*\bcallout\b"),
+    "production": re.compile(r'class="[^"]*\bprod\b|In production', re.I),
 }
 BADGE_KINDS = ["REAL", "RECORDED", "SIMULATED", "FIXTURE"]
 
@@ -243,6 +244,8 @@ def test_shared_components_failing_sample() -> None:
         "callout",
     ]
     assert component_leaks("{{ a.data_table(h, rows) }}") == []
+    assert component_leaks("<p>x <strong>In production</strong> y</p>") == ["production"]
+    assert component_leaks('<p class="prod">x</p>') == ["production"]
 
 
 def test_shared_components_render_through_the_macros() -> None:
@@ -294,7 +297,9 @@ def test_badge_recorded_keeps_its_metadata_and_simulated_its_production_line(
     assert str(recorded["date"]) in meta.group(1) and str(recorded["region"]) in meta.group(1)
     assert "opus-4-6" in meta.group(1)
     assert re.search(r"\| \d+\.\d s \|", meta.group(1)) and "USD" in meta.group(1)
-    assert 'class="badge simulated"' in step1 and "In production" in step1
+    prod = re.search(r'<p class="prod">(.*?)</p>', step1, flags=re.S)
+    assert prod is not None
+    assert 'class="badge simulated"' in prod.group(1) and "In production" in prod.group(1)
 
 
 # --- Contrast and focus (C7) ---

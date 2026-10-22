@@ -148,6 +148,16 @@ def test_q6_blocked_by_rules_on_fixture(monkeypatch: pytest.MonkeyPatch) -> None
     assert "<tr><td>" not in result
 
 
+def _callout_classes(html: str) -> list[str]:
+    return re.findall(r'class="callout (\w+)"', html)
+
+
+@pytest.mark.parametrize("folder", [FIXTURES, REAL])
+def test_q6_callout_is_blocked_and_q2_is_not(monkeypatch: pytest.MonkeyPatch, folder: Path) -> None:
+    assert "blocked" in _callout_classes(_ask("Q6", monkeypatch, folder))
+    assert "blocked" not in _callout_classes(_ask("Q2", monkeypatch, folder))
+
+
 def test_step2_missing_recording_shows_the_stale_message(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:

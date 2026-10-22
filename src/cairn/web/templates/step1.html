@@ -7,6 +7,6 @@
   <label><input type="checkbox" name="inject" value="on" hx-post="/step/1/run" hx-target="#result" hx-include="this" hx-trigger="change"> Inject a negative concentration</label>
 </form>
 <div id="result" class="result"></div>
-<p class="prod">{{ a.badge("SIMULATED") }} job runner: in process. <strong>In production →</strong> a queue with workers.</p>
+{{ a.in_production("a queue with workers.", "SIMULATED", "job runner: in process.") }}
 {% endcall %}
 {% endblock %}

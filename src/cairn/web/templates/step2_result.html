@@ -15,7 +15,7 @@
 {% endif %}
 {{ a.trace(r.trace) }}
 {% if r.message or r.failures %}
-{% call a.callout("note" if r.answered else "blocked") %}
+{% call a.callout("blocked" if (not r.answered or r.failures) else "note") %}
 {% if r.message %}<p>{{ r.message }}</p>{% endif %}
 {% if r.failures %}<ul>{% for f in r.failures %}<li>{{ f }}</li>{% endfor %}</ul>{% endif %}
 {% endcall %}
