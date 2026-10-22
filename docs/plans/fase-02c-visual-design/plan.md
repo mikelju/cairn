@@ -124,6 +124,31 @@ The spec decisions U1 to U6 and the supervisor decision S1 are recorded in `spec
 Per criterion: command or walkthrough run, observed result and reference to the evidence.
 Pending items, limitations and what could not be checked, stated plainly.
 
+Evidence in this section was obtained at the tip before delivery (f041652 for code, plus record commits only after it); details per increment above.
+
+| Criterion | Command or walkthrough | Result |
+|---|---|---|
+| C1 | `uv sync`, `npm ci`, `npm run check` on a clean clone (increment 9, E45 and again at f041652 by E50); `npm run check` rerun at the tip by E52 | ruff, format, strict mypy, 321 tests, `npm ls` and hook suite green |
+| C2 | `tests/test_design.py` `test_design_tokens_*` inside `npm run check` | green; one `:root` block, no literal colour, family or raw size elsewhere, no `style=` in templates |
+| C3 | `test_shared_components_*` inside `npm run check`; review rounds R1 and R2 | green after the step 1 "In production" line moved onto the macro |
+| C4 | Walkthrough at 1440x900, 8 app states, screenshots in `docs/plans/fase-02c-visual-design/evidence/` (increment 8, re-measured by E50) | `scrollHeight` 900 for all, tightest content end 825 px (step 1 injected) |
+| C5 | `test_word_cap_rendered_*` in `tests/test_word_cap.py` with failing samples | green; app states 20 to 93 words, lede one sentence of at most 25 words |
+| C6 | Badge macro and CSS tests; `badges.png` side by side | green; four badges differ by fill, border and glyph besides colour and always show the word |
+| C7 | `test_contrast_*` and the `:focus-visible` CSS check; keyboard pass by the supervisor (increment 8) | green; lowest pair 3.63:1 for a control border; every control shows a 2 px accent outline |
+| C8 | `tests/test_web.py` kept or strengthened, `test_q2_replay`, `test_q6_blocked` on unchanged recordings | green |
+| C9 | `test_mockups_*`, `mock3.png` to `mock7.png` at 1440x900 | green; 58 to 88 words, all fit 900 px, MOCKUP stamp and placeholder labels present |
+| C10 | Lavish page `.lavish/fase-02c-maquetas.html` (git-ignored), answer recorded as U7 in `spec.md` and Q1 here | approved as they are, later phases may adjust |
+| C11 | `make demo-offline-check` (exit 0, `--network none`), external-URL scan test, network log of step 2 | green; every request to the local host, fonts served from `static/fonts/` |
+| C12 | `git diff main...HEAD` outside `docs/` | 18 files, all under `src/cairn/web/` or `tests/`; nothing under `recordings/` |
+| C13 | Local grep of 24 PRD terms over tracked files, added lines and commit messages; GxP grep | 0 PRD matches (control matched); only "not GxP-validated" notices plus plan and spec text stating the rule |
+
+Follow-ups, not fixed in this phase:
+- Step 2 renders "examined a total of 80 animals" while the evidence says "n=80, 37 animals": a renderer defect outside 02c; a separate change is advised.
+- The word-cap state list does not pick up future step templates automatically.
+- Mockup fonts under `file://` in Firefox are unverified.
+
+Limitation: screenshots and the keyboard pass were done by hand in a headless Chrome and the supervisor's browser pane; no automated browser test exists because Playwright is not a dependency.
+
 - Pending, unrelated to the phase criteria: the stop-gate `npm run check` times out or fails in the main checkout while phase agents run there in parallel (a `.coverage` file lock was also seen); not caused by a change.
 
 ## Candidate learnings
