@@ -8,7 +8,7 @@ import typer
 import uvicorn
 from pydantic import ValidationError
 
-from cairn import live, passages
+from cairn import live, passages, weights
 from cairn.canonical import canonical_json
 from cairn.gateway import DEFAULT_MODEL, MODEL_PROFILES, GatewayError
 from cairn.recording import RECORDINGS_DIR, StaleRecording, recorded_model
@@ -173,6 +173,20 @@ def guidance_build_command(output: Path = passages.PASSAGES_PATH) -> None:
     """Rebuild data/guidance/passages.json from the pinned guideline PDFs."""
     count = passages.write_passages(output)
     typer.echo(f"wrote {output}: {count} passages")
+
+
+@guidance_app.command("weights")
+def guidance_weights_command() -> None:  # pragma: no cover
+    """Download the pinned model weights into CAIRN_MODELS and verify every SHA-256."""
+    models = weights.models_dir()
+    try:
+        done = weights.download_weights(models)
+    except weights.WeightsError as error:
+        typer.echo(str(error), err=True)
+        raise typer.Exit(1) from error
+    for name, relative, size in done:
+        typer.echo(f"{name} {relative} {size} bytes ok")
+    typer.echo(f"weights verified in {models}")
 
 
 @app.command()

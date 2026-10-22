@@ -8,7 +8,7 @@ SERVICE ?= cairn
 REGION ?= eu-west-1
 POWER ?= medium
 
-.PHONY: build demo demo-offline-check deploy guidance
+.PHONY: build demo demo-offline-check deploy guidance weights
 
 build:
 	docker build --platform $(PLATFORM) --build-arg COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo unknown) -t $(IMAGE) .
@@ -69,3 +69,7 @@ smoke:
 # Rebuilds the generated guidance files from the pinned guideline PDFs (never edit them by hand).
 guidance:
 	uv run cairn guidance build
+
+# Downloads the pinned model weights into CAIRN_MODELS (default ~/.cache/cairn/models) and verifies every SHA-256.
+weights:
+	uv run cairn guidance weights

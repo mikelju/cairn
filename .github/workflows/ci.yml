@@ -16,6 +16,11 @@ jobs:
         with:
           version: "0.10.9"
       - run: uv sync --frozen
+      - uses: actions/cache@v4.2.3
+        with:
+          path: ~/.cache/cairn/models
+          key: weights-${{ hashFiles('data/guidance/weights.json') }}
+      - run: uv run cairn guidance weights
       - run: uv run ruff check
       - run: uv run ruff format --check
       - run: uv run mypy
