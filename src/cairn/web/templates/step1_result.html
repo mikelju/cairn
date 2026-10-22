@@ -1,16 +1,11 @@
+{% import "_components.html" as a %}
 <p><strong>{{ r.total }}</strong> quarantined{% if r.injected %}, including the injected row{% endif %}.</p>
 {% if r.fired %}
-<table>
-  <tr><th>Rule</th><th>Animal</th><th>Test</th><th>Value</th></tr>
-  {% for f in r.fired %}
-  <tr class="new"><td>{{ f.rule }}</td><td>{{ f.usubjid }}</td><td>{{ f.test }}</td><td>{{ f.value }}</td></tr>
-  {% endfor %}
-</table>
+{% set fired = namespace(rows=[]) %}
+{% for f in r.fired %}{% set fired.rows = fired.rows + [[f.rule, f.usubjid, f.test, f.value]] %}{% endfor %}
+{{ a.data_table(["Rule", "Animal", "Test", "Value"], fired.rows, new=true) }}
 {% endif %}
-<table>
-  <tr><th>Rule</th><th>Animal</th><th>Test</th><th>Day</th><th>Value</th></tr>
-  {% for q in r.rows %}
-  <tr><td>{{ q.rule }}</td><td>{{ q.usubjid }}</td><td>{{ q.test }}</td><td>{{ q.visit_day|int }}</td><td>{{ q.value }}</td></tr>
-  {% endfor %}
-</table>
+{% set held = namespace(rows=[]) %}
+{% for q in r.rows %}{% set held.rows = held.rows + [[q.rule, q.usubjid, q.test, q.visit_day|int, q.value]] %}{% endfor %}
+{{ a.data_table(["Rule", "Animal", "Test", "Day", "Value"], held.rows) }}
 <p>Naive mean AUCtau, males 20 mg/kg/day, day 1: {{ r.with_bad }} with the bad value (n={{ r.n_with }}), {{ r.without_bad }} without it (n={{ r.n_without }}).</p>
