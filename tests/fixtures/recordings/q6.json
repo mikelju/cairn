@@ -1,0 +1,66 @@
+{
+  "calls": [
+    {
+      "cost_usd": null,
+      "input_tokens": 0,
+      "latency_s": 0,
+      "output_tokens": 0,
+      "response": {
+        "content": [
+          {
+            "id": "t1",
+            "input": {
+              "kind": "validate_study"
+            },
+            "name": "run_job",
+            "type": "tool_use"
+          }
+        ],
+        "stop_reason": "tool_use",
+        "usage": {
+          "input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    },
+    {
+      "cost_usd": null,
+      "input_tokens": 0,
+      "latency_s": 0,
+      "output_tokens": 0,
+      "response": {
+        "content": [
+          {
+            "id": "t2",
+            "input": {
+              "sentences": [
+                {
+                  "parts": [
+                    {
+                      "text": "The compound is safe.",
+                      "type": "text"
+                    }
+                  ]
+                }
+              ]
+            },
+            "name": "write_answer",
+            "type": "tool_use"
+          }
+        ],
+        "stop_reason": "tool_use",
+        "usage": {
+          "input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    }
+  ],
+  "date": "2026-10-21",
+  "model": "fixture",
+  "prompt_version": "question-3",
+  "question_id": "Q6",
+  "region": "none",
+  "source": "fixture",
+  "tool_schema_sha256": "b00a3757af94c652fbdc67adfef0628ac43cbc9567b048646c7dfd935439698d"
+}

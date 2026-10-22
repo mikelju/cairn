@@ -42,7 +42,7 @@ def step_sources() -> dict[int, str]:
 
 def test_each_step_template_is_within_the_word_cap() -> None:
     steps = step_sources()
-    assert 1 in steps
+    assert 1 in steps and 2 in steps
     for number, html in steps.items():
         assert over_cap(html) == [], f"step {number} is over the cap"
 

@@ -1,13 +1,17 @@
-"""Command line: the same registry tools as MCP and REST."""
+"""Command line: the registry tools (also over MCP and REST); ask, record and smoke are CLI only."""
 
 import json
+from pathlib import Path
 from typing import Annotated, Any
 
 import typer
 import uvicorn
 from pydantic import ValidationError
 
+from cairn import live
 from cairn.canonical import canonical_json
+from cairn.gateway import DEFAULT_MODEL, MODEL_PROFILES, GatewayError
+from cairn.recording import RECORDINGS_DIR, StaleRecording, recorded_model
 from cairn.tools import argument_problems, result_sha256
 from cairn.tools import call_tool as registry_call
 
@@ -76,6 +80,90 @@ def tk_summary_command(
 ) -> None:
     """Print the toxicokinetic AUCtau summary as canonical JSON."""
     _emit(call_tool("tk_summary", {"sex": sex, "dose": dose, "day": day}), hash_only)
+
+
+def _known_model(model: str) -> str:
+    """Return the model or end the command before any ceiling is computed."""
+    if model not in MODEL_PROFILES:
+        typer.echo(f"error: unknown model: {model} (known: {', '.join(MODEL_PROFILES)})", err=True)
+        raise typer.Exit(2)
+    return model
+
+
+@app.command("ask")
+def ask_command(
+    question: Annotated[str, typer.Argument(help="Question ID (Q2, Q6) or free text with --live")],
+    live_mode: Annotated[bool, typer.Option("--live", help="Call Bedrock")] = False,
+    model: Annotated[
+        str | None, typer.Option(help="Model key; replay reads it from the file")
+    ] = None,
+    recordings: Path = RECORDINGS_DIR,
+) -> None:
+    """Answer a question: replay a recording, or call the model with --live."""
+    question_id, text = live.question_text(question)
+    if model is not None:
+        _known_model(model)
+    try:
+        if live_mode:
+            chosen = model or DEFAULT_MODEL
+            typer.echo(f"ceiling: {live.record_ceiling(chosen, 1):.2f} USD")
+            result = live.ask_live(text, chosen)
+        elif question_id:
+            chosen = model or recorded_model(recordings, question_id, DEFAULT_MODEL)
+            result = live.ask_replay(question_id, recordings, chosen)
+        else:
+            typer.echo("error: replay needs a question ID (Q2, Q6); use --live", err=True)
+            raise typer.Exit(2)
+    except typer.Exit:
+        raise
+    except (StaleRecording, GatewayError) as error:
+        typer.echo(f"error: {error}", err=True)
+        raise typer.Exit(1) from error
+    except Exception as error:  # SDK errors (403, timeout, throttling) end as a plain message
+        typer.echo(f"error: {type(error).__name__}: {error}", err=True)
+        raise typer.Exit(1) from error
+    typer.echo(f"status: {result.status.value}")
+    if result.message:
+        typer.echo(result.message)
+    if result.rendered:
+        typer.echo(result.rendered)
+    if result.verdict is not None:
+        typer.echo(f"rules fired: {result.verdict.rules}")
+
+
+@app.command("record")
+def record_command(
+    questions: Annotated[list[str], typer.Argument(help="Question IDs, for example Q2 Q6")],
+    model: str = DEFAULT_MODEL,
+    recordings: Path = RECORDINGS_DIR,
+) -> None:
+    """Record questions against Bedrock (laptop only); stops before 10 USD."""
+    _known_model(model)
+    ids = [live.question_text(q)[0] for q in questions]
+    if not all(ids):
+        typer.echo("error: record takes question IDs (Q2, Q6)", err=True)
+        raise typer.Exit(2)
+    typer.echo(f"ceiling: {live.record_ceiling(model, len(ids)):.2f} USD of {live.BUDGET_USD:.2f}")
+    report = live.record_questions(ids, recordings, model)
+    for question_id, outcome in report.outcomes.items():
+        typer.echo(f"{question_id}: {outcome}")
+    for path in report.saved:
+        typer.echo(f"saved {path}")
+    for question_id in report.unsaved:
+        typer.echo(f"not saved: {question_id} (the file is left as it was)")
+    typer.echo(f"spent: {report.spent:.4f} USD")
+    if report.stopped:
+        typer.echo(report.stopped, err=report.stopped.startswith("error:"))
+    if report.stopped or report.unsaved:
+        raise typer.Exit(1)
+
+
+@app.command("smoke")
+def smoke_command(output: Path = live.SMOKE_PATH) -> None:
+    """Send question, draft and judge prompts to each profile (laptop only)."""
+    typer.echo(f"ceiling: {live.smoke_ceiling():.2f} USD of {live.BUDGET_USD:.2f}")
+    evidence = live.smoke(output)
+    typer.echo(f"wrote {output}; spent {evidence['total_cost_usd']:.4f} USD")
 
 
 @app.command()

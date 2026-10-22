@@ -1,0 +1,105 @@
+{
+  "date": "2026-10-22",
+  "profiles": [
+    {
+      "calls": [
+        {
+          "cost_usd": 0.00989,
+          "error": null,
+          "input_tokens": 1598,
+          "latency_s": 24.25,
+          "name": "question",
+          "output_tokens": 76,
+          "quota_error": false,
+          "refusal": false,
+          "status": "ok",
+          "stop_reason": "tool_use",
+          "tool_calls": [
+            "run_job"
+          ]
+        },
+        {
+          "cost_usd": 0.001905,
+          "error": null,
+          "input_tokens": 16,
+          "latency_s": 2.609,
+          "name": "draft",
+          "output_tokens": 73,
+          "quota_error": false,
+          "refusal": false,
+          "status": "ok",
+          "stop_reason": "end_turn",
+          "tool_calls": []
+        },
+        {
+          "cost_usd": 0.006415,
+          "error": null,
+          "input_tokens": 623,
+          "latency_s": 3.078,
+          "name": "judge",
+          "output_tokens": 132,
+          "quota_error": false,
+          "refusal": false,
+          "status": "ok",
+          "stop_reason": "tool_use",
+          "tool_calls": [
+            "judge_verdict"
+          ]
+        }
+      ],
+      "model": "opus-4-6",
+      "profile": "eu.anthropic.claude-opus-4-6-v1"
+    },
+    {
+      "calls": [
+        {
+          "cost_usd": 0.005949,
+          "error": null,
+          "input_tokens": 1598,
+          "latency_s": 1.922,
+          "name": "question",
+          "output_tokens": 77,
+          "quota_error": false,
+          "refusal": false,
+          "status": "ok",
+          "stop_reason": "tool_use",
+          "tool_calls": [
+            "run_job"
+          ]
+        },
+        {
+          "cost_usd": 0.000948,
+          "error": null,
+          "input_tokens": 16,
+          "latency_s": 1.578,
+          "name": "draft",
+          "output_tokens": 60,
+          "quota_error": false,
+          "refusal": false,
+          "status": "ok",
+          "stop_reason": "end_turn",
+          "tool_calls": []
+        },
+        {
+          "cost_usd": 0.004404,
+          "error": null,
+          "input_tokens": 623,
+          "latency_s": 3.032,
+          "name": "judge",
+          "output_tokens": 169,
+          "quota_error": false,
+          "refusal": false,
+          "status": "ok",
+          "stop_reason": "tool_use",
+          "tool_calls": [
+            "judge_verdict"
+          ]
+        }
+      ],
+      "model": "sonnet-4-6",
+      "profile": "eu.anthropic.claude-sonnet-4-6"
+    }
+  ],
+  "region": "eu-west-1",
+  "total_cost_usd": 0.029511000000000003
+}

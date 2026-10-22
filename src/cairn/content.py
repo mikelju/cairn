@@ -63,7 +63,8 @@ class ObservationLedger:
     def resolve(self, ref: ValueRef) -> Any:
         """Walk the dotted field path: dict keys and list positions, from the Observation values."""
         observation = self.get(ref.obs_id)
-        head, *rest = ref.field.split(".")
+        field = ref.field.removeprefix("values.")  # the model sees the values under "values"
+        head, *rest = field.split(".")
         if head in OBSERVATION_FIELDS:
             current: Any = getattr(observation, head)
         else:

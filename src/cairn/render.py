@@ -26,8 +26,17 @@ def format_value(value: Any) -> str:
 
 
 def render_parts(sentence: Sentence, place: Callable[[ValueRef], str]) -> str:
-    """Join the parts of a sentence exactly as the renderer does: no separator, in order."""
-    return "".join(part.text if isinstance(part, Text) else place(part) for part in sentence.parts)
+    """Join the parts in order, adding a space between text and a value only where words fuse."""
+    out = ""
+    previous: Text | ValueRef | None = None
+    for part in sentence.parts:
+        piece = part.text if isinstance(part, Text) else place(part)
+        mixed = isinstance(part, Text) != isinstance(previous, Text)
+        if previous is not None and mixed and out[-1:].isalnum() and piece[:1].isalnum():
+            out += " "
+        out += piece
+        previous = part
+    return out
 
 
 def render_sentence(sentence: Sentence, ledger: ObservationLedger) -> str:

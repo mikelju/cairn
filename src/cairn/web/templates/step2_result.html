@@ -1,0 +1,26 @@
+{% import "_anatomy.html" as a %}
+{% if stale %}
+<p>{{ stale }}</p>
+{% else %}
+<p>{{ a.badge(r.badge) }} {{ r.meta }}</p>
+<p>Trace: {{ r.trace }}</p>
+{% if r.message %}<p>{{ r.message }}</p>{% endif %}
+{% if r.rows %}
+<p>{{ r.rule }}</p>
+<table>
+  <tr><th>Sex</th><th>Tissue</th><th>Finding</th>{% for d in r.doses %}<th>{{ d }}</th>{% endfor %}</tr>
+  {% for row in r.rows %}
+  <tr><td>{{ row.sex }}</td><td>{{ row.tissue }}</td><td>{{ row.finding }}</td>{% for c in row.cells %}<td>{{ c }}</td>{% endfor %}</tr>
+  {% endfor %}
+</table>
+{% endif %}
+{% if r.text %}<p><strong>{{ r.text }}</strong></p>{% endif %}
+{% if r.failures %}
+<ul>{% for f in r.failures %}<li>{{ f }}</li>{% endfor %}</ul>
+{% endif %}
+<p>Rules fired: {{ r.rules }}</p>
+<details><summary>What the model wrote</summary><p>{{ r.written }}</p></details>
+{% for e in r.evidence %}
+<p class="prod">{{ e.tool }}, {{ e.population }}, n={{ e.n }}, {{ e.sources }}</p>
+{% endfor %}
+{% endif %}

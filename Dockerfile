@@ -8,6 +8,7 @@ COPY pyproject.toml uv.lock README.md LICENSE ./
 COPY src ./src
 COPY data/manifest.json ./data/manifest.json
 COPY data/pds2014 ./data/pds2014
+COPY recordings ./recordings
 # The cryptography<=46.0.3 constraint in pyproject.toml is already pinned in uv.lock; linux x86_64 wheels exist.
 RUN uv sync --frozen --no-dev
 # The DuckDB file is built here, from the vendored XPT snapshot: no network at runtime.
