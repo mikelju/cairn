@@ -61,4 +61,4 @@ Checks after the last change: `npm run check` exit 0; `make demo-offline-check` 
 Adversarial review: not run for this one-word label change; no findings open.
 Limitations: none known; recordings untouched.
 Branch `cambio-001-step2-animal-count` also carries the phase 02c closure records (69633c6).
-PR and CI: pending.
+PR: https://github.com/mikelju/cairn/pull/9 - CI green (evals pass on both runs).
