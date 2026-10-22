@@ -80,7 +80,8 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | E25 | revisor (Opus) | R1, lens evidence and tests, `git diff ce1a81f` | done | 4 important, 6 minor; see review table |
 | E26 | revisor (Opus) | R1, lens scope and maintenance, `git diff ce1a81f` | done | 2 important, 6 minor; see review table |
 | E27 | ejecutor (Sonnet) | Fix the R1 confirmed findings, no re-recording | done | c2dc752, e1baa5e, b0494b5, c818284, fa98628; 267 tests, coverage 98.58%; Q2 and Q6 replay unchanged; offline check also POSTs Q2. A continuation launched after the handoff found the original still writing and stopped without changes |
-| E28 | revisor (Opus) | R2 over the E27 fixes, correctness and evidence lenses | in progress | |
+| E28 | revisor (Opus) | R2 over the E27 fixes, correctness and evidence lenses | done | 0 blocking; 11 of 12 R1 fixes close; confirmed: DEFAULT_MODEL assigned twice in gateway.py, step 2 header crashes on a non-object JSON and shows RECORDED with no recordings, AWS-doc placeholder account ID in a test ARN; plausible: repeated question ID hides a failed run |
+| E29 | ejecutor (Sonnet) | Fix the R2 confirmed findings | in progress | |
 | E13 | ejecutor (Opus) | Lavish page for the user: the question flow drawn step by step on the real recordings | done | `.lavish/flujo-pregunta.html` open, not versioned; found two facts to check: the model sees observation values with their numbers (only the hash ID is hidden), and Q6 sentence 2 renders "containing124animals" (no space between text and value: renderer or model text, to check before re-recording) |
 
 ## User decisions
