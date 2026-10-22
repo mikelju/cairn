@@ -18,17 +18,26 @@ Current authorisation and limits: standalone change in its own worktree; re-reco
 | C3 | No regression: `npm run check` green, step 2 states within the word cap (93 with the toggle open) and `make demo-offline-check` passes | Command output |
 
 ## Plan
-- [ ] 1. Failing test on the real path, root cause, fix, re-record if needed.
-- [ ] 2. Re-run C3 and update this record.
+- [x] 1. Failing test on the real path, root cause, fix, re-record if needed.
+- [x] 2. Re-run C3 and update this record.
 
 ## Decisions
+Root cause: the prompt (question-3) told the model to answer with one sentence citing the screen's examined count and never to name tissues, findings or sexes, so the model obeyed and wrote a count sentence; "shown above" was the model's own words, and the table sits in the right column beside the answer.
+The tool output already carries `findings.N.tissue`, `.finding` and `.sex`, so no tool change was needed.
+Fix: prompt question-4 asks for one sentence naming one finding (tissue and finding by ref) and its sexes by ref, with no counts and no table position, and tells the model to decline Q6-type requests in plain text.
+The first re-recordings of question-4 drifted: a two-finding sentence broke the 93-word cap, and one prompt variant made Q6 answer instead of decline; both were fixed in the prompt, not by changing criteria.
+Q6 is re-recorded too because the prompt version is part of the recording key; its outcome is still declined.
+Test fixtures only got the new `prompt_version`.
+Existing tests that pinned the old count sentence were updated (real-recording text, toggle marker; the count-consistency test now runs on the fixture only, since the real prose no longer states a count).
+Recording cost: three runs of Q2 and Q6 with Bedrock Opus 4.6, 0.0749 + 0.1094 + 0.0589 = 0.243 USD, 0.059 USD for the kept recordings; within the 5 USD limit.
+
 
 ## Briefs
 Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, failed, cancelled.
 
 | ID | Agent | Brief | Status | Result or blocker |
 |---|---|---|---|---|
-| E55 | ejecutor (Sonnet) | Reproduce, find the root cause and fix the Q2 prose with a failing-first test | in progress | |
+| E55 | ejecutor (Sonnet) | Reproduce, find the root cause and fix the Q2 prose with a failing-first test | done | Prompt question-4 and re-recording; see Decisions and Evidence |
 
 ## User decisions
 Questions the supervisor raises with the user. Statuses: open, answered, deferred; each closes with the user's literal answer.
@@ -41,5 +50,10 @@ Questions the supervisor raises with the user. Statuses: open, answered, deferre
 |---|---|---|---|---|---|
 
 ## Evidence
+- C1: `tests/test_web.py::test_q2_prose_names_the_screened_findings_by_sex_and_places_no_table_position`.
+  Before: failed, `the prose names no finding that passes the screen: 'The screening table examined a total of 80 animals and is shown above.'`.
+  After: passed; rendered prose "GLAND, ADRENAL Vacuolization passed the screen in F and M."; no table position stated.
+- C2: the toggle shows "[tissue] [finding] passed the screen in [sex] and [sex]." with no digit (`test_step2_toggle_shows_markers_and_no_digits`); every value is a ref.
+- C3: `npm run check` exit 0 (323 passed); word cap rendered: step 2 Q2 77, Q2 open 86 (cap 93), Q6 39; `make demo-offline-check PLATFORM=linux/arm64` exit 0 (`POST /step/2/run 200 RECORDED`); the default amd64 build failed once on DNS during `uv sync` and was not retried on amd64.
 
 ## Delivery
