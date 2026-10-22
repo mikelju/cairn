@@ -22,6 +22,7 @@ CASES: list[tuple[str, dict[str, Any]]] = [
     ("incidence", {"screen": True}),
     ("body_weight_change", {"sex": "F", "population": "main_and_recovery"}),
     ("tk_summary", {"sex": "M", "dose": 20.0, "day": 1.0}),
+    ("search_guidance", {"query": "How does the FDA 2005 guidance define the no observed adverse effect level (NOAEL)?"}),
 ]
 
 
@@ -70,6 +71,8 @@ def cli_hash(name: str, arguments: dict[str, Any]) -> str:
         args = ["body-weight-change", "--sex", "F", "--hash"]
     elif name == "tk_summary":
         args = ["tk-summary", "--sex", "M", "--dose", "20", "--day", "1", "--hash"]
+    elif name == "search_guidance":
+        args = ["search-guidance", arguments["query"], "--hash"]
     else:
         args = ["study-design", "--hash"]
     result = CliRunner().invoke(cli_app, args)
@@ -92,6 +95,7 @@ def test_registry_has_exactly_the_registered_tools() -> None:
         "body_weight_change",
         "incidence",
         "run_job",
+        "search_guidance",
         "study_design",
         "tk_summary",
     ]
@@ -178,3 +182,12 @@ def test_rest_tool_endpoint_runs_off_the_event_loop() -> None:
 
     route = next(r for r in create_app().routes if getattr(r, "path", "") == "/api/tools/{name}")
     assert not inspect.iscoroutinefunction(route.endpoint)  # type: ignore[attr-defined]
+
+
+def test_registry_same_hash_search_guidance(server_url: str) -> None:
+    """The guidance search gives one result hash over MCP, REST and the CLI (replay, cached)."""
+    name, arguments = "search_guidance", {"query": CASES[-1][1]["query"]}
+    direct = result_sha256(call_tool(name, arguments))
+    assert result_sha256(anyio.run(mcp_call, server_url, name, arguments)) == direct
+    assert result_sha256(rest_call(server_url, name, arguments)) == direct
+    assert cli_hash(name, arguments) == direct

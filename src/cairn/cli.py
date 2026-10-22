@@ -84,6 +84,20 @@ def tk_summary_command(
     _emit(call_tool("tk_summary", {"sex": sex, "dose": dose, "day": day}), hash_only)
 
 
+@app.command("search-guidance")
+def search_guidance_command(
+    query: str,
+    hash_only: Annotated[bool, typer.Option("--hash", help="Print only the result hash")] = False,
+) -> None:
+    """Search the guideline library and print the passages or the abstention as canonical JSON."""
+    try:
+        result = call_tool("search_guidance", {"query": query})
+    except retrieval.StaleRetrievalCache as error:
+        typer.echo(f"error: {error}", err=True)
+        raise typer.Exit(1) from error
+    _emit(result, hash_only)
+
+
 def _known_model(model: str) -> str:
     """Return the model or end the command before any ceiling is computed."""
     if model not in MODEL_PROFILES:
