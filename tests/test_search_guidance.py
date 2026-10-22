@@ -1,5 +1,6 @@
-"""search_guidance in the registry: cached results in replay, explicit abstention below threshold."""
+"""search_guidance in the registry: cached results in replay, abstention below the threshold."""
 
+import subprocess
 import sys
 
 import pytest
@@ -49,9 +50,17 @@ def test_search_guidance_abstains_below_threshold(monkeypatch: pytest.MonkeyPatc
 
 
 def test_search_guidance_replay_never_loads_the_models() -> None:
-    call_tool("search_guidance", {"query": G2})
-    assert "fastembed" not in sys.modules
-    assert "onnxruntime" not in sys.modules
+    """Run in a fresh interpreter: other tests in the session may have loaded the models."""
+    code = "\n".join(
+        [
+            "import sys",
+            "from cairn.tools import call_tool",
+            f"call_tool('search_guidance', {{'query': {G2!r}}})",
+            "assert 'fastembed' not in sys.modules and 'onnxruntime' not in sys.modules",
+        ]
+    )
+    done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    assert done.returncode == 0, done.stderr
 
 
 def test_search_guidance_unknown_query_is_stale_in_replay() -> None:

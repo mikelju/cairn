@@ -16,13 +16,16 @@ from cairn.app import create_app
 from cairn.cli import app as cli_app
 from cairn.tools import REGISTRY, call_tool, result_sha256
 
+GUIDANCE_QUERY = (
+    "How does the FDA 2005 guidance define the no observed adverse effect level (NOAEL)?"
+)
 CASES: list[tuple[str, dict[str, Any]]] = [
     ("run_job", {"kind": "validate_study", "params": {}}),
     ("study_design", {}),
     ("incidence", {"screen": True}),
     ("body_weight_change", {"sex": "F", "population": "main_and_recovery"}),
     ("tk_summary", {"sex": "M", "dose": 20.0, "day": 1.0}),
-    ("search_guidance", {"query": "How does the FDA 2005 guidance define the no observed adverse effect level (NOAEL)?"}),
+    ("search_guidance", {"query": GUIDANCE_QUERY}),
 ]
 
 

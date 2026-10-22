@@ -1,6 +1,6 @@
 """Verifier rules 1-7: each has a passing and a failing fixture (C9)."""
 
-from cairn.content import Sentence, Text, ValueRef
+from cairn.content import Part, Sentence, Text, ValueRef
 from cairn.observation import build_observation
 from cairn.verify import RULE_REASONS, Verdict, data_quality_note, verify
 from conftest import World
@@ -189,7 +189,7 @@ def test_rules_apply_in_order_and_report_every_failure(world: World) -> None:
     assert [f.rule for f in verdict.failures] == sorted(f.rule for f in verdict.failures)
 
 
-def rule_of(world: World, parts: list[Text | ValueRef], rule: int) -> None:
+def rule_of(world: World, parts: list[Part], rule: int) -> None:
     only(verify([Sentence(parts=parts)], world.ledger), rule)
 
 
@@ -205,7 +205,7 @@ def test_f1_expressions_are_checked_on_the_final_rendered_text(world: World) -> 
 
 def test_f1_a_value_placed_between_words_does_not_make_an_expression(world: World) -> None:
     sex = world.ref(world.weight, "sex")
-    parts: list[Text | ValueRef] = [text("The NOA"), sex, text("EL here, "), sex]
+    parts: list[Part] = [text("The NOA"), sex, text("EL here, "), sex]
     assert verify([Sentence(parts=parts)], world.ledger).ok
 
 
@@ -273,12 +273,12 @@ def test_f6_ledger_text_values_cannot_be_written_by_hand(world: World) -> None:
     ):
         rule_of(world, [text(written), sex], 7)
     finding = world.ref(world.incidence, "findings.0.finding")
-    parts: list[Text | ValueRef] = [text("Finding: "), finding, text(" in F and M.")]
+    parts: list[Part] = [text("Finding: "), finding, text(" in F and M.")]
     assert verify([Sentence(parts=parts)], world.ledger).ok
 
 
 def test_f7_the_denominator_must_be_the_examined_of_the_same_group(world: World) -> None:
-    parts: list[Text | ValueRef] = [
+    parts: list[Part] = [
         world.ref(world.incidence, "findings.0.groups.3.affected"),
         text(" of "),
         world.ref(world.incidence, "n_examined"),
@@ -321,7 +321,7 @@ def test_g1_rules_6_and_7_apply_to_the_text_joined_across_sentences(world: World
 def test_g2_units_are_not_study_terms_and_the_canonical_phrase_passes(world: World) -> None:
     pct = world.ref(world.weight, "groups.3.percent_lower_than_control")
     dose = world.ref(world.weight, "groups.3.dose")
-    parts: list[Text | ValueRef] = [
+    parts: list[Part] = [
         text("Mean body weight was "),
         pct,
         text(" percent lower than control at "),
@@ -363,7 +363,7 @@ def test_g3_digits_in_cited_text_are_blocked_but_structural_fields_pass(world: W
 
 def test_g4_sentence_ends_without_a_space_or_with_other_marks(world: World) -> None:
     sex = world.ref(world.weight, "sex")
-    ends: list[list[Text | ValueRef]]
+    ends: list[list[Part]]
     ends = [
         [sex, text("... All animals looked abnormal")],
         [sex, text("\u2026 All animals looked abnormal")],
@@ -376,7 +376,7 @@ def test_g4_sentence_ends_without_a_space_or_with_other_marks(world: World) -> N
     ]
     for written in ends:
         rule_of(world, written, 1)
-    fine: list[list[Text | ValueRef]]
+    fine: list[list[Part]]
     fine = [
         [text("Seen e.g. in "), sex, text(".")],
         [text("Lower vs. control in "), sex, text(".")],

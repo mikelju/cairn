@@ -103,9 +103,23 @@ def _definition(name: str) -> dict[str, Any]:
     return {"name": name, "description": description, "strict": True, "input_schema": schema}
 
 
+def _without_quotes(schema: dict[str, Any]) -> dict[str, Any]:
+    """The sentence schema as the model sees it until increment 13: text and ref parts only.
+
+    QuoteRef exists in the content model but write_answer does not offer it yet (the committed
+    recordings are keyed on this schema); increment 13 deletes this function with the prompt bump.
+    """
+    defs = schema.get("$defs", {})
+    defs.pop("QuoteRef", None)
+    parts = defs["Sentence"]["properties"]["parts"]["items"]
+    parts["oneOf"] = [item for item in parts["oneOf"] if not item["$ref"].endswith("/QuoteRef")]
+    parts["discriminator"]["mapping"].pop("quote", None)
+    return schema
+
+
 def tool_definitions() -> list[dict[str, Any]]:
     """Strict definitions of the study tools plus write_answer, generated from the types."""
-    sentences = SENTENCES.json_schema()
+    sentences = _without_quotes(SENTENCES.json_schema())
     definitions = sentences.pop("$defs", {})  # references resolve from the schema root
     answer = {
         "name": ANSWER_TOOL,

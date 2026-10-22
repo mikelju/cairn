@@ -5,7 +5,15 @@ import re
 import pytest
 
 from cairn.body_weight import body_weight_change
-from cairn.content import ObservationLedger, QuoteRef, Sentence, Text, UnresolvedRef, ValueRef
+from cairn.content import (
+    ObservationLedger,
+    Part,
+    QuoteRef,
+    Sentence,
+    Text,
+    UnresolvedRef,
+    ValueRef,
+)
 from cairn.incidence import incidence
 from cairn.passages import Passage
 from cairn.render import format_value, quotations, quote_data, render
@@ -125,7 +133,7 @@ def test_renderer_separates_fused_text_and_value() -> None:
     ledger = ObservationLedger()
     obs_id = ledger.add(incidence())
     finding = ValueRef(obs_id=obs_id, field="findings.0.finding")
-    parts: list[Text | ValueRef] = [
+    parts: list[Part] = [
         Text(text="containing"),
         finding,
         Text(text="animals"),
@@ -148,7 +156,8 @@ def test_renderer_quoteref_copies_stored_sentences_verbatim() -> None:
     passage = stored_passage()
     ids = [s.sentence_id for s in passage.sentences[:2]]
     stored = " ".join(s.text for s in passage.sentences[:2])
-    sentence = Sentence(parts=[Text(text="The guidance says:"), QuoteRef(passage_id="FDA-IV-01", sentence_ids=ids)])
+    quote = QuoteRef(passage_id="FDA-IV-01", sentence_ids=ids)
+    sentence = Sentence(parts=[Text(text="The guidance says:"), quote])
     rendered = render([sentence], ObservationLedger())
     assert stored in rendered
     assert rendered.startswith("The guidance says: " + stored)

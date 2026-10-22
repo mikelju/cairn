@@ -96,9 +96,9 @@ def render_parts(sentence: Sentence, place: Callable[[ValueRef], str]) -> str:
             piece = place(part)
         mixed = isinstance(part, Text) != isinstance(previous, Text)
         quoted = isinstance(part, QuoteRef) or isinstance(previous, QuoteRef)
-        if previous is not None and mixed and out[-1:].isalnum() and piece[:1].isalnum():
-            out += " "
-        elif quoted and out and not (out[-1].isspace() or piece[:1].isspace() or piece[:1] in ".,;:"):
+        fused_words = mixed and out[-1:].isalnum() and piece[:1].isalnum()
+        bare = not (out[-1:].isspace() or piece[:1].isspace() or piece[:1] in ".,;:")
+        if previous is not None and (fused_words or (quoted and out and bare)):
             out += " "
         out += piece
         previous = part

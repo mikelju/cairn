@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from cairn import __version__
-from cairn.content import Text
+from cairn.content import Text, ValueRef
 from cairn.gateway import DEFAULT_MODEL, LLMGateway, Mode
 from cairn.ingest import build_report, load_study
 from cairn.jobs import JobRunner
@@ -157,7 +157,12 @@ def _marker(field: str) -> str:
 
 def _written(result: LoopResult) -> str:
     return " ".join(
-        "".join(part.text if isinstance(part, Text) else _marker(part.field) for part in s.parts)
+        "".join(
+            part.text
+            if isinstance(part, Text)
+            else _marker(part.field if isinstance(part, ValueRef) else "quote")
+            for part in s.parts
+        )
         for s in result.sentences
     )
 
