@@ -89,9 +89,9 @@ def test_record_rejects_free_text_and_stops_at_budget(
     fake: Script, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     assert runner.invoke(app, ["record", "free text"]).exit_code == 2
-    report = live.record_questions(["Q2", "Q6"], tmp_path, "opus-5-5", budget=1.0, spent=0.5)
+    report = live.record_questions(["Q2", "Q6"], tmp_path, "opus-4-6", budget=1.0, spent=0.5)
     assert report.saved == [] and "stopped before Q2" in report.stopped
-    assert live.record_ceiling("opus-5-5", 2) < live.BUDGET_USD
+    assert live.record_ceiling("opus-4-6", 2) < live.BUDGET_USD
 
 
 class Failing:

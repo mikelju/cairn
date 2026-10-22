@@ -39,8 +39,8 @@ deploy: build
 	aws lightsail get-container-services --service-name $(SERVICE) --region $(REGION) --query 'containerServices[0].[state,url]' --output text
 
 # Laptop-only commands that call Bedrock (decision D8). Each prints its estimated spending ceiling first.
-# Usage: make smoke AWS_PROFILE=<profile>; make record AWS_PROFILE=<profile> [MODEL=opus-4-8 QUESTIONS=Q6]
-MODEL ?= opus-5-5
+# Usage: make smoke AWS_PROFILE=<profile>; make record AWS_PROFILE=<profile> [MODEL=sonnet-4-6 QUESTIONS=Q6]
+MODEL ?= opus-4-6
 QUESTIONS ?= Q2 Q6
 QUESTION ?= Q2
 

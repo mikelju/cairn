@@ -1,10 +1,9 @@
 """Published per-token prices in one table, and the cost of a call."""
 
-# USD per million tokens (input, output). Provisional until increment 7 confirms the models.
+# USD per million tokens (input, output).
 PRICES_PER_MTOK: dict[str, tuple[float, float]] = {
-    "opus-5-5": (5.0, 25.0),
-    "opus-4-8": (5.0, 25.0),
-    "sonnet-5-5": (3.0, 15.0),
+    "opus-4-6": (5.0, 25.0),
+    "sonnet-4-6": (3.0, 15.0),
 }
 
 

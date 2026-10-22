@@ -12,11 +12,10 @@ REGION = "eu-west-1"
 TIMEOUT_SECONDS = 45
 MAX_RETRIES = 0
 
-# EU inference profile IDs. Provisional: increment 7 (smoke test) confirms them.
+# EU inference profile IDs, confirmed by the smoke test (ADR-001).
 MODEL_PROFILES: dict[str, str] = {
-    "opus-5-5": "eu.anthropic.claude-opus-5-5",
-    "sonnet-5-5": "eu.anthropic.claude-sonnet-5-5",
-    "opus-4-8": "eu.anthropic.claude-opus-4-8",
+    "opus-4-6": "eu.anthropic.claude-opus-4-6-v1",
+    "sonnet-4-6": "eu.anthropic.claude-sonnet-4-6",
 }
 
 

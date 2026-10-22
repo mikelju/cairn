@@ -40,7 +40,7 @@ def make_key(**changes: str) -> RecordingKey:
         "question_id": "Q9",
         "prompt_version": "v1",
         "tool_schema_sha256": tool_schema_hash(TOOLS),
-        "model": "opus-5-5",
+        "model": "opus-4-6",
     }
     fields.update(changes)
     return RecordingKey(**fields)
@@ -48,14 +48,14 @@ def make_key(**changes: str) -> RecordingKey:
 
 def record(directory: Path) -> Path:
     client = RecordingClient(FakeClient(), make_key(), region="eu-west-1")
-    LLMGateway(Mode.RECORD, client=client).create("opus-5-5", [{"role": "user", "content": "q"}])
+    LLMGateway(Mode.RECORD, client=client).create("opus-4-6", [{"role": "user", "content": "q"}])
     return client.save(directory)
 
 
 def test_replay_fixture_serves_stored_call() -> None:
-    key = RecordingKey("QFIX", "fixture-1", "fixture", "opus-5-5")
+    key = RecordingKey("QFIX", "fixture-1", "fixture", "opus-4-6")
     gateway = LLMGateway(Mode.REPLAY, client=ReplayClient.load(FIXTURES, key))
-    result = gateway.create("opus-5-5", [])
+    result = gateway.create("opus-4-6", [])
     assert result.content[0]["text"] == "fixture reply"
 
 
@@ -66,7 +66,7 @@ def test_replay_stale_missing_file(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize(
     "change",
-    [{"prompt_version": "v2"}, {"tool_schema_sha256": "other"}, {"model": "sonnet-5-5"}],
+    [{"prompt_version": "v2"}, {"tool_schema_sha256": "other"}, {"model": "sonnet-4-6"}],
     ids=["prompt_version", "tool_schema", "model"],
 )
 def test_replay_stale_changed_key(tmp_path: Path, change: dict[str, str]) -> None:
@@ -80,9 +80,9 @@ def test_replay_stale_more_calls_than_recorded(tmp_path: Path) -> None:
     record(tmp_path)
     client = ReplayClient.load(tmp_path, make_key())
     gateway = LLMGateway(Mode.REPLAY, client=client)
-    gateway.create("opus-5-5", [])
+    gateway.create("opus-4-6", [])
     with pytest.raises(StaleRecording):
-        gateway.create("opus-5-5", [])
+        gateway.create("opus-4-6", [])
 
 
 def test_record_round_trip(tmp_path: Path) -> None:
@@ -90,9 +90,9 @@ def test_record_round_trip(tmp_path: Path) -> None:
     data = json.loads(path.read_text(encoding="utf-8"))
     assert data["source"] == "bedrock"
     assert data["region"] == "eu-west-1"
-    assert data["calls"][0]["cost_usd"] == pytest.approx(call_cost("opus-5-5", 1000, 200))
+    assert data["calls"][0]["cost_usd"] == pytest.approx(call_cost("opus-4-6", 1000, 200))
     assert metadata_problems(data, require_bedrock=True) == []
-    replayed = LLMGateway(Mode.REPLAY, client=ReplayClient(data)).create("opus-5-5", [])
+    replayed = LLMGateway(Mode.REPLAY, client=ReplayClient(data)).create("opus-4-6", [])
     assert replayed.content == [{"type": "text", "text": "ok"}]
     assert total_cost(data) == pytest.approx(0.01)
 
@@ -103,7 +103,7 @@ def test_tool_schema_hash_is_stable_and_sensitive() -> None:
 
 
 def test_pricing_cost() -> None:
-    assert call_cost("sonnet-5-5", 1_000_000, 1_000_000) == pytest.approx(18.0)
+    assert call_cost("sonnet-4-6", 1_000_000, 1_000_000) == pytest.approx(18.0)
     with pytest.raises(KeyError):
         call_cost("unknown", 1, 1)
 

@@ -205,7 +205,7 @@ def _handle(
     return error, error, False
 
 
-def ask(question: str, gateway: LLMGateway, model: str = "opus-5-5") -> LoopResult:
+def ask(question: str, gateway: LLMGateway, model: str = "opus-4-6") -> LoopResult:
     """Run the loop for one question over a gateway and return everything that happened."""
     tools = tool_definitions()
     result = LoopResult(

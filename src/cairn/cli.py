@@ -89,7 +89,7 @@ RECORDINGS = Path("recordings")
 def ask_command(
     question: Annotated[str, typer.Argument(help="Question ID (Q2, Q6) or free text with --live")],
     live_mode: Annotated[bool, typer.Option("--live", help="Call Bedrock")] = False,
-    model: str = "opus-5-5",
+    model: str = "opus-4-6",
     recordings: Path = RECORDINGS,
 ) -> None:
     """Answer a question: replay a recording, or call the model with --live."""
@@ -118,7 +118,7 @@ def ask_command(
 @app.command("record")
 def record_command(
     questions: Annotated[list[str], typer.Argument(help="Question IDs, for example Q2 Q6")],
-    model: str = "opus-5-5",
+    model: str = "opus-4-6",
     recordings: Path = RECORDINGS,
 ) -> None:
     """Record questions against Bedrock (laptop only); stops before 10 USD."""

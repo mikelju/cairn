@@ -120,7 +120,7 @@ async def step1_run(request: Request, inject: Annotated[str | None, Form()] = No
     )
 
 
-DEFAULT_MODEL = "opus-5-5"
+DEFAULT_MODEL = "opus-4-6"
 SCREEN_KIND = "incidence_screen"
 SHOWN_STEPS = ("run_job", "study_design", "incidence", "body_weight_change", "tk_summary")
 
