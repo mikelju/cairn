@@ -144,7 +144,8 @@ def rendered_problems(html: str) -> list[str]:
 
 def with_result(page: str, fragment: str) -> str:
     """The GET page with the POST fragment inside #result, as HTMX places it."""
-    return page.replace('<div id="result"></div>', f'<div id="result">{fragment}</div>')
+    empty = re.compile(r'(<div id="result"[^>]*>)</div>')
+    return empty.sub(lambda m: f"{m.group(1)}{fragment}</div>", page)
 
 
 def rendered_state(name: str) -> str:
