@@ -16,11 +16,17 @@ Current authorisation and limits: the user asked for this as a standalone change
 | C3 | No regression: `npm run check` green, step 2 states stay within the word cap (93 with the toggle open) and `make demo-offline-check` passes | Command output |
 
 ## Plan
-- [ ] 1. Reproduce on the real path and find the root cause (renderer, tool output or recording) with a failing test.
-- [ ] 2. Fix at the root, keep the failing test green, re-run C3.
+- [x] 1. Reproduce on the real path and find the root cause (renderer, tool output or recording) with a failing test.
+- [x] 2. Fix at the root, keep the failing test green, re-run C3.
 - [ ] 3. Deliver: push, PR to `main`, CI.
 
 ## Decisions
+Root cause: the two figures were different quantities with the same label.
+The sentence places `n_examined` of the incidence Observation by reference (80: distinct main-study animals with at least one examined tissue, `EXAMINED_ANIMALS_SQL`), which is correct for "examined".
+The evidence line printed `n=80` from that same field, then "37 animals" as the distinct animals in `source_rows`, which for incidence are only the animals affected by the screened findings (`AFFECTED_ANIMALS_SQL`), so "37 animals" read as a contradictory total.
+The recording (RECORDED mode) is correct and untouched: the sentence references a field, and no re-recording is needed.
+Fix: `_evidence` in `src/cairn/web/__init__.py` labels the source count of incidence observations "affected" instead of "animals" (same word count, other tools keep "animals").
+The sentence keeps 80, placed by code from `n_examined`, the same field as the evidence `n`.
 Records of the phase 02c closure (integrated after PR 8) travel in this branch, since records do not go to `main` directly.
 
 ## Briefs
@@ -39,6 +45,13 @@ Questions the supervisor raises with the user. Statuses: open, answered, deferre
 ## Adversarial review
 | Round | Backend | Range | Lenses | Findings | Status |
 |---|---|---|---|---|---|
+
+## Evidence
+- C1: `tests/test_web.py::test_q2_sentence_and_evidence_state_the_same_examined_count` (fixture and real recording) and the updated `test_q2_evidence_counts_distinct_animals_not_source_rows`.
+  Before the fix: `uv run pytest tests/test_web.py -k "same_examined_count or distinct_animals" --no-cov` gave 3 failed (`assert 'animals' == 'affected'`, `'37 affected, from ' not in` the page).
+  After: 3 passed.
+- C2: sentence count and evidence `n` both come from `Observation.n_examined` (the sentence through the `ValueRef`, the evidence through `_evidence`); the test compares them on the rendered page.
+- C3: `npm run check` exit 0 (ruff, mypy, 323 passed including `tests/test_word_cap.py` with cap 93, hooks tests); `make demo-offline-check` exit 0 (`POST /step/2/run 200 RECORDED`).
 
 ## Delivery
 Result, commands and observed results, resolved or pending findings, limitations and references to evidence.
