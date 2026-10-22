@@ -17,8 +17,8 @@ def aws_service(service: str, region: str) -> dict[str, Any]:
     command = ["aws", "lightsail", "get-container-services", "--service-name", service]
     command += ["--region", region, "--output", "json"]
     out = subprocess.run(command, check=True, capture_output=True, text=True).stdout
-    service: dict[str, Any] = json.loads(out)["containerServices"][0]
-    return service
+    described: dict[str, Any] = json.loads(out)["containerServices"][0]
+    return described
 
 
 def wait_running(
