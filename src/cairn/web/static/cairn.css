@@ -50,6 +50,7 @@
   --border-1: 1px;
   --border-badge: 1.5px;
   --border-focus: 2px;
+  --border-callout: 4px;
   --focus-offset: 2px;
 
   --shadow-card: 0 1px 2px rgba(27, 36, 48, 0.08);
@@ -122,7 +123,7 @@ footer {
 .brand { font-weight: var(--weight-bold); font-size: var(--text-lg); text-decoration: none; color: var(--color-accent); }
 .steps { display: flex; gap: var(--space-4); }
 .steps a, .steps span { padding: var(--space-1) 0; font-size: var(--text-sm); text-decoration: none; color: var(--color-ink); border-bottom: var(--border-focus) solid transparent; }
-.steps .locked { color: var(--color-muted); cursor: not-allowed; }
+.steps .locked { color: var(--color-muted); cursor: not-allowed; text-decoration: line-through; }
 .steps a[aria-current] { color: var(--color-accent); border-bottom-color: var(--color-accent); font-weight: var(--weight-semibold); }
 .role { color: var(--color-muted); font-size: var(--text-xs); }
 main { flex: 1; padding: var(--space-5) var(--space-7); max-width: var(--main-max-width); width: 100%; margin: 0 auto; }
@@ -190,12 +191,17 @@ tr.new td:first-child { font-weight: var(--weight-bold); border-left: var(--bord
 .prod { color: var(--color-muted); font-size: var(--text-xs); margin: var(--space-2) 0 0; }
 .meta { margin: var(--space-1) 0; color: var(--color-muted); font-size: var(--text-sm); }
 .trace { font-family: var(--font-mono); font-size: var(--text-sm); }
-.callout { margin: var(--space-2) 0; padding: var(--space-2) var(--space-3); border: var(--border-1) solid var(--color-line); border-left-width: var(--border-focus); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-ink); }
+.callout { position: relative; margin: var(--space-2) 0; padding: var(--space-2) var(--space-3) var(--space-2) var(--space-6); border: var(--border-1) solid var(--color-line); border-left-width: var(--border-callout); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-ink); }
 .callout p, .callout ul { margin: var(--space-1) 0; }
-.callout.rules { background: var(--color-accent-tint); border-left-color: var(--color-accent); }
-.callout.blocked { background: var(--color-block-tint); border-left-color: var(--color-block); }
-.callout.stale { background: var(--color-warning-tint); border-left-color: var(--color-simulated); }
-.callout.note { border-left-color: var(--color-control-border); }
+.callout::before { position: absolute; left: var(--space-2); top: var(--space-2); font-weight: var(--weight-bold); }
+.callout.rules { background: var(--color-accent-tint); border-left-color: var(--color-accent); border-left-style: solid; }
+.callout.rules::before { content: "B6"; }
+.callout.blocked { background: var(--color-block-tint); border-left-color: var(--color-block); border-left-style: double; }
+.callout.blocked::before { content: "¹5"; }
+.callout.stale { background: var(--color-warning-tint); border-left-color: var(--color-simulated); border-left-style: dashed; }
+.callout.stale::before { content: "A0"; }
+.callout.note { border-left-color: var(--color-control-border); border-left-style: dotted; }
+.callout.note::before { content: "9"; }
 .evidence p { margin: var(--space-1) 0 0; color: var(--color-muted); font-size: var(--text-xs); }
 td.not-examined { background: repeating-linear-gradient(45deg, var(--color-not-examined), var(--color-not-examined) var(--space-1), var(--color-surface) var(--space-1), var(--color-surface) var(--space-2)); color: var(--color-muted); font-style: italic; }
 .two-col { max-width: none; display: grid; grid-template-columns: minmax(0, var(--col-left-max)) minmax(0, 1fr); column-gap: var(--space-6); align-items: start; }
@@ -217,7 +223,9 @@ h2 { font-size: var(--text-md); line-height: 1.2; margin: 0 0 var(--space-2); }
   main { padding: var(--space-5) var(--space-4); }
   .two-col { grid-template-columns: minmax(0, 1fr); }
   .two-col > form, .two-col > details, .two-col > .col-prod, .two-col .col-left, .two-col .col-right { grid-column: 1; }
-  .two-col .col-right { grid-row: auto; }
+  .two-col .col-right { grid-row: auto; order: 1; }
+  .two-col .col-left { order: 2; }
+  .two-col > .col-prod { order: 3; }
   .legend { grid-template-columns: minmax(0, 1fr); }
   .controls { flex-wrap: wrap; }
 }

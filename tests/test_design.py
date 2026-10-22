@@ -159,7 +159,7 @@ LEAKS = {
     "badge": re.compile(r"class=\"[^\"]*\bbadge\b"),
     "trace": re.compile(r"class=\"[^\"]*\btrace\b"),
     "callout": re.compile(r"class=\"[^\"]*\bcallout\b"),
-    "production": re.compile(r'class="[^"]*\bprod\b|In production', re.I),
+    "production": re.compile(r'class="(?:[^"]*\s)?prod\b|In production', re.I),
 }
 BADGE_KINDS = ["REAL", "RECORDED", "SIMULATED", "FIXTURE"]
 
@@ -246,6 +246,7 @@ def test_shared_components_failing_sample() -> None:
     assert component_leaks("{{ a.data_table(h, rows) }}") == []
     assert component_leaks("<p>x <strong>In production</strong> y</p>") == ["production"]
     assert component_leaks('<p class="prod">x</p>') == ["production"]
+    assert component_leaks('<div class="col-prod">x</div>') == []
 
 
 def test_shared_components_render_through_the_macros() -> None:
@@ -313,9 +314,11 @@ LARGE = 3.0  # text of 18 px and above or 14 px bold, control borders, focus out
 CONTRAST_PAIRS: list[tuple[str, str, float, str]] = [
     ("ink", "paper", BODY, "body text"),
     ("ink", "surface", BODY, "cards, tables, callouts"),
-    ("muted", "paper", BODY, ".meta, .prod, .lede on the page"),
+    ("muted", "paper", BODY, ".meta, .prod, .lede, .evidence p on the page"),
     ("muted", "surface", BODY, "header, footer, legend cards, evidence"),
     ("muted", "not-examined", BODY, "td.not-examined"),
+    ("muted", "new-row", BODY, "tr.new td.not-examined"),
+    ("simulated", "warning-tint", LARGE, ".stamp border"),
     ("accent", "paper", BODY, "summary toggle, step links"),
     ("accent", "surface", BODY, ".brand, summary"),
     ("on-accent", "accent", BODY, ".num, button"),
@@ -391,11 +394,43 @@ def test_contrast_failing_sample() -> None:
     assert "ink on paper" in failures[0] and "missing token" in failures[2]
 
 
+OUTLINE_STYLES = {
+    "solid",
+    "dashed",
+    "dotted",
+    "double",
+    "groove",
+    "ridge",
+    "inset",
+    "outset",
+    "auto",
+}
+
+
+def _resolve_vars(value: str, tokens: dict[str, str]) -> str:
+    return re.sub(r"var\(--([\w-]+)\)", lambda m: tokens.get(m.group(1), ""), value)
+
+
+def _visible_outline(value: str) -> bool:
+    """An outline shorthand with a visible style and a width above zero."""
+    words = value.split()
+    width = [w for w in words if re.fullmatch(r"\d*\.?\d+px|thin|medium|thick", w)]
+    has_style = any(w in OUTLINE_STYLES for w in words)
+    return (
+        has_style
+        and bool(width)
+        and any(w in ("thin", "medium", "thick") or float(w[:-2]) > 0 for w in width)
+    )
+
+
 def focus_gaps(css: str) -> list[str]:
-    """Interactive selectors with no :focus-visible rule that sets an outline."""
+    """Interactive selectors with no :focus-visible rule that sets a visible outline."""
+    css = _strip_comments(css)
+    tokens = dict(re.findall(r"--([\w-]+)\s*:\s*([^;]+);", css))
     selectors: set[str] = set()
-    for match in RULE.finditer(_strip_comments(css)):
-        if "outline" not in match.group(2):
+    for match in RULE.finditer(css):
+        outline = re.search(r"(?<![-\w])outline\s*:\s*([^;]+)", match.group(2))
+        if outline is None or not _visible_outline(_resolve_vars(outline.group(1), tokens)):
             continue
         for sel in match.group(1).split(","):
             sel = sel.strip()
@@ -415,6 +450,88 @@ def test_focus_visible_failing_sample() -> None:
         "select:focus-visible { color: red; }"
     )
     assert focus_gaps(sample) == ["select", "input", "summary", "[tabindex]"]
+    assert focus_gaps("a:focus-visible { outline: none; }")[0] == "a"
+    assert focus_gaps("a:focus-visible { outline-offset: 2px; }")[0] == "a"
+    assert focus_gaps("a:focus-visible { outline: 0 solid red; }")[0] == "a"
+    ok = ":root { --w: 2px; } a:focus-visible { outline: var(--w) solid red; }"
+    assert "a" not in focus_gaps(ok)
+
+
+CALLOUT_KINDS = ("rules", "blocked", "stale", "note")
+
+
+def callout_css_problems(css: str) -> list[str]:
+    """Callout kinds told apart only by colour: each needs its own glyph and border style."""
+    styles: dict[str, str] = {}
+    glyphs: dict[str, str] = {}
+    for selector, body in RULE.findall(_strip_comments(css)):
+        found = re.fullmatch(r"\s*\.callout\.(\w+?)(::before)?\s*", selector)
+        if not found:
+            continue
+        kind, is_glyph = found.group(1), bool(found.group(2))
+        if is_glyph:
+            content = re.search(r"content\s*:\s*([^;]+)", body)
+            glyphs[kind] = content.group(1).strip() if content else ""
+        else:
+            style = re.search(r"border-left-style\s*:\s*([^;]+)", body)
+            styles[kind] = style.group(1).strip() if style else ""
+    problems = []
+    for kind in CALLOUT_KINDS:
+        if not glyphs.get(kind):
+            problems.append(f"no glyph for {kind}")
+        if not styles.get(kind):
+            problems.append(f"no border style for {kind}")
+    if len({v for v in glyphs.values() if v}) < len([v for v in glyphs.values() if v]):
+        problems.append("two kinds share a glyph")
+    if len({v for v in styles.values() if v}) < len([v for v in styles.values() if v]):
+        problems.append("two kinds share a border style")
+    return problems
+
+
+def test_callout_kinds_differ_by_glyph_and_border_style_not_only_colour() -> None:
+    assert callout_css_problems(CSS_PATH.read_text(encoding="utf-8")) == []
+    sample = (
+        ".callout.rules { border-left-color: var(--a); } "
+        ".callout.blocked { border-left-color: var(--b); }"
+    )
+    assert "no glyph for rules" in callout_css_problems(sample)
+    assert "no border style for blocked" in callout_css_problems(sample)
+    same = " ".join(
+        f'.callout.{k} {{ border-left-style: solid; }} .callout.{k}::before {{ content: "x"; }}'
+        for k in CALLOUT_KINDS
+    )
+    problems = callout_css_problems(same)
+    assert "two kinds share a glyph" in problems and "two kinds share a border style" in problems
+
+
+def test_locked_steps_are_not_told_apart_only_by_colour() -> None:
+    css = _strip_comments(CSS_PATH.read_text(encoding="utf-8"))
+    rules = dict((s.strip(), b) for s, b in RULE.findall(css))
+    locked = rules[".steps .locked"]
+    glyph = rules.get(".steps .locked::before", "")
+    assert "line-through" in locked or "content" in glyph
+
+
+def _media_rules(css: str) -> dict[str, str]:
+    match = re.search(
+        r"@media\s*\(max-width:\s*\d+px\)\s*\{(.*)\}\s*$", _strip_comments(css), flags=re.S
+    )
+    assert match is not None
+    return {s.strip(): b for s, b in RULE.findall(match.group(1))}
+
+
+def _order(rules: dict[str, str], selector: str) -> int | None:
+    found = re.search(r"(?<![-\w])order\s*:\s*(-?\d+)", rules.get(selector, ""))
+    return int(found.group(1)) if found else None
+
+
+def test_narrow_width_puts_the_table_above_the_answer_that_says_shown_above() -> None:
+    rules = _media_rules(CSS_PATH.read_text(encoding="utf-8"))
+    right = _order(rules, ".two-col .col-right")
+    left = _order(rules, ".two-col .col-left")
+    prod = _order(rules, ".two-col > .col-prod")
+    assert right is not None and left is not None and prod is not None
+    assert 0 <= right < left < prod  # title, lede, form and questions (order 0) stay first
 
 
 def test_narrow_width_rule_collapses_grids_to_one_column() -> None:
@@ -468,6 +585,9 @@ def test_mockups_follow_the_rules(path: Any) -> None:
     print(path.name, rendered_words(html), rendered_lede(html))
     assert mockup_problems(html) == [], path.name
     assert 'class="stamp"' in html and "placeholder" in html.lower()
+    for meta in re.findall(r'<p class="meta">(.*?)</p>', html):
+        if 'class="badge recorded"' in meta:
+            assert re.search(r"\| \d+\.\d s \| \d+\.\d\d USD$", meta), meta
 
 
 def test_mockups_failing_sample() -> None:
