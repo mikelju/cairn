@@ -1,7 +1,10 @@
 """Verifier rules 1-7: each has a passing and a failing fixture (C9)."""
 
-from cairn.content import Part, Sentence, Text, ValueRef
+from typing import Any
+
+from cairn.content import ObservationLedger, Part, QuoteRef, Sentence, Text, ValueRef
 from cairn.observation import build_observation
+from cairn.tools import call_tool
 from cairn.verify import RULE_REASONS, Verdict, data_quality_note, verify
 from conftest import World
 
@@ -448,3 +451,72 @@ def test_h3_rule_1_judges_sentence_ends_inside_placed_values(world: World) -> No
     rule_of(world, [text("Seen in "), _cited(world, "note", "Control."), text(" All were bad")], 1)
     ref = _cited(world, "note", "mean of animals")
     assert verify([Sentence(parts=[text("Seen in "), ref, text(".")])], world.ledger).ok
+
+
+G2 = "How does the FDA 2005 guidance define the no observed adverse effect level (NOAEL)?"
+
+
+def retrieve(world: World) -> dict[str, Any]:
+    """Run the cached G2 search and record its passages in the ledger, as the loop does."""
+    result = call_tool("search_guidance", {"query": G2})
+    world.ledger.add_guidance(result)
+    return result
+
+
+def quote(passage_id: str, sentence_id: str) -> QuoteRef:
+    return QuoteRef(passage_id=passage_id, sentence_ids=[sentence_id])
+
+
+def test_rule_8_quotation_of_a_retrieved_passage_passes(world: World) -> None:
+    retrieve(world)
+    sentence = Sentence(parts=[text("The guidance says: "), quote("FDA-IV-01", "FDA-IV-01.s1")])
+    verdict = verify([sentence], world.ledger)
+    assert verdict.ok
+    assert verdict.text is not None
+    assert "(FDA" in verdict.text or "Guidance" in verdict.text
+
+
+def test_rule_8_quotation_of_a_passage_not_retrieved_fails(world: World) -> None:
+    retrieve(world)
+    sentence = Sentence(parts=[quote("M4S-2.6.6.3-01", "M4S-2.6.6.3-01.s1")])
+    only(verify([sentence], world.ledger), 8)
+
+
+def test_rule_8_quotation_with_nothing_retrieved_fails(world: World) -> None:
+    only(verify([Sentence(parts=[quote("FDA-IV-01", "FDA-IV-01.s1")])], world.ledger), 8)
+
+
+def test_rule_8_text_that_differs_from_the_retrieved_text_fails(world: World) -> None:
+    result = retrieve(world)
+    hit = next(h for h in result["hits"] if h["passage_id"] == "FDA-IV-01")
+    altered = {
+        **result,
+        "hits": [{**hit, "sentences": [{**hit["sentences"][0], "text": "Changed."}]}],
+    }
+    fresh = ObservationLedger()
+    fresh.add_guidance(altered)
+    verdict = verify([Sentence(parts=[quote("FDA-IV-01", "FDA-IV-01.s1")])], fresh)
+    only(verdict, 8)
+    assert "differs" in verdict.failures[0].reason
+
+
+def test_rule_8_abstention_and_hits_below_the_threshold_retrieve_nothing(world: World) -> None:
+    result = call_tool("search_guidance", {"query": G2})
+    world.ledger.add_guidance({**result, "abstained": True, "hits": []})
+    assert world.ledger.retrieved == {}
+    world.ledger.add_guidance({**result, "threshold": 100.0})
+    assert world.ledger.retrieved == {}
+
+
+def test_rule_8_unknown_passage_fails_rule_2_not_rule_8(world: World) -> None:
+    verdict = verify([Sentence(parts=[quote("NOPE-01", "NOPE-01.s1")])], world.ledger)
+    only(verdict, 2)
+
+
+def test_rule_8_quotation_text_is_not_judged_as_model_text(world: World) -> None:
+    """The NOAEL definition holds digits-free guideline wording the safety list would flag."""
+    retrieve(world)
+    sentence = Sentence(parts=[quote("FDA-IV-01", "FDA-IV-01.s1")])
+    assert verify([sentence], world.ledger).ok
+    shouty = Sentence(parts=[text("It is safe: "), quote("FDA-IV-01", "FDA-IV-01.s1")])
+    assert verify([shouty], world.ledger).rules == [6]

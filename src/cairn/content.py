@@ -48,6 +48,26 @@ class ObservationLedger:
 
     def __init__(self) -> None:
         self._observations: dict[str, Observation] = {}
+        self._retrieved: dict[str, dict[str, str]] = {}
+
+    def add_guidance(self, result: dict[str, Any]) -> None:
+        """Record the passages a `search_guidance` result returned at or above its threshold.
+
+        Rule 8 accepts a quotation only for a passage recorded here, with the sentence texts the
+        tool returned. An abstention records nothing.
+        """
+        if result.get("abstained"):
+            return
+        for hit in result.get("hits", []):
+            if hit["rerank_score"] >= result["threshold"]:
+                self._retrieved[hit["passage_id"]] = {
+                    s["sentence_id"]: s["text"] for s in hit["sentences"]
+                }
+
+    @property
+    def retrieved(self) -> dict[str, dict[str, str]]:
+        """Passage ID to {sentence ID: text} for every passage retrieved in this run."""
+        return {pid: dict(sentences) for pid, sentences in self._retrieved.items()}
 
     def add(self, observation: Observation) -> str:
         obs_id = f"O{len(self._observations) + 1}"

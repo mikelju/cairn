@@ -83,7 +83,11 @@ def quotations(sentences: list[Sentence]) -> list[dict[str, Any]]:
     return [quote_data(p) for s in sentences for p in s.parts if isinstance(p, QuoteRef)]
 
 
-def render_parts(sentence: Sentence, place: Callable[[ValueRef], str]) -> str:
+def render_parts(
+    sentence: Sentence,
+    place: Callable[[ValueRef], str],
+    place_quote: Callable[[QuoteRef], str] = render_quote,
+) -> str:
     """Join the parts in order, adding a space between text and a value only where words fuse."""
     out = ""
     previous: Text | ValueRef | QuoteRef | None = None
@@ -91,7 +95,7 @@ def render_parts(sentence: Sentence, place: Callable[[ValueRef], str]) -> str:
         if isinstance(part, Text):
             piece = part.text
         elif isinstance(part, QuoteRef):
-            piece = render_quote(part)
+            piece = place_quote(part)
         else:
             piece = place(part)
         mixed = isinstance(part, Text) != isinstance(previous, Text)
@@ -105,8 +109,12 @@ def render_parts(sentence: Sentence, place: Callable[[ValueRef], str]) -> str:
     return out
 
 
-def render_sentence(sentence: Sentence, ledger: ObservationLedger) -> str:
-    return render_parts(sentence, lambda ref: format_value(ledger.resolve(ref)))
+def render_sentence(
+    sentence: Sentence,
+    ledger: ObservationLedger,
+    place_quote: Callable[[QuoteRef], str] = render_quote,
+) -> str:
+    return render_parts(sentence, lambda ref: format_value(ledger.resolve(ref)), place_quote)
 
 
 def render(sentences: list[Sentence], ledger: ObservationLedger) -> str:

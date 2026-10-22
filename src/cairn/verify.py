@@ -1,7 +1,11 @@
-"""The verifier: rules 1-7 applied in order to a drafted answer before anyone reads it.
+"""The verifier: rules 1-8 applied in order to a drafted answer before anyone reads it.
 
-Rule 8 (quote provenance) belongs to a later phase. The expression lists live here, in code,
-not in configuration. A draft passes only when no rule reports a failure.
+Rule 8 is quote provenance: a QuoteRef must point to a passage that `search_guidance` returned in
+this run, and the quotation the code renders must equal the text retrieved.
+The text a quotation places is guideline wording copied by code, so rules 3, 6 and 7 look at the
+model text and at the final text with each quotation masked.
+The expression lists live here, in code, not in configuration.
+A draft passes only when no rule reports a failure.
 """
 
 import itertools
@@ -11,8 +15,15 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Any
 
-from cairn.content import ObservationLedger, Sentence, Text, UnresolvedRef, ValueRef
-from cairn.render import render, render_parts, render_sentence
+from cairn.content import (
+    ObservationLedger,
+    QuoteRef,
+    Sentence,
+    Text,
+    UnresolvedRef,
+    ValueRef,
+)
+from cairn.render import quote_data, render, render_parts, render_sentence
 
 RULE_REASONS = {
     1: "every sentence needs at least one reference to a tool result",
@@ -22,6 +33,7 @@ RULE_REASONS = {
     5: "data with quarantined rows needs the fixed data-quality note",
     6: "no safety claim and no NOAEL that a person has not recorded",
     7: "no study term written by hand and no expression from the wording list",
+    8: "a quotation must come from a passage retrieved in this run, with the text retrieved",
 }
 
 # Matching is whole-word and case-insensitive on normalized text (NFKC, no invisible characters
@@ -235,9 +247,26 @@ def _refs(sentence: Sentence) -> list[ValueRef]:
     return [part for part in sentence.parts if isinstance(part, ValueRef)]
 
 
+def _quotes(sentence: Sentence) -> list[QuoteRef]:
+    return [part for part in sentence.parts if isinstance(part, QuoteRef)]
+
+
 def _model_text(sentence: Sentence) -> str:
-    """What the model wrote, joined as the renderer joins it, with a mark where a value goes."""
-    return render_parts(sentence, lambda ref: REF_MARK)
+    """What the model wrote, joined as the renderer joins it, with a mark where a value or a
+    quotation goes."""
+    return render_parts(sentence, lambda ref: REF_MARK, lambda quote: REF_MARK)
+
+
+def _quote_problem(quote: QuoteRef, ledger: ObservationLedger) -> str | None:
+    """Rule 8 for one quotation: not retrieved in the run, or the rendered text differs."""
+    retrieved = ledger.retrieved.get(quote.passage_id)
+    if retrieved is None:
+        return f"{quote.passage_id} was not retrieved in this run"
+    placed = quote_data(quote)["text"]
+    expected = " ".join(retrieved.get(sid, "") for sid in quote.sentence_ids)
+    if placed != expected:
+        return f"the text of {quote.passage_id} differs from the text retrieved"
+    return None
 
 
 def _ends_a_sentence(written: str) -> bool:
@@ -313,7 +342,7 @@ def _cites_quarantine(ref: ValueRef, ledger: ObservationLedger) -> bool:
 
 
 def verify(sentences: list[Sentence], ledger: ObservationLedger) -> Verdict:
-    """Apply rules 1-7 in order; the verdict carries every failure and, if none, the text."""
+    """Apply rules 1-8 in order; the verdict carries every failure and, if none, the text."""
     failures: list[Failure] = []
 
     def fail(rule: int, index: int | None, detail: str = "") -> None:
@@ -325,12 +354,14 @@ def verify(sentences: list[Sentence], ledger: ObservationLedger) -> Verdict:
     errors: dict[int, str] = {}
     for index, sentence in enumerate(sentences):
         try:
-            rendered.append(render_sentence(sentence, ledger))
+            for quote in _quotes(sentence):
+                quote_data(quote)  # rule 2: an unknown passage or sentence does not resolve
+            rendered.append(render_sentence(sentence, ledger, lambda quote: REF_MARK))
         except UnresolvedRef as error:
             rendered.append(written[index].replace(REF_MARK, ""))
             errors[index] = str(error)
     for index, sentence in enumerate(sentences):  # rule 1, on the model text and the final text
-        if not _refs(sentence):
+        if not _refs(sentence) and not _quotes(sentence):
             fail(1, index)
         elif _ends_a_sentence(written[index]) or (
             index not in errors and _ends_a_sentence(rendered[index])
@@ -365,6 +396,13 @@ def verify(sentences: list[Sentence], ledger: ObservationLedger) -> Verdict:
     for index in sorted(by_hand.keys() | wording.keys()):
         match = by_hand.get(index) or wording[index]
         fail(7, index, f'"{match.group(0)}"')
+    for index, sentence in enumerate(sentences):  # rule 8, after rules 1-7 (resolvable quotes)
+        if index in errors:
+            continue
+        for quote in _quotes(sentence):
+            problem = _quote_problem(quote, ledger)
+            if problem:
+                fail(8, index, problem)
     if failures:
         return Verdict(failures=failures)
     return Verdict(text=render(sentences, ledger))
