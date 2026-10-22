@@ -68,7 +68,8 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | E39 | ejecutor (Sonnet) | Increment 2: shared component macros | done | 98443c6 |
 | E40 | ejecutor (Sonnet) | Increments 3 and 4: rendered word counter, landing and step 1 rebuilt | done | 1400431, 88c9ff8; landing 41, step 1 33/59/68 words |
 | E41 | ejecutor (Sonnet) | Increment 5: step 2 rebuilt with the fold | done | e75028e; step 2 20/80/93/40 words (toggle-open state exactly at cap) |
-| E42 | ejecutor (Sonnet) | Increment 6: contrast and focus, plus a single-column fallback for narrow widths | in progress | |
+| E42 | ejecutor (Sonnet) | Increment 6: contrast and focus, plus a single-column fallback for narrow widths | done | 7a178bb; lowest pair control border on paper 3.63:1, no token changed |
+| E43 | ejecutor (Sonnet) | Increment 7: static mockups of steps 3 to 7 | in progress | |
 
 ## User decisions
 Questions the supervisor raises with the user. Statuses: open, answered, deferred; each closes with the user's literal answer.
