@@ -94,7 +94,7 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | E44 | ejecutor (Sonnet) | Increment 8, capture part: headless-browser screenshots and scroll heights at 1440x900 of the 8 app states and 5 mockups | done | 98e50bf; all 13 fit, tightest step 1 injected (content ends at 825 px, footer at 864) |
 | E45 | ejecutor (Sonnet) | Increment 9: clean clone, offline check, diff scope, brand and GxP greps | in progress | |
 | R1 | revisor (Opus) | Adversarial review, correctness and criteria lens, `main...HEAD` | in progress | |
-| R2 | revisor (Opus) | Adversarial review, evidence and tests lens, `main...HEAD` | in progress | |
+| R2 | revisor (Opus) | Adversarial review, evidence and tests lens, `main...HEAD` | done | 9 findings; confirmed for correction: word-cap states pass on a stale recording or a failed substitution (C5), step 1 hand-writes the In production line and the leak test misses it (C3), locked nav steps differ by colour only and the focus test accepts `outline: none` (C7), missing contrast pairs, SIMULATED badge test too loose; logged: word-cap list no longer picks up new step templates |
 
 ## User decisions
 Questions the supervisor raises with the user. Statuses: open, answered, deferred; each closes with the user's literal answer.
