@@ -1,0 +1,16 @@
+IBM Plex fonts, self-hosted by Cairn. Latin-1 subset woff2 files taken unmodified from the "split" folder of the official IBM Plex releases on GitHub.
+Licence: SIL Open Font License 1.1, full text in OFL.txt. Copyright 2017 IBM Corp. with Reserved Font Name "Plex".
+Source repository: https://github.com/IBM/plex
+
+IBM Plex Sans, release @ibm/plex-sans@1.1.0
+Archive: https://github.com/IBM/plex/releases/download/%40ibm%2Fplex-sans%401.1.0/ibm-plex-sans.zip
+  IBMPlexSans-Regular-Latin1.woff2   20984 bytes  SHA-256 b5ad7bd39f996144915f0ad9849a90183b27d8c28ad97ed98af5b1bebc51f6b1
+  IBMPlexSans-SemiBold-Latin1.woff2  22260 bytes  SHA-256 fff0ab3a88b0b4aa0b693e4f0201359a15183b08e3fa5696d1918d8f0ade8ad5
+  IBMPlexSans-Bold-Latin1.woff2      21256 bytes  SHA-256 914f1400f363e636b6f9cc7965aa807ff01e93586e1437617525cba0a62aa78d
+
+IBM Plex Mono, release @ibm/plex-mono@2.5.0
+Archive: https://github.com/IBM/plex/releases/download/%40ibm%2Fplex-mono%402.5.0/ibm-plex-mono.zip
+  IBMPlexMono-Regular-Latin1.woff2   17544 bytes  SHA-256 e8993d946649b9d01abb1ed06d574b19d8ea3e66b5c3948602db335c44c18e56
+
+Path inside each archive: fonts/split/woff2/. Total: 82044 bytes.
+OFL.txt: SHA-256 7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da (LICENSE.txt of the Sans release; the Mono release carries the same text).
