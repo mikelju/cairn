@@ -135,10 +135,11 @@ def test_recordings_metadata_real_files(path: Path | None) -> None:
 
 def test_recordings_present_q2_q6() -> None:
     from cairn import live
-    from cairn.loop import LoopStatus
+    from cairn.loop import PROMPT_VERSION, LoopStatus
 
     for name in ("q2.json", "q6.json"):
-        assert (REAL_DIR / name).is_file()
+        data = json.loads((REAL_DIR / name).read_text(encoding="utf-8"))
+        assert data["prompt_version"] == PROMPT_VERSION
     q2 = live.ask_replay("Q2", REAL_DIR, "opus-4-6")
     assert q2.status is LoopStatus.ANSWERED
     assert q2.verdict is not None and q2.verdict.ok
