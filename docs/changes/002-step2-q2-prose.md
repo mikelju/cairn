@@ -1,6 +1,6 @@
 # 002 - Step 2 Q2 prose answers the question
 
-Status: in progress
+Status: ready locally
 
 ## Contract
 Goal and reason: the Q2 prose says "The screening table examined a total of 80 animals and is shown above."
@@ -69,3 +69,6 @@ Questions the supervisor raises with the user. Statuses: open, answered, deferre
 - C3 (first version): `npm run check` exit 0 (323 passed); word cap rendered: step 2 Q2 77, Q2 open 86 (cap 93), Q6 39; `make demo-offline-check PLATFORM=linux/arm64` exit 0 (`POST /step/2/run 200 RECORDED`); the default amd64 build failed once on DNS during `uv sync` and was not retried on amd64.
 
 ## Delivery
+Branch `cambio-002-step2-q2-prose`, six commits over `origin/main` (36333e3), the first of them the record of change 001 as integrated (PR 9 merged).
+Local checks: `npm run check` green (324 passed); adversarial review not run for this standalone change.
+Pending: PR URL and CI result are recorded after the push.
