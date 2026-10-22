@@ -120,5 +120,7 @@ The spec decisions U1 to U6 and the supervisor decision S1 are recorded in `spec
 Per criterion: command or walkthrough run, observed result and reference to the evidence.
 Pending items, limitations and what could not be checked, stated plainly.
 
+- Pending, unrelated to the phase criteria: the stop-gate `npm run check` times out or fails in the main checkout while phase agents run there in parallel (a `.coverage` file lock was also seen); not caused by a change.
+
 ## Candidate learnings
 Only reusable lessons with a literal quote from the session; consolidated when the phase closes.
