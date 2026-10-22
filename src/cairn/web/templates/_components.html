@@ -37,8 +37,8 @@
 <p class="lede">{{ sentence }}</p>
 {% endmacro %}
 
-{% macro step(number, title, kind, sentence) %}
-<section class="step">
+{% macro step(number, title, kind, sentence, cls="") %}
+<section class="step {{ cls }}">
   {{ step_header(number, title, kind, sentence) }}
   {{ caller() }}
 </section>

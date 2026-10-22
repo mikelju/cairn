@@ -1,8 +1,18 @@
 {% import "_components.html" as a %}
 {% if stale %}
+<div class="col-left">
 {% call a.callout("stale") %}<p>{{ stale }}</p>{% endcall %}
+</div>
 {% else %}
+<div class="col-left">
 {{ a.badge_meta(r.badge, r.meta) }}
+{% if r.text %}
+<div class="card answer"><p><strong>{{ r.text }}</strong></p>
+{% call a.disclosure("What the model wrote") %}<p>{{ r.written }}</p>{% endcall %}</div>
+{% elif r.written %}
+<div class="card answer">
+{% call a.disclosure("What the model wrote") %}<p>{{ r.written }}</p>{% endcall %}</div>
+{% endif %}
 {{ a.trace(r.trace) }}
 {% if r.message or r.failures %}
 {% call a.callout("note" if r.answered else "blocked") %}
@@ -10,14 +20,15 @@
 {% if r.failures %}<ul>{% for f in r.failures %}<li>{{ f }}</li>{% endfor %}</ul>{% endif %}
 {% endcall %}
 {% endif %}
+{% call a.callout("rules") %}<p>Rules fired: {{ r.rules }}</p>{% endcall %}
+{{ a.evidence_panel(r.evidence) }}
+</div>
 {% if r.rows %}
-<p>{{ r.rule }}</p>
+<div class="col-right card">
+{% call a.disclosure("Screening rule") %}<p>{{ r.rule }}</p>{% endcall %}
 {% set screen = namespace(rows=[]) %}
 {% for row in r.rows %}{% set screen.rows = screen.rows + [[row.sex, row.tissue, row.finding] + row.cells] %}{% endfor %}
 {{ a.data_table(["Sex", "Tissue", "Finding"] + r.doses, screen.rows) }}
+</div>
 {% endif %}
-{% if r.text %}<p><strong>{{ r.text }}</strong></p>{% endif %}
-{% call a.callout("rules") %}<p>Rules fired: {{ r.rules }}</p>{% endcall %}
-{% call a.disclosure("What the model wrote") %}<p>{{ r.written }}</p>{% endcall %}
-{{ a.evidence_panel(r.evidence) }}
 {% endif %}
