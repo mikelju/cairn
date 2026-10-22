@@ -124,7 +124,13 @@ def test_renderer_separates_fused_text_and_value() -> None:
     ledger = ObservationLedger()
     obs_id = ledger.add(incidence())
     finding = ValueRef(obs_id=obs_id, field="findings.0.finding")
-    parts = [Text(text="containing"), finding, Text(text="animals"), finding, Text(text=".")]
+    parts: list[Text | ValueRef] = [
+        Text(text="containing"),
+        finding,
+        Text(text="animals"),
+        finding,
+        Text(text="."),
+    ]
     fused = Sentence(parts=parts)
     assert render([fused], ledger) == "containing Vacuolization animals Vacuolization."
     spaced = Sentence(parts=[Text(text="of "), finding, Text(text=" ("), finding, Text(text=")")])
