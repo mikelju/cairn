@@ -75,6 +75,7 @@ The user approved this spec on 2026-10-22 through the phase 02c Lavish review pa
 | U4 | O4 How visible words are counted on a rendered page | "O4-A: área principal renderizada; cada cuerpo de tabla cuenta como un bloque" | Option A: render each state through the app, drop header, navigation and footer, count every word in the main area including table headers, captions, badges and metadata, and count each data table body as one block |
 | U5 | O5 Dark mode | "O5-A: solo tema claro" | Option A: light theme only |
 | U6 | Approval of the phase 02c spec and the direction | "Sí, apruebo la spec y la dirección" | Spec approved and frozen with the direction of U1 to U5 |
+| U7 | Approval of the step 3 to 7 mockups (C10), 2026-10-22, Lavish page with the five mockups and the eight app states | "Sí, apruebo las cinco maquetas (pasos 3 a 7) tal como están (aunque en las sucesivas fases podrá haber modificaciones)" | Mockups approved as they are; later phases may still adjust them |
 
 Decision taken by the supervisor, not by the user (supervisor decision, recommended option):
 
