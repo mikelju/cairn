@@ -73,6 +73,44 @@ REF_MARK = "\ue000"
 STRUCTURAL_FIELDS = frozenset({"study_id", "usubjid", "setcd", "label"})
 DOSE_UNITS = r"(?:[muµ]?g|mL)/kg(?:/(?:day|d))?"
 DOSE_WITH_UNIT = re.compile(rf"(?<![\w.])\d[\d.,]*\s*{DOSE_UNITS}(?![\w/])", re.IGNORECASE)
+# Rule 3 on the model text also blocks English number words used as quantities. Conservative
+# fixed list: two to twenty, the tens, hundred, thousand, million, dozen and zero, with an
+# optional plural s. "one", "first", "single", "none" and "half" stay allowed: idioms such as
+# "one of the findings" or "none observed" are ordinary prose and not a placed quantity.
+NUMBER_WORDS = [
+    "zero",
+    "two",
+    "three",
+    "four",
+    "five",
+    "six",
+    "seven",
+    "eight",
+    "nine",
+    "ten",
+    "eleven",
+    "twelve",
+    "thirteen",
+    "fourteen",
+    "fifteen",
+    "sixteen",
+    "seventeen",
+    "eighteen",
+    "nineteen",
+    "twenty",
+    "thirty",
+    "forty",
+    "fifty",
+    "sixty",
+    "seventy",
+    "eighty",
+    "ninety",
+    "hundred",
+    "thousand",
+    "million",
+    "dozen",
+]
+NUMBER_WORD = re.compile(rf"(?<![A-Za-z])(?:{'|'.join(NUMBER_WORDS)})s?(?![A-Za-z])", re.IGNORECASE)
 # Abbreviations whose full stop does not end a sentence (rule 1).
 ABBREVIATIONS = re.compile(r"(?<!\w)(?:e\.g\.|i\.e\.|vs\.|approx\.|etc\.|cf\.)", re.IGNORECASE)
 # A sentence end (after NFKC, so full-width and ellipsis marks are already ASCII): a run of
@@ -254,6 +292,10 @@ def _has_number(text: str) -> bool:
     return any(unicodedata.category(ch).startswith("N") for ch in text)
 
 
+def _has_number_word(text: str) -> bool:
+    return bool(NUMBER_WORD.search(text))
+
+
 def _is_incidence_count(ref: ValueRef) -> bool:
     return ref.field.rsplit(".", 1)[-1] == "affected"
 
@@ -297,7 +339,11 @@ def verify(sentences: list[Sentence], ledger: ObservationLedger) -> Verdict:
     for index, detail in errors.items():  # rule 2
         fail(2, index, detail)
     for index in range(len(sentences)):  # rule 3
-        if _has_number(written[index]) or _placed_text_has_number(sentences[index], ledger):
+        if (
+            _has_number(written[index])
+            or _has_number_word(written[index])
+            or _placed_text_has_number(sentences[index], ledger)
+        ):
             fail(3, index)
     for index, sentence in enumerate(sentences):  # rule 4
         refs = _refs(sentence)

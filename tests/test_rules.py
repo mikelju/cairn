@@ -80,6 +80,25 @@ def test_rule_3_digit_in_model_text_fails(world: World) -> None:
         only(verify([sentence], world.ledger), 3)
 
 
+def test_rule_3_number_word_in_model_text_fails(world: World) -> None:
+    for written in (
+        "Seven of ten",
+        "twelve animals",
+        "Twenty-one",
+        "hundreds of",
+        "a dozen",
+        "Two",
+    ):
+        sentence = Sentence(parts=[text(written + " in "), world.ref(world.weight, "sex")])
+        only(verify([sentence], world.ledger), 3)
+
+
+def test_rule_3_ordinary_words_are_not_number_words(world: World) -> None:
+    for written in ("One of the findings", "None observed", "The first single", "often tend to"):
+        sentence = Sentence(parts=[text(written + " in "), world.ref(world.weight, "sex")])
+        assert verify([sentence], world.ledger).ok, written
+
+
 def test_rule_4_incidence_with_denominator_passes(world: World) -> None:
     group = "findings.0.groups.3"
     sentence = Sentence(
