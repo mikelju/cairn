@@ -34,7 +34,7 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 
 | ID | Agent | Brief | Status | Result or blocker |
 |---|---|---|---|---|
-| E53 | ejecutor (Sonnet) | Reproduce, find the root cause and fix the step 2 animal count with a failing-first test | in progress | |
+| E53 | ejecutor (Sonnet) | Reproduce, find the root cause and fix the step 2 animal count with a failing-first test | done | Mislabelled affected-animal count in the evidence line fixed with a failing-first test; see Decisions and Evidence |
 
 ## User decisions
 Questions the supervisor raises with the user. Statuses: open, answered, deferred; each closes with the user's literal answer.
