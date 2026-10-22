@@ -62,6 +62,7 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | E6 | ejecutor (Sonnet) | Finish increment 5: check green, mark plan, commit | done | c34cd79; 230 tests green; mypy import fixed; 0 live-client imports in the web |
 | E7 | ejecutor (Sonnet) | Increment 6: step 2 of the web in replay over fixtures | done | 92a3f2d; 237 tests green; step 2 at 46 words of 93; nav "Design" renamed "Ask"; browser walkthrough left to increment 9 |
 | E8 | ejecutor (Sonnet) | Fix found on the user's path during U1: `cairn` console script missing and Makefile live targets failing from PowerShell | done | f03cadf; `uv run cairn --help` checked by the supervisor; recipes export variables at make level; `deploy` keeps an inline `MSYS_NO_PATHCONV=1` (left for increment 11); the agent ran smoke with a nonexistent profile by mistake, no AWS call, uncommitted evidence JSON overwritten and to be regenerated |
+| E9 | ejecutor (Sonnet) | Increment 11, code part: bounded wait in `make deploy`, recipe usable from PowerShell; the user's deploy run comes later | done | cc3b23d, 27658c5, e162d42; 242 tests green; 30 tries at 10 s, RUNNING with no pending deployment, fails fast on FAILED, DISABLED or DELETING; other `deploy` lines still need sh, so the user runs `make deploy` from Git Bash; real AWS response checked only on the user's run |
 
 ## User decisions
 Questions the supervisor raises with the user. Statuses: open, answered, deferred; each closes with the user's literal answer.
