@@ -105,12 +105,14 @@ def _definition(name: str) -> dict[str, Any]:
 
 def tool_definitions() -> list[dict[str, Any]]:
     """Strict definitions of the study tools plus write_answer, generated from the types."""
+    sentences = SENTENCES.json_schema()
+    definitions = sentences.pop("$defs", {})  # references resolve from the schema root
     answer = {
         "name": ANSWER_TOOL,
         "description": "Give the final answer as a list of sentences made of text and ref parts.",
         "strict": True,
         "input_schema": strictify(
-            {"type": "object", "properties": {"sentences": SENTENCES.json_schema()}}
+            {"type": "object", "properties": {"sentences": sentences}, "$defs": definitions}
         ),
     }
     return [*(_definition(name) for name in STUDY_TOOLS), answer]
