@@ -193,6 +193,7 @@ def _step2_context(question_id: str, directory: Path) -> dict[str, Any]:
     result = ask(QUESTIONS[question_id], LLMGateway(Mode.REPLAY, client=client), model)
     verdict = result.verdict
     cost = total_cost(recording)
+    latency = sum(float(call.get("latency_s", 0.0)) for call in recording["calls"])
     fixture = recording.get("source") == "fixture"
     doses, rows = _screen(result)
     trace = " -> ".join(step.tool for step in result.steps if step.tool in SHOWN_STEPS)
@@ -200,7 +201,7 @@ def _step2_context(question_id: str, directory: Path) -> dict[str, Any]:
         "badge": "FIXTURE" if fixture else "RECORDED",
         "meta": (
             f"{recording['date']} | {recording['region']} | {recording['model']} | "
-            f"{result.latency_s:.1f} s | " + ("cost n/a" if cost is None else f"{cost:.2f} USD")
+            f"{latency:.1f} s | " + ("cost n/a" if cost is None else f"{cost:.2f} USD")
         ),
         "trace": trace,
         "status": result.status.value,

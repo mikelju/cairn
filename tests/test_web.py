@@ -88,7 +88,22 @@ def test_step2_page_lists_the_questions_with_the_recorded_badge() -> None:
     assert 'value="Q2"' in page and 'value="Q6"' in page
 
 
+REAL = Path(__file__).parent.parent / "recordings"
+
+
 def test_q2_replay(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Offline replay of the real Opus 4.6 recording: 9-row screen, honest denominators."""
+    result = _ask("Q2", monkeypatch, REAL)
+    assert 'class="badge recorded"' in result
+    assert "Rules fired: none" in result
+    assert result.count("<tr><td>") == 9
+    assert "not examined" in result and "0/1" in result
+    assert "The screening table examined a total of 80 animals" in result
+    assert re.search(r"\| opus-4-6 \| [1-9]\d*\.\d s \|", result)
+    assert "Screen: a finding enters" in result
+
+
+def test_q2_replay_fixture(monkeypatch: pytest.MonkeyPatch) -> None:
     result = _ask("Q2", monkeypatch)
     assert "run_job -&gt; study_design -&gt; incidence" in result
     assert 'class="badge fixture"' in result
@@ -111,6 +126,13 @@ def test_step2_toggle_shows_markers_and_no_digits(monkeypatch: pytest.MonkeyPatc
 
 
 def test_q6_blocked(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Deviation D3: the real Q6 recording ends declined, which counts as correct."""
+    result = _ask("Q6", monkeypatch, REAL)
+    assert "the model declined" in result
+    assert "<tr><td>" not in result and "<strong>" not in result
+
+
+def test_q6_blocked_by_rules_on_fixture(monkeypatch: pytest.MonkeyPatch) -> None:
     result = _ask("Q6", monkeypatch)
     assert "Rules fired: 1, 6" in result
     assert "Rule 1" in result and "Rule 6" in result
