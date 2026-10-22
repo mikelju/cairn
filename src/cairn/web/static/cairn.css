@@ -210,3 +210,12 @@ td.not-examined { background: repeating-linear-gradient(45deg, var(--color-not-e
 .answer p { margin: var(--space-1) 0; }
 details { margin: var(--space-1) 0; }
 summary { cursor: pointer; color: var(--color-accent); font-size: var(--text-sm); }
+@media (max-width: 900px) {
+  header, footer { padding: 0 var(--space-4); flex-wrap: wrap; }
+  main { padding: var(--space-5) var(--space-4); }
+  .two-col { grid-template-columns: minmax(0, 1fr); }
+  .two-col > form, .two-col > details, .two-col > .col-prod, .two-col .col-left, .two-col .col-right { grid-column: 1; }
+  .two-col .col-right { grid-row: auto; }
+  .legend { grid-template-columns: minmax(0, 1fr); }
+  .controls { flex-wrap: wrap; }
+}

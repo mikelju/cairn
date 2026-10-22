@@ -294,3 +294,126 @@ def test_badge_recorded_keeps_its_metadata_and_simulated_its_production_line(
     assert "opus-4-6" in meta.group(1)
     assert re.search(r"\| \d+\.\d s \|", meta.group(1)) and "USD" in meta.group(1)
     assert 'class="badge simulated"' in step1 and "In production" in step1
+
+
+# --- Contrast and focus (C7) ---
+
+ROOT_BLOCK = re.compile(r":root\s*\{([^{}]*)\}")
+HEX_TOKEN = re.compile(r"--([\w-]+)\s*:\s*(#[0-9a-fA-F]{6})\s*;")
+BODY = 4.5  # body text
+LARGE = 3.0  # text of 18 px and above or 14 px bold, control borders, focus outline
+
+# (foreground token, background token, minimum ratio, where it is used)
+CONTRAST_PAIRS: list[tuple[str, str, float, str]] = [
+    ("ink", "paper", BODY, "body text"),
+    ("ink", "surface", BODY, "cards, tables, callouts"),
+    ("muted", "paper", BODY, ".meta, .prod, .lede on the page"),
+    ("muted", "surface", BODY, "header, footer, legend cards, evidence"),
+    ("muted", "not-examined", BODY, "td.not-examined"),
+    ("accent", "paper", BODY, "summary toggle, step links"),
+    ("accent", "surface", BODY, ".brand, summary"),
+    ("on-accent", "accent", BODY, ".num, button"),
+    ("on-accent", "real", BODY, ".badge.real"),
+    ("recorded", "recorded-tint", BODY, ".badge.recorded"),
+    ("simulated", "surface", BODY, ".badge.simulated"),
+    ("fixture", "fixture-tint", BODY, ".badge.fixture (hatch tint)"),
+    ("fixture", "surface", BODY, ".badge.fixture (hatch white)"),
+    ("ink", "accent-tint", BODY, ".callout.rules"),
+    ("ink", "block-tint", BODY, ".callout.blocked"),
+    ("ink", "warning-tint", BODY, ".callout.stale"),
+    ("ink", "new-row", BODY, "tr.new td"),
+    ("control-border", "paper", LARGE, "control and rule borders"),
+    ("control-border", "surface", LARGE, "select border, table header rule"),
+    ("accent", "paper", LARGE, "focus outline on paper"),
+    ("accent", "surface", LARGE, "focus outline on surface"),
+    ("accent", "accent-tint", LARGE, "focus outline on tinted callouts"),
+]
+
+
+def root_colours(css: str) -> dict[str, str]:
+    match = ROOT_BLOCK.search(_strip_comments(css))
+    assert match is not None
+    return {name.removeprefix("color-"): value for name, value in HEX_TOKEN.findall(match.group(1))}
+
+
+def _luminance(hex_colour: str) -> float:
+    channels = [int(hex_colour[i : i + 2], 16) / 255 for i in (1, 3, 5)]
+    lin = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4 for c in channels]
+    return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2]
+
+
+def contrast_ratio(foreground: str, background: str) -> float:
+    a, b = sorted((_luminance(foreground), _luminance(background)), reverse=True)
+    return (a + 0.05) / (b + 0.05)
+
+
+def contrast_failures(
+    colours: dict[str, str], pairs: list[tuple[str, str, float, str]] = CONTRAST_PAIRS
+) -> list[str]:
+    failures: list[str] = []
+    for fg, bg, minimum, where in pairs:
+        if fg not in colours or bg not in colours:
+            failures.append(f"missing token for {fg}/{bg} ({where})")
+            continue
+        ratio = contrast_ratio(colours[fg], colours[bg])
+        if ratio < minimum:
+            failures.append(f"{fg} on {bg} is {ratio:.2f}:1, needs {minimum}:1 ({where})")
+    return failures
+
+
+def test_contrast_every_pair_in_use_meets_its_threshold() -> None:
+    colours = root_colours(CSS_PATH.read_text())
+    assert contrast_failures(colours) == []
+
+
+def test_contrast_known_ratios() -> None:
+    assert contrast_ratio("#000000", "#ffffff") == pytest.approx(21.0)
+    assert contrast_ratio("#ffffff", "#ffffff") == pytest.approx(1.0)
+
+
+def test_contrast_failing_sample() -> None:
+    bad = {"ink": "#cccccc", "paper": "#ffffff", "control-border": "#eeeeee", "surface": "#ffffff"}
+    failures = contrast_failures(
+        bad,
+        [
+            ("ink", "paper", BODY, "body"),
+            ("control-border", "surface", LARGE, "border"),
+            ("ink", "gone", BODY, "missing"),
+        ],
+    )
+    assert len(failures) == 3
+    assert "ink on paper" in failures[0] and "missing token" in failures[2]
+
+
+def focus_gaps(css: str) -> list[str]:
+    """Interactive selectors with no :focus-visible rule that sets an outline."""
+    selectors: set[str] = set()
+    for match in RULE.finditer(_strip_comments(css)):
+        if "outline" not in match.group(2):
+            continue
+        for sel in match.group(1).split(","):
+            sel = sel.strip()
+            if sel.endswith(":focus-visible"):
+                selectors.add(sel.removesuffix(":focus-visible"))
+    wanted = ("a", "button", "select", "input", "summary", "[tabindex]")
+    return [s for s in wanted if s not in selectors]
+
+
+def test_focus_visible_outline_on_every_interactive_element() -> None:
+    assert focus_gaps(CSS_PATH.read_text()) == []
+
+
+def test_focus_visible_failing_sample() -> None:
+    sample = (
+        "a:focus-visible, button:focus-visible { outline: 2px solid red; } "
+        "select:focus-visible { color: red; }"
+    )
+    assert focus_gaps(sample) == ["select", "input", "summary", "[tabindex]"]
+
+
+def test_narrow_width_rule_collapses_grids_to_one_column() -> None:
+    css = _strip_comments(CSS_PATH.read_text())
+    match = re.search(r"@media\s*\(max-width:\s*(\d+)px\)\s*\{(.*)\}\s*$", css, flags=re.S)
+    assert match is not None and 800 <= int(match.group(1)) <= 960
+    assert ".two-col" in match.group(2) and "grid-template-columns" in match.group(2)
+    assert not COLOUR_LITERAL.search(match.group(2))
