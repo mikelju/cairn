@@ -99,7 +99,7 @@ def test_q2_replay(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "Rules fired: none" in result
     assert result.count("<tr><td>") == 9
     assert "not examined" in result and "0/1" in result
-    assert "GLAND, ADRENAL Vacuolization passed the screen in F and M." in result
+    assert "9 screened findings; the clearest is GLAND, ADRENAL Vacuolization in F and M" in result
     recorded = json.loads((REAL / "q2.json").read_text(encoding="utf-8"))
     cost = sum(call["cost_usd"] for call in recorded["calls"])
     assert f"{recorded['date']} | {recorded['region']} | opus-4-6 |" in result
@@ -240,3 +240,18 @@ def test_q2_prose_names_the_screened_findings_by_sex_and_places_no_table_positio
         }
         assert all(re.search(rf"\b{sex}\b", text) for sex in sexes), text
     assert not re.search(r"\b(above|below)\b", text)
+
+
+def test_q2_prose_counts_the_screened_findings_by_reference(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The count is a reference to the code's own count and matches the rows of the table."""
+    from cairn.incidence import incidence
+
+    result = _ask("Q2", monkeypatch, REAL)
+    text = re.search(r'<div class="card answer"><p><strong>(.*?)</strong>', result, re.S).group(1)  # type: ignore[union-attr]
+    rows = result.count("<tr><td>")
+    assert re.match(rf"{rows} screened findings", text), text
+    assert rows == incidence().values["n_findings"]
+    toggle = re.search(r"<details>.*?</details>", result, flags=re.S)
+    assert toggle and "[n_findings]" in toggle.group(0) and not re.search(r"\d", toggle.group(0))

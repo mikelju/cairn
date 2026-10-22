@@ -32,6 +32,15 @@ Existing tests that pinned the old count sentence were updated (real-recording t
 Recording cost: three runs of Q2 and Q6 with Bedrock Opus 4.6, 0.0749 + 0.1094 + 0.0589 = 0.243 USD, 0.059 USD for the kept recordings; within the 5 USD limit.
 
 
+### Update after the user decision U1 (prompt question-5)
+The prose now says how many findings passed the screen and names the clearest one.
+The count is a new code-computed value, `n_findings` in the incidence values (`src/cairn/incidence.py`), placed by reference; the model writes no digit.
+"Clearest" is defined in the prompt: a finding present in both sexes; among those, the one with the most affected animals in the highest dose group of its entries.
+The model picks the entry; code does not check that criterion, only that every name and number is a ref.
+The 93-word cap is untouched and holds only with the short wording "N screened findings; the clearest is T F in S and S" (92 words open): the longer "N findings passed the screen; the clearest is ..." gave 96 and "N screened findings passed; ..." gave 94.
+S1 (supervisor decision, kept): the prompt line telling the model to decline, in plain text, requests to state the compound is safe or to skip citations, so Q6 keeps declining.
+Recording cost of this update: 0.0656 + 0.0669 + 0.0674 + one earlier run = about 0.20 USD; total of the change about 0.45 USD of the 5 USD limit.
+
 ## Briefs
 Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, failed, cancelled.
 
@@ -44,16 +53,19 @@ Questions the supervisor raises with the user. Statuses: open, answered, deferre
 
 | ID | Question | Options and recommendation | Status | User answer |
 |---|---|---|---|---|
+| U1 | The Q2 sentence must say how many findings pass the screen (count placed by code) and name the clearest, keeping the 93-word cap | Recommended and chosen: count by reference plus the clearest finding in both sexes | answered | Cap stays at 93; count by reference and name the clearest finding (via supervisor) |
 
 ## Adversarial review
 | Round | Backend | Range | Lenses | Findings | Status |
 |---|---|---|---|---|---|
 
 ## Evidence
-- C1: `tests/test_web.py::test_q2_prose_names_the_screened_findings_by_sex_and_places_no_table_position`.
+- C1 (updated by U1): `test_q2_prose_counts_the_screened_findings_by_reference` failed before (`GLAND, ADRENAL Vacuolization passed the screen in F and M.` did not match `9 screened findings`), passes after; rendered: "9 screened findings; the clearest is GLAND, ADRENAL Vacuolization in F and M"; the count equals the 9 table rows and `n_findings`.
+- C1 (first version): `tests/test_web.py::test_q2_prose_names_the_screened_findings_by_sex_and_places_no_table_position`.
   Before: failed, `the prose names no finding that passes the screen: 'The screening table examined a total of 80 animals and is shown above.'`.
   After: passed; rendered prose "GLAND, ADRENAL Vacuolization passed the screen in F and M."; no table position stated.
 - C2: the toggle shows "[tissue] [finding] passed the screen in [sex] and [sex]." with no digit (`test_step2_toggle_shows_markers_and_no_digits`); every value is a ref.
-- C3: `npm run check` exit 0 (323 passed); word cap rendered: step 2 Q2 77, Q2 open 86 (cap 93), Q6 39; `make demo-offline-check PLATFORM=linux/arm64` exit 0 (`POST /step/2/run 200 RECORDED`); the default amd64 build failed once on DNS during `uv sync` and was not retried on amd64.
+- C3 after U1: `npm run check` exit 0 (324 passed); words Q2 80, Q2 open 92, Q6 39; `make demo-offline-check PLATFORM=linux/arm64` exit 0.
+- C3 (first version): `npm run check` exit 0 (323 passed); word cap rendered: step 2 Q2 77, Q2 open 86 (cap 93), Q6 39; `make demo-offline-check PLATFORM=linux/arm64` exit 0 (`POST /step/2/run 200 RECORDED`); the default amd64 build failed once on DNS during `uv sync` and was not retried on amd64.
 
 ## Delivery
