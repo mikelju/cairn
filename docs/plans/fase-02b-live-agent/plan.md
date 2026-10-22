@@ -75,10 +75,11 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | E20 | ejecutor (Sonnet) | Increment 10: rule 3 blocks English number words used as quantities | done | 6cfc436; see increment 10 evidence |
 | E21 | ejecutor (Sonnet) | Increment 11: `make deploy` from Git Bash with the `default` profile (U2), then curl checks, footer commit and `make demo-offline-check` | done | no commits; first try lost on session handoff, retry deployed e372394, all checks 200; see increment 11 evidence |
 | E22 | ejecutor (Sonnet) | Increment 12: clean clone with `uv sync` and `npm run check`, PRD-term, AWS account ID and GxP greps | done | no commits; see increment 12 evidence |
-| E23 | revisor (Opus) | R1, lens correctness, `git diff ce1a81f` | in progress | |
-| E24 | revisor (Opus) | R1, lens security and data, `git diff ce1a81f` | in progress | |
-| E25 | revisor (Opus) | R1, lens evidence and tests, `git diff ce1a81f` | in progress | |
-| E26 | revisor (Opus) | R1, lens scope and maintenance, `git diff ce1a81f` | in progress | |
+| E23 | revisor (Opus) | R1, lens correctness, `git diff ce1a81f` | done | 3 important, 5 minor; see review table |
+| E24 | revisor (Opus) | R1, lens security and data, `git diff ce1a81f` | done | no Critical or High; 2 Medium, 2 Low; no scanners installed; see review table |
+| E25 | revisor (Opus) | R1, lens evidence and tests, `git diff ce1a81f` | done | 4 important, 6 minor; see review table |
+| E26 | revisor (Opus) | R1, lens scope and maintenance, `git diff ce1a81f` | done | 2 important, 6 minor; see review table |
+| E27 | ejecutor (Sonnet) | Fix the R1 confirmed findings, no re-recording | in progress | |
 | E13 | ejecutor (Opus) | Lavish page for the user: the question flow drawn step by step on the real recordings | done | `.lavish/flujo-pregunta.html` open, not versioned; found two facts to check: the model sees observation values with their numbers (only the hash ID is hidden), and Q6 sentence 2 renders "containing124animals" (no space between text and value: renderer or model text, to check before re-recording) |
 
 ## User decisions
@@ -101,6 +102,7 @@ Questions the supervisor raises with the user. Statuses: open, answered, deferre
 ## Adversarial review
 | Round | Backend | Range | Lenses | Findings | Status |
 |---|---|---|---|---|---|
+| R1 | local | `git diff ce1a81f` at add2f33 | correctness, security and data, evidence and tests, scope and maintenance (Opus, parallel) | 0 blocking. Confirmed, fixed in E27: evidence panel counts source rows as animals (69 vs 37 subjects); tool exceptions such as `run_job` with an unknown kind escape the loop instead of going back to the model; `record` overwrites a good recording whatever the outcome and exits 0; spend ceiling assumes 2048 output tokens while calls use 4096; smoke evidence stores raw exception text that could carry the AWS account ID; SDK errors and unknown models surface as raw tracebacks in the CLI; model default and recordings folder repeated in several places (ADR-001 "table change" claim false); `demo-offline-check` never POSTs `/step/2/run`; toggle and badge tests only on the fixture or partial; stale comments, README without step 2 or the cost commands. Accepted demo limits: budget not cumulative across `make record` runs; `PROMPT_VERSION` is manual (hashing the prompt would make the real recordings stale and force paid re-recording); metadata check trusts the `source` field (fixtures are kept out of `recordings/` by tests); smoke JSON predates later schema fixes (the real recordings prove Bedrock accepts the current schema); failed trace steps unmarked; Q6 test accepts declined or rejected (D3). Security: `/step/2/run` added to SEC-001 | in progress |
 
 ## Results
 Per criterion: command or walkthrough run, observed result and reference to the evidence.
