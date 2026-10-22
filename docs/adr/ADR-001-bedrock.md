@@ -14,7 +14,10 @@ The first plan named Opus 5.5, Sonnet 5.5 and Opus 4.8.
 The account cannot use those models yet: they answer 403 "not available for this account" while the rollout reaches it.
 Opus 4.6 and Sonnet 4.6 are enabled and answer normally.
 The demo therefore uses Opus 4.6 for the question and draft prompts and for recordings, and Sonnet 4.6 as the fallback for a question Opus 4.6 refuses and as the judge model.
-Switching back to the newer models is a change to the profile and price tables (`src/cairn/gateway.py`, `src/cairn/pricing.py`) plus re-recording, since a recording is keyed by model.
+Switching back to the newer models changes exactly these places, and then every recording must be made again, since a recording is keyed by model:
+- `MODEL_PROFILES` and `DEFAULT_MODEL` in `src/cairn/gateway.py`.
+- `PRICES_PER_MTOK` in `src/cairn/pricing.py`.
+- `make record` takes the model from `DEFAULT_MODEL` unless `MODEL=<key>` is given, so the Makefile needs no change.
 
 ## Smoke test results
 The smoke test sent a question prompt (with the study tools and the answer tool), a draft prompt and a judge prompt (with the verdict tool) to each profile.

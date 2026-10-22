@@ -19,9 +19,10 @@ demo: build
 	docker run --rm --platform $(PLATFORM) -p 127.0.0.1:$(PORT):8000 $(IMAGE)
 
 # Docker cannot publish ports with --network none, so this target proves the offline claim
-# by fetching the landing page and step 1 from inside a container that has no network.
+# from inside a container that has no network: it fetches the landing page, steps 1 and 2 and /healthz,
+# then posts question Q2 to step 2 and requires a 200 whose page carries the RECORDED badge.
 demo-offline-check: build
-	docker run --rm --platform $(PLATFORM) --network none $(IMAGE) python -c "import urllib.request as u, socket, subprocess, time; p = subprocess.Popen(['uvicorn', 'cairn.app:create_app', '--factory', '--port', '8000']); [time.sleep(1) for _ in range(120) if socket.socket().connect_ex(('127.0.0.1', 8000))]; [print(x, u.urlopen('http://127.0.0.1:8000' + x).status) for x in ('/', '/step/1', '/step/2', '/healthz')]; p.terminate()"
+	docker run --rm --platform $(PLATFORM) --network none $(IMAGE) python -c "import urllib.request as u, socket, subprocess, sys, time; p = subprocess.Popen(['uvicorn', 'cairn.app:create_app', '--factory', '--port', '8000']); [time.sleep(1) for _ in range(120) if socket.socket().connect_ex(('127.0.0.1', 8000))]; [print(x, u.urlopen('http://127.0.0.1:8000' + x).status) for x in ('/', '/step/1', '/step/2', '/healthz')]; r = u.urlopen('http://127.0.0.1:8000/step/2/run', data=b'question=Q2'); b = r.read(); ok = r.status == 200 and b'RECORDED' in b; print('POST /step/2/run', r.status, 'RECORDED' if ok else 'missing RECORDED'); p.terminate(); sys.exit(0 if ok else 1)"
 
 # Deploys the image to one Lightsail container service (created on first run), waits up to 5 minutes
 # (30 tries, 10 s apart) for RUNNING, and prints its state and URL.
@@ -40,7 +41,9 @@ deploy: build
 
 # Laptop-only commands that call Bedrock (decision D8). Each prints its estimated spending ceiling first.
 # Usage: make smoke AWS_PROFILE=<profile>; make record AWS_PROFILE=<profile> [MODEL=sonnet-4-6 QUESTIONS=Q6]
-MODEL ?= opus-4-6
+# Without MODEL the commands use DEFAULT_MODEL from src/cairn/gateway.py.
+MODEL ?=
+MODEL_FLAG = $(if $(MODEL),--model $(MODEL))
 QUESTIONS ?= Q2 Q6
 QUESTION ?= Q2
 
@@ -53,11 +56,11 @@ live smoke: export CAIRN_LLM_MODE := live
 
 record:
 	$(if $(AWS_PROFILE),,$(error set AWS_PROFILE=<profile>))
-	uv run cairn record $(QUESTIONS) --model $(MODEL)
+	uv run cairn record $(QUESTIONS) $(MODEL_FLAG)
 
 live:
 	$(if $(AWS_PROFILE),,$(error set AWS_PROFILE=<profile>))
-	uv run cairn ask "$(QUESTION)" --live --model $(MODEL)
+	uv run cairn ask "$(QUESTION)" --live $(MODEL_FLAG)
 
 smoke:
 	$(if $(AWS_PROFILE),,$(error set AWS_PROFILE=<profile>))
