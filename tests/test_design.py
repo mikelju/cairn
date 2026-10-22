@@ -603,3 +603,31 @@ def test_mockups_failing_sample() -> None:
     assert mockup_problems(good.replace("</main>", "<p>" + "word " * 100 + "</p></main>")) == [
         "step words"
     ]
+
+
+CALLOUT_GLYPHS = {"rules": 0x25B6, "blocked": 0x2715, "stale": 0x26A0, "note": 0x2139}
+
+
+def css_glyph_problems(css: str) -> list[str]:
+    """Control characters in the stylesheet and callout glyphs that are not the intended escape."""
+    problems = []
+    if any(ord(ch) < 32 and ch not in "\t\n\r" for ch in css):
+        problems.append("control character")
+    for kind, code in CALLOUT_GLYPHS.items():
+        found = re.search(rf"\.callout\.{kind}::before\s*\{{[^}}]*content\s*:\s*([^;]+);", css)
+        wanted = re.compile(rf'"\\0*{code:X}\s?"', re.I)
+        if not found or not wanted.fullmatch(found.group(1).strip()):
+            problems.append(f"callout {kind} glyph")
+    return problems
+
+
+def test_css_glyphs_are_valid_escapes() -> None:
+    css = (HERE / "static" / "cairn.css").read_text(encoding="utf-8")
+    assert css_glyph_problems(css) == []
+
+
+def test_css_glyphs_failing_sample() -> None:
+    bad = '.callout.rules::before { content: "\x15B6"; }\n.callout.note::before { content: "x"; }'
+    assert "control character" in css_glyph_problems(bad)
+    assert "callout rules glyph" in css_glyph_problems(bad)
+    assert "callout note glyph" in css_glyph_problems(bad)

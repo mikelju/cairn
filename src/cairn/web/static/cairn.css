@@ -195,13 +195,13 @@ tr.new td:first-child { font-weight: var(--weight-bold); border-left: var(--bord
 .callout p, .callout ul { margin: var(--space-1) 0; }
 .callout::before { position: absolute; left: var(--space-2); top: var(--space-2); font-weight: var(--weight-bold); }
 .callout.rules { background: var(--color-accent-tint); border-left-color: var(--color-accent); border-left-style: solid; }
-.callout.rules::before { content: "B6"; }
+.callout.rules::before { content: "\25B6"; }
 .callout.blocked { background: var(--color-block-tint); border-left-color: var(--color-block); border-left-style: double; }
-.callout.blocked::before { content: "¹5"; }
+.callout.blocked::before { content: "\2715"; }
 .callout.stale { background: var(--color-warning-tint); border-left-color: var(--color-simulated); border-left-style: dashed; }
-.callout.stale::before { content: "A0"; }
+.callout.stale::before { content: "\26A0"; }
 .callout.note { border-left-color: var(--color-control-border); border-left-style: dotted; }
-.callout.note::before { content: "9"; }
+.callout.note::before { content: "\2139"; }
 .evidence p { margin: var(--space-1) 0 0; color: var(--color-muted); font-size: var(--text-xs); }
 td.not-examined { background: repeating-linear-gradient(45deg, var(--color-not-examined), var(--color-not-examined) var(--space-1), var(--color-surface) var(--space-1), var(--color-surface) var(--space-2)); color: var(--color-muted); font-style: italic; }
 .two-col { max-width: none; display: grid; grid-template-columns: minmax(0, var(--col-left-max)) minmax(0, 1fr); column-gap: var(--space-6); align-items: start; }
