@@ -1,5 +1,7 @@
+import os
 import re
 from html.parser import HTMLParser
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -7,6 +9,8 @@ from fastapi.testclient import TestClient
 from cairn.app import create_app
 
 STEP_WORD_CAP = 93
+REAL_RECORDINGS = Path(__file__).resolve().parents[1] / "recordings"
+STALE_NOTICE = "stale recording"
 SENTENCE_WORD_CAP = 25
 
 
@@ -91,16 +95,32 @@ def rendered_problems(html: str) -> list[str]:
 def with_result(page: str, fragment: str) -> str:
     """The GET page with the POST fragment inside #result, as HTMX places it."""
     empty = re.compile(r'(<div id="result"[^>]*>)</div>')
-    return empty.sub(lambda m: f"{m.group(1)}{fragment}</div>", page)
+    placed, count = empty.subn(lambda m: f"{m.group(1)}{fragment}</div>", page)
+    assert count == 1, "no empty #result element to place the fragment in"
+    return placed
 
 
 def open_toggle(html: str) -> str:
     """Mark the "What the model wrote" disclosure open, as a visitor does."""
     closed = "<details><summary>What the model wrote"
+    assert closed in html, "no closed 'What the model wrote' toggle to open"
     return html.replace(closed, closed.replace("<details>", "<details open>"))
 
 
 def rendered_state(name: str) -> str:
+    # Step 2 states always replay the real recordings, whatever the cwd or the environment say.
+    saved = os.environ.get("CAIRN_RECORDINGS")
+    os.environ["CAIRN_RECORDINGS"] = str(REAL_RECORDINGS)
+    try:
+        return _rendered_state(name)
+    finally:
+        if saved is None:
+            del os.environ["CAIRN_RECORDINGS"]
+        else:
+            os.environ["CAIRN_RECORDINGS"] = saved
+
+
+def _rendered_state(name: str) -> str:
     with TestClient(create_app()) as client:
         if name == "landing":
             return client.get("/").text
@@ -110,6 +130,7 @@ def rendered_state(name: str) -> str:
                 return page
             question = "Q6" if name == "step2_q6" else "Q2"
             result = client.post("/step/2/run", data={"question": question}).text
+            assert STALE_NOTICE not in result, f"{name} rendered a stale recording"
             if name == "step2_q2_open":
                 result = open_toggle(result)
             return with_result(page, result)
@@ -182,3 +203,28 @@ def test_word_cap_rendered(state: str) -> None:
     html = rendered_state(state)
     print(state, rendered_words(html), rendered_lede(html))
     assert rendered_problems(html) == [], state
+
+
+def test_with_result_fails_when_there_is_no_result_element() -> None:
+    with pytest.raises(AssertionError):
+        with_result(_page("<p>no result here</p>"), "<p>a b</p>")
+
+
+def test_open_toggle_fails_when_there_is_no_closed_toggle() -> None:
+    with pytest.raises(AssertionError):
+        open_toggle("<p>stale recording: run make record</p>")
+    assert "<details open><summary>What the model wrote" in open_toggle(
+        "<details><summary>What the model wrote</summary></details>"
+    )
+
+
+@pytest.mark.parametrize("state", ["step2_q2", "step2_q2_open", "step2_q6"])
+def test_step2_states_replay_the_real_recordings_whatever_the_environment_says(
+    state: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CAIRN_RECORDINGS", str(tmp_path))  # an empty folder: would be stale
+    monkeypatch.chdir(tmp_path)  # and no relative "recordings" folder here either
+    html = rendered_state(state)
+    assert STALE_NOTICE not in html
+    assert os.environ["CAIRN_RECORDINGS"] == str(tmp_path)  # restored afterwards
+    assert "Rules fired:" in html
