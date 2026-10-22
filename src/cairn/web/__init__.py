@@ -189,12 +189,14 @@ def _evidence(result: LoopResult) -> list[dict[str, str]]:
     evidence = []
     for o in result.ledger.observations:
         ids = sorted({str(row["usubjid"]) for row in o.source_rows if "usubjid" in row})
+        # Incidence source rows are the affected animals; n is the examined count.
+        label = "affected" if o.kind.startswith("incidence") else "animals"
         evidence.append(
             {
                 "tool": o.tool.name,
                 "population": o.population,
                 "n": "n/a" if o.n_examined is None else str(o.n_examined),
-                "sources": f"{len(ids)} animals, from {ids[0]}" if ids else "none",
+                "sources": f"{len(ids)} {label}, from {ids[0]}" if ids else "none",
             }
         )
     return evidence

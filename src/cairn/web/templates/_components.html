@@ -1,0 +1,76 @@
+{# Shared components: every page builds on these macros; step templates hold wording only. #}
+{% macro badge(kind) %}<span class="badge {{ kind|lower }}">{{ kind }}</span>{% endmacro %}
+
+{% macro badge_meta(kind, meta) %}<p class="meta">{{ badge(kind) }} {{ meta }}</p>{% endmacro %}
+
+{% macro shell_header(steps, current, role) %}
+<header>
+  <a class="brand" href="/">Cairn</a>
+  <nav class="steps" aria-label="Steps">
+    {% for name in steps %}
+      {% set n = loop.index %}
+      {% if n <= 2 %}
+        <a href="/step/{{ n }}"{% if current == n %} aria-current="step"{% endif %}>{{ n }} {{ name }}</a>
+      {% else %}
+        <span class="locked" aria-disabled="true">{{ n }} {{ name }}</span>
+      {% endif %}
+    {% endfor %}
+  </nav>
+  <span class="role">Role: {{ role }} (simulated)</span>
+</header>
+{% endmacro %}
+
+{% macro shell_footer(footer) %}
+<footer>
+  <span>Public sample data · fictional compound · not GxP-validated</span>
+  <span>v{{ footer.version }} · commit {{ footer.commit }} · snapshot {{ footer.snapshot[:12] }}</span>
+</footer>
+{% endmacro %}
+
+{% macro page_header(title, sentence) %}
+<h1>{{ title }}</h1>
+<p class="lede">{{ sentence }}</p>
+{% endmacro %}
+
+{% macro step_header(number, title, kind, sentence) %}
+<h1><span class="num">{{ number }}</span> {{ title }} {{ badge(page_badge|default(kind)) }}</h1>
+<p class="lede">{{ sentence }}</p>
+{% endmacro %}
+
+{% macro step(number, title, kind, sentence, cls="") %}
+<section class="step {{ cls }}">
+  {{ step_header(number, title, kind, sentence) }}
+  {{ caller() }}
+</section>
+{% endmacro %}
+
+{# headers: list of column names; rows: list of lists of cells; new: highlight every row as new. #}
+{% macro data_table(headers, rows, new=false) %}
+<table>
+  <thead><tr>{% for h in headers %}<th>{{ h }}</th>{% endfor %}</tr></thead>
+  <tbody>
+  {% for row in rows %}
+  <tr{% if new %} class="new"{% endif %}>{% for cell in row %}<td{% if cell == "not examined" %} class="not-examined"{% endif %}>{{ cell }}</td>{% endfor %}</tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endmacro %}
+
+{% macro trace(steps) %}<p class="trace">Trace: {{ steps }}</p>{% endmacro %}
+
+{% macro evidence_panel(items) %}
+<div class="evidence">
+{% for e in items %}
+<p>{{ e.tool }}, {{ e.population }}, n={{ e.n }}, {{ e.sources }}</p>
+{% endfor %}
+</div>
+{% endmacro %}
+
+{# kind: rules, blocked, stale or note. #}
+{% macro callout(kind) %}<div class="callout {{ kind }}">{{ caller() }}</div>{% endmacro %}
+
+{% macro disclosure(summary) %}<details><summary>{{ summary }}</summary>{{ caller() }}</details>{% endmacro %}
+
+{% macro in_production(text, kind=none, lead=none) %}
+<p class="prod">{% if kind %}{{ badge(kind) }} {{ lead }} <strong>In production →</strong>{% else %}In production →{% endif %} {{ text }}</p>
+{% endmacro %}

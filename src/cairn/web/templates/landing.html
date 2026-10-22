@@ -1,14 +1,13 @@
 {% extends "base.html" %}
-{% import "_anatomy.html" as a %}
+{% import "_components.html" as a %}
 {% block main %}
-<section class="step">
-  <h1>Traceable drug safety science</h1>
-  <p class="lede">From a public SEND study to a draft nonclinical summary, with every number placed by code.</p>
+<section class="step landing">
+  {{ a.page_header("Traceable drug safety science", "From a public SEND study to a draft nonclinical summary, with every number placed by code.") }}
   <ul class="legend">
     <li>{{ a.badge("REAL") }} computed live from the data</li>
     <li>{{ a.badge("RECORDED") }} replayed from a saved run</li>
     <li>{{ a.badge("SIMULATED") }} a stand-in for production</li>
   </ul>
-  <p><a class="button" href="/step/1">Start with step 1</a></p>
+  <p class="actions"><a class="button" href="/step/1">Start with step 1</a></p>
 </section>
 {% endblock %}

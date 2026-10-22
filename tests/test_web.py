@@ -148,6 +148,16 @@ def test_q6_blocked_by_rules_on_fixture(monkeypatch: pytest.MonkeyPatch) -> None
     assert "<tr><td>" not in result
 
 
+def _callout_classes(html: str) -> list[str]:
+    return re.findall(r'class="callout (\w+)"', html)
+
+
+@pytest.mark.parametrize("folder", [FIXTURES, REAL])
+def test_q6_callout_is_blocked_and_q2_is_not(monkeypatch: pytest.MonkeyPatch, folder: Path) -> None:
+    assert "blocked" in _callout_classes(_ask("Q6", monkeypatch, folder))
+    assert "blocked" not in _callout_classes(_ask("Q2", monkeypatch, folder))
+
+
 def test_step2_missing_recording_shows_the_stale_message(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -171,8 +181,21 @@ def test_q2_evidence_counts_distinct_animals_not_source_rows(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     result = _ask("Q2", monkeypatch, REAL)
-    assert "37 animals, from " in result
+    assert "37 affected, from " in result
     assert "69 animals" not in result
+
+
+@pytest.mark.parametrize("folder", [FIXTURES, REAL])
+def test_q2_sentence_and_evidence_state_the_same_examined_count(
+    monkeypatch: pytest.MonkeyPatch, folder: Path
+) -> None:
+    """Sentence and evidence n are one field of one observation; the other count is labelled."""
+    result = _ask("Q2", monkeypatch, folder)
+    sentence = re.search(r"examined (?:a total of )?(\d+) animals", result)
+    evidence = re.search(r"incidence, [^<]*?, n=(\d+), (\d+) (\w+), from ", result)
+    assert sentence and evidence
+    assert sentence.group(1) == evidence.group(1)
+    assert evidence.group(3) == "affected"
 
 
 def test_step2_header_badge_follows_the_recordings_served(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -1,12 +1,12 @@
 {% extends "base.html" %}
-{% import "_anatomy.html" as a %}
+{% import "_components.html" as a %}
 {% block main %}
 {% call a.step(1, "Validate", "REAL", "Bad data stops at the door: negative values are quarantined, never corrected.") %}
-<form class="controls">
+<form class="controls card">
   <button type="submit" hx-post="/step/1/run" hx-target="#result">Run validation</button>
   <label><input type="checkbox" name="inject" value="on" hx-post="/step/1/run" hx-target="#result" hx-include="this" hx-trigger="change"> Inject a negative concentration</label>
 </form>
-<div id="result"></div>
-<p class="prod">{{ a.badge("SIMULATED") }} job runner: in process. <strong>In production →</strong> a queue with workers.</p>
+<div id="result" class="result"></div>
+{{ a.in_production("a queue with workers.", "SIMULATED", "job runner: in process.") }}
 {% endcall %}
 {% endblock %}

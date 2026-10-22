@@ -1,26 +1,34 @@
-{% import "_anatomy.html" as a %}
+{% import "_components.html" as a %}
 {% if stale %}
-<p>{{ stale }}</p>
+<div class="col-left">
+{% call a.callout("stale") %}<p>{{ stale }}</p>{% endcall %}
+</div>
 {% else %}
-<p>{{ a.badge(r.badge) }} {{ r.meta }}</p>
-<p>Trace: {{ r.trace }}</p>
+<div class="col-left">
+{{ a.badge_meta(r.badge, r.meta) }}
+{% if r.text %}
+<div class="card answer"><p><strong>{{ r.text }}</strong></p>
+{% call a.disclosure("What the model wrote") %}<p>{{ r.written }}</p>{% endcall %}</div>
+{% elif r.written %}
+<div class="card answer">
+{% call a.disclosure("What the model wrote") %}<p>{{ r.written }}</p>{% endcall %}</div>
+{% endif %}
+{{ a.trace(r.trace) }}
+{% if r.message or r.failures %}
+{% call a.callout("blocked" if (not r.answered or r.failures) else "note") %}
 {% if r.message %}<p>{{ r.message }}</p>{% endif %}
+{% if r.failures %}<ul>{% for f in r.failures %}<li>{{ f }}</li>{% endfor %}</ul>{% endif %}
+{% endcall %}
+{% endif %}
+{% call a.callout("rules") %}<p>Rules fired: {{ r.rules }}</p>{% endcall %}
+{{ a.evidence_panel(r.evidence) }}
+</div>
 {% if r.rows %}
-<p>{{ r.rule }}</p>
-<table>
-  <tr><th>Sex</th><th>Tissue</th><th>Finding</th>{% for d in r.doses %}<th>{{ d }}</th>{% endfor %}</tr>
-  {% for row in r.rows %}
-  <tr><td>{{ row.sex }}</td><td>{{ row.tissue }}</td><td>{{ row.finding }}</td>{% for c in row.cells %}<td>{{ c }}</td>{% endfor %}</tr>
-  {% endfor %}
-</table>
+<div class="col-right card">
+{% call a.disclosure("Screening rule") %}<p>{{ r.rule }}</p>{% endcall %}
+{% set screen = namespace(rows=[]) %}
+{% for row in r.rows %}{% set screen.rows = screen.rows + [[row.sex, row.tissue, row.finding] + row.cells] %}{% endfor %}
+{{ a.data_table(["Sex", "Tissue", "Finding"] + r.doses, screen.rows) }}
+</div>
 {% endif %}
-{% if r.text %}<p><strong>{{ r.text }}</strong></p>{% endif %}
-{% if r.failures %}
-<ul>{% for f in r.failures %}<li>{{ f }}</li>{% endfor %}</ul>
-{% endif %}
-<p>Rules fired: {{ r.rules }}</p>
-<details><summary>What the model wrote</summary><p>{{ r.written }}</p></details>
-{% for e in r.evidence %}
-<p class="prod">{{ e.tool }}, {{ e.population }}, n={{ e.n }}, {{ e.sources }}</p>
-{% endfor %}
 {% endif %}
