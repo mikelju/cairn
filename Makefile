@@ -23,16 +23,19 @@ demo: build
 demo-offline-check: build
 	docker run --rm --platform $(PLATFORM) --network none $(IMAGE) python -c "import urllib.request as u, socket, subprocess, time; p = subprocess.Popen(['uvicorn', 'cairn.app:create_app', '--factory', '--port', '8000']); [time.sleep(1) for _ in range(120) if socket.socket().connect_ex(('127.0.0.1', 8000))]; [print(x, u.urlopen('http://127.0.0.1:8000' + x).status) for x in ('/', '/step/1', '/step/2', '/healthz')]; p.terminate()"
 
-# Deploys the image to one Lightsail container service (created on first run) and prints its state and URL.
+# Deploys the image to one Lightsail container service (created on first run), waits up to 5 minutes
+# (30 tries, 10 s apart) for RUNNING, and prints its state and URL.
 # Needs the AWS CLI with Lightsail permissions and the lightsailctl plugin on PATH.
+# MSYS_NO_PATHCONV stops Git Bash from rewriting /healthz into a Windows path; exported by make so cmd runs it too.
+deploy: export MSYS_NO_PATHCONV := 1
 deploy: build
 	aws lightsail get-container-services --service-name $(SERVICE) --region $(REGION) > /dev/null 2>&1 \
 		|| aws lightsail create-container-service --service-name $(SERVICE) --power $(POWER) --scale 1 --region $(REGION)
 	aws lightsail push-container-image --service-name $(SERVICE) --label app --image $(IMAGE) --region $(REGION)
-	# MSYS_NO_PATHCONV stops Git Bash from rewriting /healthz into a Windows path.
-	MSYS_NO_PATHCONV=1 aws lightsail create-container-service-deployment --service-name $(SERVICE) --region $(REGION) \
+	aws lightsail create-container-service-deployment --service-name $(SERVICE) --region $(REGION) \
 		--containers "app={image=$$(aws lightsail get-container-images --service-name $(SERVICE) --region $(REGION) --query 'containerImages[0].image' --output text),ports={8000=HTTP}}" \
 		--public-endpoint "containerName=app,containerPort=8000,healthCheck={path=/healthz}"
+	uv run python -m cairn.wait_running $(SERVICE) $(REGION)
 	aws lightsail get-container-services --service-name $(SERVICE) --region $(REGION) --query 'containerServices[0].[state,url]' --output text
 
 # Laptop-only commands that call Bedrock (decision D8). Each prints its estimated spending ceiling first.
