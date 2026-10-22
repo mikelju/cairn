@@ -61,6 +61,7 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | E5 | ejecutor (Sonnet) | Increment 5: CLI ask, record, smoke and Makefile targets; strict-compatible tool schemas | failed | context budget; work left uncommitted in the tree, mypy pending |
 | E6 | ejecutor (Sonnet) | Finish increment 5: check green, mark plan, commit | done | c34cd79; 230 tests green; mypy import fixed; 0 live-client imports in the web |
 | E7 | ejecutor (Sonnet) | Increment 6: step 2 of the web in replay over fixtures | done | 92a3f2d; 237 tests green; step 2 at 46 words of 93; nav "Design" renamed "Ask"; browser walkthrough left to increment 9 |
+| E8 | ejecutor (Sonnet) | Fix found on the user's path during U1: `cairn` console script missing and Makefile live targets failing from PowerShell | done | f03cadf; `uv run cairn --help` checked by the supervisor; recipes export variables at make level; `deploy` keeps an inline `MSYS_NO_PATHCONV=1` (left for increment 11); the agent ran smoke with a nonexistent profile by mistake, no AWS call, uncommitted evidence JSON overwritten and to be regenerated |
 
 ## User decisions
 Questions the supervisor raises with the user. Statuses: open, answered, deferred; each closes with the user's literal answer.
@@ -72,6 +73,7 @@ Questions the supervisor raises with the user. Statuses: open, answered, deferre
 ## Deviations
 | ID | Summary | Affects criteria | Status |
 |---|---|---|---|
+| D1 | First `make smoke` (2026-10-21): all 9 calls returned 403 "model is not available for this account" for the three EU profiles, also for a non-Anthropic model in the console playground while Amazon Nova works; account plan is PAID and active, card valid, Anthropic use case form sent, payment currency was unset; AWS account-level block, the user is resolving it with AWS; increments 7-10 wait, independent work goes ahead | C11-C16 | open |
 
 ## Adversarial review
 | Round | Backend | Range | Lenses | Findings | Status |
