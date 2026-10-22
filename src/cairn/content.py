@@ -24,7 +24,15 @@ class ValueRef(BaseModel):
     field: str
 
 
-Part = Annotated[Text | ValueRef, Field(discriminator="type")]
+class QuoteRef(BaseModel):
+    """A pointer to stored sentences of one guideline passage; the code copies their text."""
+
+    type: Literal["quote"] = "quote"
+    passage_id: str
+    sentence_ids: list[str]
+
+
+Part = Annotated[Text | ValueRef | QuoteRef, Field(discriminator="type")]
 
 
 class Sentence(BaseModel):
