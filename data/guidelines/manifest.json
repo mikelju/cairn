@@ -1,0 +1,44 @@
+{
+  "guidelines": {
+    "fda-2005": {
+      "bytes": 718888,
+      "filename": "FDA_2005_starting_dose.pdf",
+      "license_note": "FDA website content is public domain (https://www.fda.gov/about-fda/about-website/website-policies). File committed unmodified.",
+      "page_link_base": "https://www.fda.gov/media/72309/download",
+      "retrieved": "2026-10-22",
+      "sha256": "133b827046cd3b99157d15afb483a638c4ab3b0c319898e2bc089129670916b8",
+      "source_url": "https://www.fda.gov/media/72309/download",
+      "title": "FDA 2005 Estimating the Maximum Safe Starting Dose in Initial Clinical Trials"
+    },
+    "ich-m3r2": {
+      "bytes": 237049,
+      "filename": "M3_R2__Guideline.pdf",
+      "license_note": "ICH guidelines may be used, reproduced and distributed provided ICH copyright is acknowledged, any changes are labelled and no ICH endorsement is implied; the ICH logo is excluded. File committed unmodified.",
+      "page_link_base": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "retrieved": "2026-10-22",
+      "sha256": "da8bc18c11d224d23b2b3c391a32e5aa87fd49fbdc6bf515c9787bb4c41f8552",
+      "source_url": "https://database.ich.org/sites/default/files/M3_R2__Guideline.pdf",
+      "title": "ICH M3(R2) Nonclinical Safety Studies for Clinical Trials"
+    },
+    "ich-m4sr2": {
+      "bytes": 1036367,
+      "filename": "M4S_R2_Guideline.pdf",
+      "license_note": "ICH guidelines may be used, reproduced and distributed provided ICH copyright is acknowledged, any changes are labelled and no ICH endorsement is implied; the ICH logo is excluded. File committed unmodified.",
+      "page_link_base": "https://database.ich.org/sites/default/files/M4S_R2_Guideline.pdf",
+      "retrieved": "2026-10-22",
+      "sha256": "69b9dc26433031642ce6b7d8b799f2393727f64caa405a371eb5a8e10d6b7a4f",
+      "source_url": "https://database.ich.org/sites/default/files/M4S_R2_Guideline.pdf",
+      "title": "ICH M4S(R2) Common Technical Document, Safety"
+    },
+    "ich-s9": {
+      "bytes": 108906,
+      "filename": "S9_Guideline.pdf",
+      "license_note": "ICH guidelines may be used, reproduced and distributed provided ICH copyright is acknowledged, any changes are labelled and no ICH endorsement is implied; the ICH logo is excluded. File committed unmodified.",
+      "page_link_base": "https://database.ich.org/sites/default/files/S9_Guideline.pdf",
+      "retrieved": "2026-10-22",
+      "sha256": "55e2db381d4b1f66033da18300e248b105933a9fe1813403d130d33d2cdd86e6",
+      "source_url": "https://database.ich.org/sites/default/files/S9_Guideline.pdf",
+      "title": "ICH S9 Nonclinical Evaluation for Anticancer Pharmaceuticals"
+    }
+  }
+}
