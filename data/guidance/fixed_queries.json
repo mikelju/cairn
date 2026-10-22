@@ -1,0 +1,9 @@
+{
+  "queries": [
+    {"id": "NS1", "used_by": "nonclinical-summary", "query": "How should the no observed adverse effect level be determined and reported from a repeat-dose toxicity study?"},
+    {"id": "NS2", "used_by": "nonclinical-summary", "query": "What dose and exposure information belongs in the nonclinical written summary of a toxicity study?"},
+    {"id": "G1", "used_by": "question G1", "query": "What does ICH M4S(R2) section 2.6.6.3 require in the toxicology written summary?"},
+    {"id": "G2", "used_by": "question G2", "query": "How does the FDA 2005 guidance define the no observed adverse effect level (NOAEL)?"},
+    {"id": "G3", "used_by": "question G3", "query": "What is the scope of ICH S9 for the nonclinical evaluation of anticancer pharmaceuticals?"}
+  ]
+}

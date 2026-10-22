@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict
 
 from cairn import weights
 from cairn.passages import GUIDANCE_DIR, PASSAGES_PATH, Passage, load_passages
+from cairn.recording import RECORDINGS_DIR
 
 RRF_K = 60
 # Depth of each ranking that enters the fusion, and size of the fused list returned.
@@ -41,6 +42,9 @@ RERANK_TOLERANCE = 1e-2
 CALIBRATION_PATH = GUIDANCE_DIR / "calibration.json"
 CALIBRATION_SETS = ("in_library", "out_of_library")
 ABSTENTION = "no supporting passage in the library"
+FIXED_QUERIES_PATH = GUIDANCE_DIR / "fixed_queries.json"
+CACHE_PATH = GUIDANCE_DIR / "retrieval_cache.json"
+STALE_CACHE = "stale retrieval cache: rebuild"
 
 
 class Hit(BaseModel):
@@ -246,3 +250,54 @@ def calibrate(index: Index, path: Path = CALIBRATION_PATH) -> str:
     )
     data["threshold"] = round(compute_threshold(best["in_library"], best["out_of_library"]), 4)
     return json.dumps(data, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+
+
+class StaleRetrievalCache(Exception):
+    """Replay asked for a query the cache does not hold: rebuild it with `cairn guidance build`."""
+
+    def __init__(self, query: str):
+        super().__init__(f"{STALE_CACHE} (query: {query!r})")
+
+
+def load_fixed_queries(path: Path = FIXED_QUERIES_PATH) -> list[dict[str, str]]:
+    queries: list[dict[str, str]] = _read(path)["queries"]
+    return queries
+
+
+def recorded_queries(directory: Path = RECORDINGS_DIR) -> list[str]:
+    """Every distinct `search_guidance` query in the recordings of a folder, sorted."""
+    found: set[str] = set()
+    for path in sorted(directory.glob("*.json")):
+        for call in _read(path).get("calls", []):
+            for block in call["response"].get("content", []):
+                if block.get("type") == "tool_use" and block.get("name") == "search_guidance":
+                    found.add(str(block["input"]["query"]))
+    return sorted(found)
+
+
+def build_cache(
+    index: Index, fixed: Path = FIXED_QUERIES_PATH, recordings: Path = RECORDINGS_DIR
+) -> str:
+    """The cache as JSON text: the reranked top hits of every fixed and recorded query."""
+    queries = sorted(
+        {q["query"] for q in load_fixed_queries(fixed)} | set(recorded_queries(recordings))
+    )
+    results = {
+        query: [
+            {k: round(v, 6) if isinstance(v, float) else v for k, v in hit.model_dump().items()}
+            for hit in index.rerank(query)
+        ]
+        for query in queries
+    }
+    data = {"model": weights.RERANKER, "queries": results}
+    return json.dumps(data, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
+
+
+def cached_guidance(
+    query: str, path: Path = CACHE_PATH, threshold: float | None = None
+) -> Guidance:
+    """Replay lookup by exact query string; never loads the embedder or the reranker."""
+    stored = _read(path)["queries"].get(query)
+    if stored is None:
+        raise StaleRetrievalCache(query)
+    return decide(query, [RankedHit(**hit) for hit in stored], threshold)

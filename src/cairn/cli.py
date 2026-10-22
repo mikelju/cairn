@@ -172,11 +172,12 @@ def smoke_command(output: Path = live.SMOKE_PATH) -> None:
 def guidance_build_command(
     output: Path = passages.PASSAGES_PATH,
     calibration: Path = retrieval.CALIBRATION_PATH,
+    cache: Path = retrieval.CACHE_PATH,
     passages_only: bool = False,
 ) -> None:
-    """Rebuild the generated guidance files: passages, then the calibration scores and threshold.
+    """Rebuild the generated guidance files: passages, calibration, retrieval cache.
 
-    The second step embeds and reranks (needs the weights: run `cairn guidance weights` once).
+    The last two steps embed and rerank (needs the weights: run `cairn guidance weights` once).
     """
     count = passages.write_passages(output)
     typer.echo(f"wrote {output}: {count} passages")
@@ -185,6 +186,9 @@ def guidance_build_command(
     index = retrieval.build_index(output)
     calibration.write_text(retrieval.calibrate(index, calibration), encoding="utf-8", newline="\n")
     typer.echo(f"wrote {calibration}: threshold {retrieval.load_threshold(calibration):.4f}")
+    cache.write_text(retrieval.build_cache(index), encoding="utf-8", newline="\n")
+    cached = json.loads(cache.read_text(encoding="utf-8"))["queries"]
+    typer.echo(f"wrote {cache}: {len(cached)} queries")
 
 
 @guidance_app.command("weights")
