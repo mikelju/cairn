@@ -43,14 +43,19 @@ QUESTION ?= Q2
 
 .PHONY: record live smoke
 
+# Environment is exported by make itself (not inline VAR=value prefixes), so the recipes run the same under sh and cmd.
+record live smoke: export AWS_PROFILE := $(AWS_PROFILE)
+record: export CAIRN_LLM_MODE := record
+live smoke: export CAIRN_LLM_MODE := live
+
 record:
 	$(if $(AWS_PROFILE),,$(error set AWS_PROFILE=<profile>))
-	AWS_PROFILE=$(AWS_PROFILE) CAIRN_LLM_MODE=record uv run cairn record $(QUESTIONS) --model $(MODEL)
+	uv run cairn record $(QUESTIONS) --model $(MODEL)
 
 live:
 	$(if $(AWS_PROFILE),,$(error set AWS_PROFILE=<profile>))
-	AWS_PROFILE=$(AWS_PROFILE) CAIRN_LLM_MODE=live uv run cairn ask "$(QUESTION)" --live --model $(MODEL)
+	uv run cairn ask "$(QUESTION)" --live --model $(MODEL)
 
 smoke:
 	$(if $(AWS_PROFILE),,$(error set AWS_PROFILE=<profile>))
-	AWS_PROFILE=$(AWS_PROFILE) CAIRN_LLM_MODE=live uv run cairn smoke
+	uv run cairn smoke
