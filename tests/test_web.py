@@ -181,8 +181,21 @@ def test_q2_evidence_counts_distinct_animals_not_source_rows(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     result = _ask("Q2", monkeypatch, REAL)
-    assert "37 animals, from " in result
+    assert "37 affected, from " in result
     assert "69 animals" not in result
+
+
+@pytest.mark.parametrize("folder", [FIXTURES, REAL])
+def test_q2_sentence_and_evidence_state_the_same_examined_count(
+    monkeypatch: pytest.MonkeyPatch, folder: Path
+) -> None:
+    """Sentence and evidence n are one field of one observation; the other count is labelled."""
+    result = _ask("Q2", monkeypatch, folder)
+    sentence = re.search(r"examined (?:a total of )?(\d+) animals", result)
+    evidence = re.search(r"incidence, [^<]*?, n=(\d+), (\d+) (\w+), from ", result)
+    assert sentence and evidence
+    assert sentence.group(1) == evidence.group(1)
+    assert evidence.group(3) == "affected"
 
 
 def test_step2_header_badge_follows_the_recordings_served(monkeypatch: pytest.MonkeyPatch) -> None:
