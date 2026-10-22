@@ -90,6 +90,7 @@ def incidence(screen: bool = True) -> Observation:
     values: dict[str, Any] = {
         "screen": screen,
         "screen_rule": SCREEN_RULE if screen else None,
+        "n_findings": len(findings),
         "findings": findings,
     }
     return build_observation(
