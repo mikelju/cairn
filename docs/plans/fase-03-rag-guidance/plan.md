@@ -57,7 +57,7 @@ If the mockup asks for data the now part does not produce, the supervisor raises
 
 ### Gated part
 
-- [ ] 18. Rebase on `main`: rebase the branch on the merged 02c, resolve conflicts, re-run the full suite; if 02c changed the loop prompt or tool schemas, the affected recordings are stale and go back through increment 14 within the same 5 USD ceiling (all now criteria kept) - verification: `git log --oneline main..HEAD`, `npm run check` green, `test_replay_stale_*` green - evidence:
+- [x] 18. Rebase on `main`: rebase the branch on the merged 02c, resolve conflicts, re-run the full suite; if 02c changed the loop prompt or tool schemas, the affected recordings are stale and go back through increment 14 within the same 5 USD ceiling (all now criteria kept) - verification: `git log --oneline main..HEAD`, `npm run check` green, `test_replay_stale_*` green - evidence: evidence: merge commit f72f8c0 (origin/main into the branch, conflict only in the master plan row, which keeps main's content and the phase 03 status cell); `npm run check` exit 0, 356 passed, coverage 98.27%; 02c changed nothing in `PROMPT_VERSION` (question-3), tool schemas, `loop.py`, `tools.py`, `questions.py` or `recordings/` (diff of `src/cairn` between 8407d1a and f72f8c0 is only `src/cairn/web/`), so no recording is stale and increment 14 is not re-triggered by 02c; `uv run pytest -k test_replay_stale` 5 passed; see D102.
 - [ ] 19. Explore page: route and template under `src/cairn/web/` in the 02c design, Q1-Q8 and G1-G3 as buttons, each replaying offline to its rendered, verified answer with its RECORDED badge; quotations rendered from `QuoteRef` (C14) - verification: `uv run pytest -k test_explore` with `test_explore_*`, then `npm run check` - evidence:
 - [ ] 20. Step 3 to the approved 02c mockup: the two fixed queries with top 3 passages (guideline, section, page) and lexical, semantic and fused ranks, the rest folded, the "computed at build" badge, "Quotes: N · verbatim on the cited page: N/N", an "In production ->" line; `test_word_cap` extended to step 3 (C15) - verification: `uv run pytest tests/test_web.py tests/test_word_cap.py`, then `npm run check` - evidence:
 - [ ] 21. Highlighted page in the app: a route serving the committed highlight PNGs; each quotation in step 3 and Explore opens its highlighted page plus the official link with `#page=N`; browser walkthrough at 1440x900 with the network disabled, no scroll, screenshots in `docs/plans/fase-03-rag-guidance/evidence/` (C13 in the app, C14, C15) - verification: `uv run pytest -k "highlight_route or explore"`, the walkthrough screenshots, then `npm run check` - evidence:
@@ -107,6 +107,7 @@ Phase 03 brief IDs start at E101 and review rounds at R101, so they never collid
 | E106 | ejecutor (Sonnet) | Commit the frozen spec and plan; batch A (increment 1) | done | spec and plan b7b7a7c; increment 1 commit in this branch tip |
 | E107 | ejecutor (Sonnet) | Batch B (increments 2-3) | done | 13ac3aa; increments 2 and 3 share files, one commit |
 | E108 | ejecutor (Sonnet) | Batch C (increments 4-5) | done | 75cdce2 (increment 4), increment 5 in the next commit |
+| E109 | ejecutor (Sonnet) | Merge main (inc 18) and batch D (inc 6-7) | in progress | |
 
 ## User decisions
 Questions the supervisor raises with the user. Statuses: open, answered, deferred; each closes with the user's literal answer.
@@ -125,6 +126,8 @@ O1-O6 were decided on 2026-10-22 by the user's main session (the Jefe) under the
 | ID | Summary | Affects criteria | Status |
 |---|---|---|---|
 | D101 | Appendices of M4S(R2) and FDA 2005 (example tables and derivations) are not indexed as passages (E107 choice) | C3 | open |
+| D102 | Increment 18 brought main in with a merge (app sync tool) instead of a rebase | none | accepted |
+| D103 | Reranker weights come from `onnx-community/bge-reranker-v2-m3-ONNX` `onnx/model_int8.onnx` (pinned revision and SHA-256) instead of the fastembed `BAAI/bge-reranker-v2-m3-int8` id named in O1; same model, int8 | C5 | accepted (accepted 2026-10-22 by the Jefe: "D103 accepted.") |
 
 ## Adversarial review
 | Round | Backend | Range | Lenses | Findings | Status |
