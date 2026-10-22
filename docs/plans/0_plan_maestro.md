@@ -23,7 +23,8 @@ It works if a person with no context finishes the 7-step web walkthrough in 5 mi
 | 01 | Validated data and skeleton: Python repo with quality tooling and CI, SEND ingestion with quarantine, `validate_study`, MCP/REST/CLI registry, landing page and step 1, offline `make demo` and Lightsail deployment | - | integrated |
 | 02a | Tools and rules that write no numbers, offline and at no cost: Observation, the four study tools, renderer, rules 1-7, full E1, E2 and the bad PR blocked | 01 | integrated |
 | 02b | An agent that writes no numbers, live and recorded: Bedrock smoke test and ADR-001, LLMGateway (replay, record, live), the question loop, Q2 and Q6 recordings and step 2 | 02a | in progress |
-| 03 | RAG over public guidelines: 4 guidelines with pinned SHA-256, hybrid index with reranker, `search_guidance`, QuoteRef, rule 8, highlighted page, E3, E4, Explore with recorded questions and step 3 | 02b | pending |
+| 02c | App visual design that invites use: a visual system (type, colour, spacing, components, badges, tables, trace) applied to the landing page and steps 1 and 2, plus approved mockups of steps 3 to 7 that later phases build to, all within 1440x900 and the word caps | 02b | pending |
+| 03 | RAG over public guidelines: 4 guidelines with pinned SHA-256, hybrid index with reranker, `search_guidance`, QuoteRef, rule 8, highlighted page, E3, E4, Explore with recorded questions and step 3 | 02c | pending |
 | 04 | People decide: `nonclinical-summary` workflow in LangGraph with two pauses, DecisionRef, decision form and model-free NOAEL rule, 403 and 409, E6 and steps 4 and 5 without judge | 03 | pending |
 | 05 | Audit and judge: per-session SHA-256 chain with verify and tampering, calibrated Sonnet judge (E5, kappa), judge panel in step 5 and step 6 | 04 | pending |
 | 06 | Live question and delivery: live Explore behind an access code and cap, remaining step 1 switches, step 7, configuration-only `data-quality-memo` workflow, clean-clone and timed tests, documentation and v0.1.0 | 05 | pending |
@@ -60,6 +61,7 @@ Only the user adds, removes or reorders phases; the agent proposes.
 | 2026-10-20 | Six phases instead of the PRD's five days; day 4 is split into phases 04 and 05 | Day 4 is the longest (11 h) and each phase must leave something working | One phase per day |
 | 2026-10-20 | English for every versioned artifact; conversation with the user stays in Spanish | The repo is public and the demo audience reads English | Spanish documentation |
 | 2026-10-21 | Phase 02 split into 02a (tools, rules and the bad PR, no network and no cost) and 02b (model connection, recordings and step 2), approved by the user | A smaller PR, and the work with no network and no cost goes first; 02b isolates what depends on AWS access and model behaviour | A single phase 02 |
+| 2026-10-22 | New phase 02c for the visual design of the whole app, between 02b and 03, decided by the user | The demo gets little viewing time, so it has to look good and make people want to use it; the step 2 walkthrough showed a working but undesigned page | Polishing step 2 inside 02b; leaving design to the end |
 
 ## Milestones
 - After phase 01: HTTPS URL with landing page and step 1, and an equivalent offline `make demo`.
