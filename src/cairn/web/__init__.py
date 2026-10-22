@@ -169,7 +169,7 @@ def _screen(result: LoopResult) -> tuple[list[str], list[dict[str, Any]]]:
 def _evidence(result: LoopResult) -> list[dict[str, str]]:
     evidence = []
     for o in result.ledger.observations:
-        ids = [str(row["usubjid"]) for row in o.source_rows if "usubjid" in row]
+        ids = sorted({str(row["usubjid"]) for row in o.source_rows if "usubjid" in row})
         evidence.append(
             {
                 "tool": o.tool.name,

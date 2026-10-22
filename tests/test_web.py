@@ -157,3 +157,11 @@ def test_step2_rejects_an_unknown_question(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setenv("CAIRN_RECORDINGS", str(FIXTURES))
     with TestClient(create_app()) as client:
         assert client.post("/step/2/run", data={"question": "Q9"}).status_code == 422
+
+
+def test_q2_evidence_counts_distinct_animals_not_source_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    result = _ask("Q2", monkeypatch, REAL)
+    assert "37 animals, from " in result
+    assert "69 animals" not in result
