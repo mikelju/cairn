@@ -20,7 +20,6 @@ MODEL_PROFILES: dict[str, str] = {
     "opus-4-6": "eu.anthropic.claude-opus-4-6-v1",
     "sonnet-4-6": "eu.anthropic.claude-sonnet-4-6",
 }
-DEFAULT_MODEL = "opus-4-6"
 
 
 class Mode(StrEnum):

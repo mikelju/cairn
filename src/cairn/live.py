@@ -104,6 +104,7 @@ def record_questions(
 ) -> RecordReport:
     """Record each question; stop before the next one could pass the budget."""
     report = RecordReport(spent=spent)
+    ids = list(dict.fromkeys(ids))
     step = MAX_CALLS * call_ceiling(model)
     for question_id in ids:
         if report.spent + step > budget:

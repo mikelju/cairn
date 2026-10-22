@@ -181,3 +181,17 @@ def test_step2_header_badge_follows_the_recordings_served(monkeypatch: pytest.Mo
         with TestClient(create_app()) as client:
             page = client.get("/step/2").text
         assert f'class="badge {shown}"' in page and f'class="badge {hidden}"' not in page
+
+
+def test_step2_badge_ignores_unreadable_files_and_empty_folders(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    (tmp_path / "list.json").write_text("[]", encoding="utf-8")
+    (tmp_path / "bad.json").write_text("{not json", encoding="utf-8")
+    for folder in (tmp_path, tmp_path / "missing"):
+        monkeypatch.setenv("CAIRN_RECORDINGS", str(folder))
+        with TestClient(create_app()) as client:
+            response = client.get("/step/2")
+        assert response.status_code == 200
+        page = response.text
+        assert 'class="badge none"' in page and 'class="badge recorded"' not in page

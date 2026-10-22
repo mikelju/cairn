@@ -134,12 +134,19 @@ def _recordings_dir() -> Path:
     return Path(os.environ.get("CAIRN_RECORDINGS", str(RECORDINGS_DIR)))
 
 
-def _serves_fixtures(directory: Path) -> bool:
-    """True when any recording in the folder is a hand-written fixture, not a Bedrock one."""
-    return any(
-        json.loads(path.read_text(encoding="utf-8")).get("source") == "fixture"
-        for path in directory.glob("*.json")
-    )
+def _step2_badge(directory: Path) -> str:
+    """FIXTURE if any readable recording is hand-written, RECORDED if there are any, else NONE."""
+    sources = []
+    for path in directory.glob("*.json"):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if isinstance(data, dict):
+            sources.append(data.get("source"))
+    if not sources:
+        return "NONE"
+    return "FIXTURE" if "fixture" in sources else "RECORDED"
 
 
 def _marker(field: str) -> str:
@@ -231,7 +238,7 @@ def _step2_context(question_id: str, directory: Path) -> dict[str, Any]:
 
 @router.get("/step/2", response_class=HTMLResponse)
 async def step2(request: Request) -> HTMLResponse:
-    badge = "FIXTURE" if _serves_fixtures(_recordings_dir()) else "RECORDED"
+    badge = _step2_badge(_recordings_dir())
     return _page(request, "step2.html", current=2, questions=QUESTIONS, page_badge=badge)
 
 

@@ -1,6 +1,7 @@
 """Laptop commands over a fake client: no network, no AWS, no credentials."""
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -284,17 +285,18 @@ def test_smoke_keeps_only_the_error_type_and_masks_account_ids(
     class AccessDenied(Exception):
         status_code = 403
 
-    message = "User: arn:aws:sts::123456789012:assumed-role/dev/x is not authorized"
+    account = "1" * 12
+    message = f"User: arn:aws:sts::{account}:assumed-role/dev/x is not authorized"
     client = Raising([], 0, AccessDenied(message))
     monkeypatch.setattr(live, "make_client", lambda mode: client)
     out = tmp_path / "smoke.json"
     done = runner.invoke(app, ["smoke", "--output", str(out)])
     assert done.exit_code == 0, done.output
     text = out.read_text(encoding="utf-8")
-    assert "123456789012" not in text and "arn:aws" not in text
+    assert account not in text and "arn:aws" not in text
     call = json.loads(text)["profiles"][0]["calls"][0]
     assert call["error"] == "AccessDenied" and call["status_code"] == 403
-    assert live.mask_account_ids("a 123456789012 b 12345") == "a [masked] b 12345"
+    assert live.mask_account_ids(f"a {account} b 12345") == "a [masked] b 12345"
 
 
 def test_one_source_for_the_default_model_and_the_recordings_folder() -> None:
@@ -305,3 +307,21 @@ def test_one_source_for_the_default_model_and_the_recordings_folder() -> None:
         if path.name != "recording.py":
             assert 'Path("recordings")' not in path.read_text(encoding="utf-8"), path
     assert DEFAULT_MODEL in MODEL_PROFILES
+    gateway = (root / "gateway.py").read_text(encoding="utf-8")
+    assert len(re.findall(r"^DEFAULT_MODEL\b", gateway, re.MULTILINE)) == 1
+
+
+def test_record_ignores_repeated_ids_so_a_truncated_run_cannot_hide(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cut = {"stop_reason": "max_tokens", "content": [], "usage": {"input_tokens": 5}}
+    made: list[Any] = []
+
+    def make(mode: Any) -> Script:
+        made.append(mode)
+        return Script([cut])
+
+    monkeypatch.setattr(live, "make_client", make)
+    done = runner.invoke(app, ["record", "Q2", "Q2", "--recordings", str(tmp_path)])
+    assert done.exit_code == 1, done.output
+    assert len(made) == 1
