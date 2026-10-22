@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 
 from cairn.app import create_app
 from cairn.web import HERE, templates
+from test_word_cap import rendered_lede, rendered_problems, rendered_words
 
 STATIC = HERE / "static"
 REAL_RECORDINGS = HERE.parents[2] / "recordings"
@@ -417,3 +418,63 @@ def test_narrow_width_rule_collapses_grids_to_one_column() -> None:
     assert match is not None and 800 <= int(match.group(1)) <= 960
     assert ".two-col" in match.group(2) and "grid-template-columns" in match.group(2)
     assert not COLOUR_LITERAL.search(match.group(2))
+
+
+# --- Mockups of steps 3 to 7 (C9, C13) ---
+
+MOCKUPS_DIR = HERE.parents[2] / "docs" / "plans" / "fase-02c-visual-design" / "mockups"
+MOCKUP_FILES = [MOCKUPS_DIR / f"step{n}.html" for n in range(3, 8)]
+REAL_STYLESHEET = "../../../../src/cairn/web/static/cairn.css"
+RESOURCE_LINK = re.compile(r"<(?:link|script|img|iframe|source)\b[^>]*", re.IGNORECASE)
+INLINE_MOCKUP_COLOUR = re.compile(
+    r"#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?)\(|(?<![-\w])(?:white|black|red|green|blue)(?![-\w])"
+)
+
+
+def mockup_problems(html: str) -> list[str]:
+    """Why a mockup page breaks the rules of C9 and C13; empty when it is sound."""
+    problems = []
+    if "<style" in html.lower() or INLINE_STYLE.search(html):
+        problems.append("inline style")
+    if "<script" in html.lower():
+        problems.append("script")
+    if INLINE_MOCKUP_COLOUR.search(html):
+        problems.append("colour literal")
+    if "MOCKUP" not in html:
+        problems.append("no stamp")
+    if EXTERNAL.search(html):
+        problems.append("external reference")
+    stylesheets = [m for m in RESOURCE_LINK.findall(html) if "stylesheet" in m.lower()]
+    if len(stylesheets) != 1 or REAL_STYLESHEET not in stylesheets[0]:
+        problems.append("stylesheet")
+    problems += rendered_problems(html)
+    return problems
+
+
+def test_mockups_exist_and_link_the_real_stylesheet() -> None:
+    for path in MOCKUP_FILES:
+        assert path.is_file(), path.name
+        assert (path.parent / REAL_STYLESHEET).resolve() == CSS_PATH.resolve()
+
+
+@pytest.mark.parametrize("path", MOCKUP_FILES, ids=lambda p: p.name)
+def test_mockups_follow_the_rules(path: Any) -> None:
+    html = path.read_text(encoding="utf-8")
+    print(path.name, rendered_words(html), rendered_lede(html))
+    assert mockup_problems(html) == [], path.name
+    assert 'class="stamp"' in html and "placeholder" in html.lower()
+
+
+def test_mockups_failing_sample() -> None:
+    good = MOCKUP_FILES[0].read_text(encoding="utf-8")
+    assert mockup_problems(good) == []
+    assert mockup_problems(good.replace("</head>", "<style>a{}</style></head>")) == ["inline style"]
+    assert mockup_problems(good.replace("<h1>", '<h1 style="color:red">')) == [
+        "inline style",
+        "colour literal",
+    ]
+    assert mockup_problems(good.replace("MOCKUP", "DRAFT")) == ["no stamp"]
+    assert mockup_problems(good.replace(REAL_STYLESHEET, "other.css")) == ["stylesheet"]
+    assert mockup_problems(good.replace("</main>", "<p>" + "word " * 100 + "</p></main>")) == [
+        "step words"
+    ]
