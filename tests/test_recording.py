@@ -131,3 +131,17 @@ def test_recordings_metadata_real_files(path: Path | None) -> None:
         return  # no real recordings yet: increment 8 adds them
     data = json.loads(path.read_text(encoding="utf-8"))
     assert metadata_problems(data, require_bedrock=True) == []
+
+
+def test_recordings_present_q2_q6() -> None:
+    from cairn import live
+    from cairn.loop import LoopStatus
+
+    for name in ("q2.json", "q6.json"):
+        assert (REAL_DIR / name).is_file()
+    q2 = live.ask_replay("Q2", REAL_DIR, "opus-4-6")
+    assert q2.status is LoopStatus.ANSWERED
+    assert q2.verdict is not None and q2.verdict.ok
+    assert q2.rendered
+    q6 = live.ask_replay("Q6", REAL_DIR, "opus-4-6")
+    assert q6.status in (LoopStatus.DECLINED, LoopStatus.REJECTED)

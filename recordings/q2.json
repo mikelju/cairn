@@ -1,0 +1,160 @@
+{
+  "calls": [
+    {
+      "cost_usd": 0.01054,
+      "input_tokens": 1828,
+      "latency_s": 2.157,
+      "output_tokens": 56,
+      "response": {
+        "container": null,
+        "content": [
+          {
+            "caller": null,
+            "id": "toolu_bdrk_01KKS95xizKFfb6Nbaow9eUw",
+            "input": {
+              "kind": "validate_study"
+            },
+            "name": "run_job",
+            "toolset_name": null,
+            "type": "tool_use"
+          }
+        ],
+        "diagnostics": null,
+        "id": "msg_bdrk_011CgGv3yReYjJau6suNexHb",
+        "model": "claude-opus-4-6",
+        "role": "assistant",
+        "stop_details": null,
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "type": "message",
+        "usage": {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "inference_geo": null,
+          "input_tokens": 1828,
+          "output_tokens": 56,
+          "output_tokens_details": null,
+          "server_tool_use": null,
+          "service_tier": null,
+          "speed": null
+        }
+      }
+    },
+    {
+      "cost_usd": 0.010425,
+      "input_tokens": 1910,
+      "latency_s": 1.515,
+      "output_tokens": 35,
+      "response": {
+        "container": null,
+        "content": [
+          {
+            "caller": null,
+            "id": "toolu_bdrk_017GoXfJ6sXMFDpjcixEaCgN",
+            "input": {},
+            "name": "incidence",
+            "toolset_name": null,
+            "type": "tool_use"
+          }
+        ],
+        "diagnostics": null,
+        "id": "msg_bdrk_011CgGv485Yp6pLyR2cWWUwx",
+        "model": "claude-opus-4-6",
+        "role": "assistant",
+        "stop_details": null,
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "type": "message",
+        "usage": {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "inference_geo": null,
+          "input_tokens": 1910,
+          "output_tokens": 35,
+          "output_tokens_details": null,
+          "server_tool_use": null,
+          "service_tier": null,
+          "speed": null
+        }
+      }
+    },
+    {
+      "cost_usd": 0.01954,
+      "input_tokens": 3313,
+      "latency_s": 2.5,
+      "output_tokens": 119,
+      "response": {
+        "container": null,
+        "content": [
+          {
+            "caller": null,
+            "id": "toolu_bdrk_01WEixwZMVwhaA7qsstFwaBM",
+            "input": {
+              "sentences": [
+                {
+                  "parts": [
+                    {
+                      "text": "The screening table examined a total of ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "n_examined",
+                      "obs_id": "O1",
+                      "type": "ref"
+                    },
+                    {
+                      "text": " animals and is shown above.",
+                      "type": "text"
+                    }
+                  ]
+                }
+              ]
+            },
+            "name": "write_answer",
+            "toolset_name": null,
+            "type": "tool_use"
+          }
+        ],
+        "diagnostics": null,
+        "id": "msg_bdrk_011CgGv4ExJ6d6FVqTDoLXkm",
+        "model": "claude-opus-4-6",
+        "role": "assistant",
+        "stop_details": null,
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "type": "message",
+        "usage": {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "inference_geo": null,
+          "input_tokens": 3313,
+          "output_tokens": 119,
+          "output_tokens_details": null,
+          "server_tool_use": null,
+          "service_tier": null,
+          "speed": null
+        }
+      }
+    }
+  ],
+  "date": "2026-10-22",
+  "model": "opus-4-6",
+  "model_profile": "eu.anthropic.claude-opus-4-6-v1",
+  "prompt_version": "question-3",
+  "question_id": "Q2",
+  "region": "eu-west-1",
+  "source": "bedrock",
+  "tool_schema_sha256": "b00a3757af94c652fbdc67adfef0628ac43cbc9567b048646c7dfd935439698d"
+}
