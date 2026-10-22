@@ -8,7 +8,7 @@ import typer
 import uvicorn
 from pydantic import ValidationError
 
-from cairn import live, passages, retrieval, weights
+from cairn import highlight, live, passages, retrieval, weights
 from cairn.canonical import canonical_json
 from cairn.gateway import DEFAULT_MODEL, MODEL_PROFILES, GatewayError
 from cairn.recording import RECORDINGS_DIR, StaleRecording, recorded_model
@@ -188,11 +188,17 @@ def guidance_build_command(
     calibration: Path = retrieval.CALIBRATION_PATH,
     cache: Path = retrieval.CACHE_PATH,
     passages_only: bool = False,
+    highlights_only: bool = False,
 ) -> None:
-    """Rebuild the generated guidance files: passages, calibration, retrieval cache.
+    """Rebuild the generated guidance files: passages, calibration, retrieval cache, highlights.
 
-    The last two steps embed and rerank (needs the weights: run `cairn guidance weights` once).
+    The calibration and cache steps embed and rerank (needs the weights: run
+    `cairn guidance weights` once). `--highlights-only` redraws the highlighted pages from the
+    committed cache without loading any model.
     """
+    if highlights_only:
+        typer.echo(f"wrote {highlight.HIGHLIGHTS_PATH}: {highlight.write_highlights()} highlights")
+        return
     count = passages.write_passages(output)
     typer.echo(f"wrote {output}: {count} passages")
     if passages_only:
@@ -203,6 +209,7 @@ def guidance_build_command(
     cache.write_text(retrieval.build_cache(index), encoding="utf-8", newline="\n")
     cached = json.loads(cache.read_text(encoding="utf-8"))["queries"]
     typer.echo(f"wrote {cache}: {len(cached)} queries")
+    typer.echo(f"wrote {highlight.HIGHLIGHTS_PATH}: {highlight.write_highlights(cache)} highlights")
 
 
 @guidance_app.command("weights")
