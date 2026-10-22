@@ -93,7 +93,8 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | E43 | ejecutor (Sonnet) | Increment 7: static mockups of steps 3 to 7 | done | bd44c14; 83/60/81/60/58 words |
 | E44 | ejecutor (Sonnet) | Increment 8, capture part: headless-browser screenshots and scroll heights at 1440x900 of the 8 app states and 5 mockups | done | 98e50bf; all 13 fit, tightest step 1 injected (content ends at 825 px, footer at 864) |
 | E45 | ejecutor (Sonnet) | Increment 9: clean clone, offline check, diff scope, brand and GxP greps | in progress | |
-| R1 | revisor (Opus) | Adversarial review, correctness and criteria lens, `main...HEAD` | in progress | |
+| R1 | revisor (Opus) | Adversarial review, correctness and criteria lens, `main...HEAD` | done | 7 findings; confirmed: callout class follows `answered` not the verifier block (C8), callout kinds differ by colour only (C7), step 1 In production line hand-written (C3, same as R2), word-cap helpers fail silently (C5, same as R2), table after the answer in narrow layout against "shown above" (C8), mockup RECORDED meta line lacks latency and cost (C6, C9); logged: fonts may not load from `file://` in Firefox (moderate confidence) |
+| E46 | ejecutor (Sonnet) | Correction of confirmed R1 and R2 findings, recapture of affected states | in progress | |
 | R2 | revisor (Opus) | Adversarial review, evidence and tests lens, `main...HEAD` | done | 9 findings; confirmed for correction: word-cap states pass on a stale recording or a failed substitution (C5), step 1 hand-writes the In production line and the leak test misses it (C3), locked nav steps differ by colour only and the focus test accepts `outline: none` (C7), missing contrast pairs, SIMULATED badge test too loose; logged: word-cap list no longer picks up new step templates |
 
 ## User decisions
