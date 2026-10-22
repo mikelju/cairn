@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% import "_anatomy.html" as a %}
+{% import "_anatomy.html" as a with context %}
 {% block main %}
 {% call a.step(2, "Ask", "RECORDED", "The model picks the tools and drafts; code places every number.") %}
 <form class="controls" hx-post="/step/2/run" hx-target="#result">

@@ -1,5 +1,6 @@
 """Web pages: landing page, steps 1 and 2 and /healthz, rendered with Jinja2 and local HTMX."""
 
+import json
 import os
 import subprocess
 from pathlib import Path
@@ -133,6 +134,14 @@ def _recordings_dir() -> Path:
     return Path(os.environ.get("CAIRN_RECORDINGS", str(RECORDINGS_DIR)))
 
 
+def _serves_fixtures(directory: Path) -> bool:
+    """True when any recording in the folder is a hand-written fixture, not a Bedrock one."""
+    return any(
+        json.loads(path.read_text(encoding="utf-8")).get("source") == "fixture"
+        for path in directory.glob("*.json")
+    )
+
+
 def _marker(field: str) -> str:
     """A marker for a reference: the last field name, with no digit."""
     last = field.rsplit(".", 1)[-1]
@@ -222,7 +231,8 @@ def _step2_context(question_id: str, directory: Path) -> dict[str, Any]:
 
 @router.get("/step/2", response_class=HTMLResponse)
 async def step2(request: Request) -> HTMLResponse:
-    return _page(request, "step2.html", current=2, questions=QUESTIONS)
+    badge = "FIXTURE" if _serves_fixtures(_recordings_dir()) else "RECORDED"
+    return _page(request, "step2.html", current=2, questions=QUESTIONS, page_badge=badge)
 
 
 @router.post("/step/2/run", response_class=HTMLResponse)

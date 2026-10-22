@@ -1,4 +1,5 @@
 import hashlib
+import json
 import re
 from pathlib import Path
 
@@ -99,7 +100,11 @@ def test_q2_replay(monkeypatch: pytest.MonkeyPatch) -> None:
     assert result.count("<tr><td>") == 9
     assert "not examined" in result and "0/1" in result
     assert "The screening table examined a total of 80 animals" in result
-    assert re.search(r"\| opus-4-6 \| [1-9]\d*\.\d s \|", result)
+    recorded = json.loads((REAL / "q2.json").read_text(encoding="utf-8"))
+    cost = sum(call["cost_usd"] for call in recorded["calls"])
+    assert f"{recorded['date']} | {recorded['region']} | opus-4-6 |" in result
+    assert re.search(r"\| [1-9]\d*\.\d s \|", result)
+    assert f"| {cost:.2f} USD" in result
     assert "Screen: a finding enters" in result
 
 
@@ -116,8 +121,11 @@ def test_q2_replay_fixture(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "incidence, main study" in result and "n=80" in result
 
 
-def test_step2_toggle_shows_markers_and_no_digits(monkeypatch: pytest.MonkeyPatch) -> None:
-    result = _ask("Q2", monkeypatch)
+@pytest.mark.parametrize("folder", [FIXTURES, REAL])
+def test_step2_toggle_shows_markers_and_no_digits(
+    monkeypatch: pytest.MonkeyPatch, folder: Path
+) -> None:
+    result = _ask("Q2", monkeypatch, folder)
     toggle = re.search(r"<details>.*?</details>", result, flags=re.S)
     assert toggle is not None
     assert "What the model wrote" in toggle.group(0)
@@ -165,3 +173,11 @@ def test_q2_evidence_counts_distinct_animals_not_source_rows(
     result = _ask("Q2", monkeypatch, REAL)
     assert "37 animals, from " in result
     assert "69 animals" not in result
+
+
+def test_step2_header_badge_follows_the_recordings_served(monkeypatch: pytest.MonkeyPatch) -> None:
+    for folder, shown, hidden in ((FIXTURES, "fixture", "recorded"), (REAL, "recorded", "fixture")):
+        monkeypatch.setenv("CAIRN_RECORDINGS", str(folder))
+        with TestClient(create_app()) as client:
+            page = client.get("/step/2").text
+        assert f'class="badge {shown}"' in page and f'class="badge {hidden}"' not in page
