@@ -1,6 +1,6 @@
 # Phase 02c - App visual design that invites use: plan and results
 
-Status: in progress
+Status: ready locally
 Spec: `spec.md` (approved, frozen)
 Base: branch `fase-02c-visual-design` from `main` at 4236c59 (phase 02b merged)
 
