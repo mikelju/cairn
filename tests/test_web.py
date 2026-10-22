@@ -99,7 +99,7 @@ def test_q2_replay(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "Rules fired: none" in result
     assert result.count("<tr><td>") == 9
     assert "not examined" in result and "0/1" in result
-    assert "The screening table examined a total of 80 animals" in result
+    assert "GLAND, ADRENAL Vacuolization passed the screen in F and M." in result
     recorded = json.loads((REAL / "q2.json").read_text(encoding="utf-8"))
     cost = sum(call["cost_usd"] for call in recorded["calls"])
     assert f"{recorded['date']} | {recorded['region']} | opus-4-6 |" in result
@@ -121,15 +121,15 @@ def test_q2_replay_fixture(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "incidence, main study" in result and "n=80" in result
 
 
-@pytest.mark.parametrize("folder", [FIXTURES, REAL])
+@pytest.mark.parametrize(("folder", "marker"), [(FIXTURES, "[n_examined]"), (REAL, "[finding]")])
 def test_step2_toggle_shows_markers_and_no_digits(
-    monkeypatch: pytest.MonkeyPatch, folder: Path
+    monkeypatch: pytest.MonkeyPatch, folder: Path, marker: str
 ) -> None:
     result = _ask("Q2", monkeypatch, folder)
     toggle = re.search(r"<details>.*?</details>", result, flags=re.S)
     assert toggle is not None
     assert "What the model wrote" in toggle.group(0)
-    assert "[n_examined]" in toggle.group(0)
+    assert marker in toggle.group(0)
     assert not re.search(r"\d", toggle.group(0))
 
 
@@ -185,12 +185,11 @@ def test_q2_evidence_counts_distinct_animals_not_source_rows(
     assert "69 animals" not in result
 
 
-@pytest.mark.parametrize("folder", [FIXTURES, REAL])
 def test_q2_sentence_and_evidence_state_the_same_examined_count(
-    monkeypatch: pytest.MonkeyPatch, folder: Path
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Sentence and evidence n are one field of one observation; the other count is labelled."""
-    result = _ask("Q2", monkeypatch, folder)
+    result = _ask("Q2", monkeypatch, FIXTURES)  # the real prose no longer states a count
     sentence = re.search(r"examined (?:a total of )?(\d+) animals", result)
     evidence = re.search(r"incidence, [^<]*?, n=(\d+), (\d+) (\w+), from ", result)
     assert sentence and evidence
@@ -218,3 +217,26 @@ def test_step2_badge_ignores_unreadable_files_and_empty_folders(
         assert response.status_code == 200
         page = response.text
         assert 'class="badge none"' in page and 'class="badge recorded"' not in page
+
+
+def test_q2_prose_names_the_screened_findings_by_sex_and_places_no_table_position(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The prose answers the question: a finding that passes the screen, with its sexes."""
+    from cairn.incidence import incidence
+
+    result = _ask("Q2", monkeypatch, REAL)
+    prose = re.search(r'<div class="card answer"><p><strong>(.*?)</strong></p>', result, re.S)
+    assert prose, "no rendered answer"
+    text = prose.group(1)
+    findings = incidence().values["findings"]
+    named = [f for f in findings if f["tissue"] in text and f["finding"] in text]
+    assert named, f"the prose names no finding that passes the screen: {text!r}"
+    for finding in named:
+        sexes = {
+            f["sex"]
+            for f in findings
+            if (f["tissue"], f["finding"]) == (finding["tissue"], finding["finding"])
+        }
+        assert all(re.search(rf"\b{sex}\b", text) for sex in sexes), text
+    assert not re.search(r"\b(above|below)\b", text)
