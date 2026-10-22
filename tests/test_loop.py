@@ -145,3 +145,19 @@ def test_loop_exposes_prompt_version_and_schema_hash() -> None:
     assert result.tool_schema_sha256 == schema_hash()
     assert all(definition["strict"] for definition in tool_definitions())
     assert "run_job" in PROMPT
+
+
+def test_loop_incidence_screen_hidden_and_default_applies() -> None:
+    definition = next(d for d in tool_definitions() if d["name"] == "incidence")
+    assert "screen" not in definition["input_schema"]["properties"]
+    assert "screen" not in definition["input_schema"]["required"]
+    result, _ = run([JOB, INCIDENCE, answer(text("Examined: "), ref("O1", "n_examined"))])
+    incidence = result.ledger.observations[0]
+    assert incidence.kind == "incidence_screen"
+
+
+def test_loop_text_only_end_turn_is_declined() -> None:
+    chatter = {"stop_reason": "end_turn", "content": [text("Let me think.")], "usage": {}}
+    result, script = run([JOB, chatter])
+    assert result.status is LoopStatus.DECLINED and result.rendered is None
+    assert result.message == "the model declined" and len(script.calls) == 2

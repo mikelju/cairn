@@ -25,7 +25,7 @@ FIRST_TOOL = "run_job"
 ANSWER_TOOL = "write_answer"
 STUDY_TOOLS = ("run_job", "study_design", "incidence", "body_weight_change", "tk_summary")
 PROMPT = (Path(__file__).parent / "prompts" / "question.md").read_text(encoding="utf-8")
-PROMPT_VERSION = "question-1"
+PROMPT_VERSION = "question-2"
 SENTENCES = TypeAdapter(list[Sentence])
 
 
@@ -67,7 +67,7 @@ class LoopResult:
 
 
 # Open-ended parameters the model never needs to set; strict schemas cannot express them.
-HIDDEN_PARAMETERS = {"run_job": ("params",)}
+HIDDEN_PARAMETERS = {"run_job": ("params",), "incidence": ("screen",)}
 
 
 def strictify(node: Any) -> Any:
@@ -232,8 +232,9 @@ def ask(question: str, gateway: LLMGateway, model: str = "opus-4-6") -> LoopResu
         messages.append({"role": "assistant", "content": reply.content})
         uses = [block for block in reply.content if block.get("type") == "tool_use"]
         if not uses:
-            messages.append({"role": "user", "content": f"Call {FIRST_TOOL} or {ANSWER_TOOL}."})
-            continue
+            result.status = LoopStatus.DECLINED
+            result.message = "the model declined"
+            return result
         feedback: list[dict[str, Any]] = []
         for use in uses:
             error, text, finished = _handle(use, result, first_done)

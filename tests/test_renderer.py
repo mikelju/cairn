@@ -110,3 +110,22 @@ def test_renderer_reads_nested_incidence_fields() -> None:
         ]
     )
     assert render([sentence], ledger) == "Vacuolization affected 10 of 10"
+
+
+def test_renderer_accepts_values_prefix_in_field_paths() -> None:
+    ledger = ObservationLedger()
+    obs_id = ledger.add(incidence())
+    plain = ValueRef(obs_id=obs_id, field="findings.0.finding")
+    shown = ValueRef(obs_id=obs_id, field="values.findings.0.finding")
+    assert ledger.resolve(plain) == ledger.resolve(shown) == "Vacuolization"
+
+
+def test_renderer_separates_fused_text_and_value() -> None:
+    ledger = ObservationLedger()
+    obs_id = ledger.add(incidence())
+    finding = ValueRef(obs_id=obs_id, field="findings.0.finding")
+    parts = [Text(text="containing"), finding, Text(text="animals"), finding, Text(text=".")]
+    fused = Sentence(parts=parts)
+    assert render([fused], ledger) == "containing Vacuolization animals Vacuolization."
+    spaced = Sentence(parts=[Text(text="of "), finding, Text(text=" ("), finding, Text(text=")")])
+    assert render([spaced], ledger) == "of Vacuolization (Vacuolization)"
