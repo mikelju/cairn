@@ -60,6 +60,11 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 
 | ID | Agent | Brief | Status | Result or blocker |
 |---|---|---|---|---|
+| E34 | ejecutor (Sonnet) | Create `fase-02c-visual-design` from `main` with the 02b record commits | done | 8655148 |
+| E35 | ejecutor (Opus) | Draft the phase 02c spec | done | 0d08e21 |
+| E36 | ejecutor (Opus) | Visual proposal in Lavish with before/after and decisions O1-O5 | done | `.lavish/fase-02c-propuesta.html`, answered by the user on 2026-10-22 |
+| E37 | ejecutor (Opus) | Record the user decisions, approve the spec, write this plan | done | b72fba0 |
+| E38 | ejecutor (Sonnet) | Increment 1: tokens and self-hosted fonts | in progress | |
 
 ## User decisions
 Questions the supervisor raises with the user. Statuses: open, answered, deferred; each closes with the user's literal answer.
