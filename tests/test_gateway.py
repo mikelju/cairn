@@ -131,3 +131,21 @@ def test_gateway_reads_pydantic_like_response() -> None:
 
     result = LLMGateway(Mode.LIVE, client=Client()).create("opus-4-6", [])
     assert result.status is Status.OK
+
+
+def test_echo_block_drops_fields_bedrock_rejects() -> None:
+    from cairn.gateway import echo_block
+
+    raw: dict[str, object] = {
+        "type": "tool_use",
+        "id": "t1",
+        "name": "x",
+        "input": {},
+        "toolset_name": None,
+        "caller": None,
+    }
+    assert echo_block(raw) == {"type": "tool_use", "id": "t1", "name": "x", "input": {}}
+    assert echo_block({"type": "text", "text": "hi", "citations": None}) == {
+        "type": "text",
+        "text": "hi",
+    }

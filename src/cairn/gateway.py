@@ -79,6 +79,18 @@ def as_dict(value: Any) -> Any:
     return value
 
 
+ECHO_KEYS = {
+    "text": ("type", "text"),
+    "tool_use": ("type", "id", "name", "input"),
+}
+
+
+def echo_block(block: Any) -> Any:
+    """Keep only the fields Bedrock accepts when a block is sent back (it rejects toolset_name)."""
+    keys = ECHO_KEYS.get(str(block.get("type"))) if isinstance(block, dict) else None
+    return {key: block[key] for key in keys if key in block} if keys else block
+
+
 class LLMGateway:
     """Calls messages.create (never streaming) and reads stop_reason before any content."""
 
@@ -132,7 +144,7 @@ class LLMGateway:
             result.status = Status.TRUNCATED
             result.message = "the model output was cut off and discarded"
         elif stop_reason in ("tool_use", "end_turn"):
-            result.content = [as_dict(block) for block in response.get("content") or []]
+            result.content = [echo_block(as_dict(block)) for block in response.get("content") or []]
         else:
             raise GatewayError(f"unexpected stop_reason: {stop_reason}")
         return result
