@@ -95,7 +95,8 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | E45 | ejecutor (Sonnet) | Increment 9: clean clone, offline check, diff scope, brand and GxP greps | done | e248e48 at a649c10; all five checks pass; to be repeated at the tip after E46 |
 | R1 | revisor (Opus) | Adversarial review, correctness and criteria lens, `main...HEAD` | done | 7 findings; confirmed: callout class follows `answered` not the verifier block (C8), callout kinds differ by colour only (C7), step 1 In production line hand-written (C3, same as R2), word-cap helpers fail silently (C5, same as R2), table after the answer in narrow layout against "shown above" (C8), mockup RECORDED meta line lacks latency and cost (C6, C9); logged: fonts may not load from `file://` in Firefox (moderate confidence) |
 | E46 | ejecutor (Sonnet) | Correction of confirmed R1 and R2 findings, recapture of affected states | failed | 7945fcd; only finding 1 (word-cap helpers, C5) done before the context budget ran out; findings 2-10 handed to E47 |
-| E47 | ejecutor (Sonnet) | Correction of findings 2-10 from R1 and R2 (code and tests only) | in progress | |
+| E47 | ejecutor (Sonnet) | Correction of findings 2-10 from R1 and R2 (code and tests only) | done | 5df357a, e75b0c4; each finding with a test failing before and passing after; deviation: narrow layout uses order 1/2/3 instead of -1 so the title and form stay first; words unchanged for app states, mockups step3 88 and step5 86 |
+| E48 | ejecutor (Sonnet) | Recapture at 1440x900 after the fixes and repeat increment 9 at the tip | in progress | |
 | R2 | revisor (Opus) | Adversarial review, evidence and tests lens, `main...HEAD` | done | 9 findings; confirmed for correction: word-cap states pass on a stale recording or a failed substitution (C5), step 1 hand-writes the In production line and the leak test misses it (C3), locked nav steps differ by colour only and the focus test accepts `outline: none` (C7), missing contrast pairs, SIMULATED badge test too loose; logged: word-cap list no longer picks up new step templates |
 
 ## User decisions
@@ -112,6 +113,7 @@ The spec decisions U1 to U6 and the supervisor decision S1 are recorded in `spec
 ## Adversarial review
 | Round | Backend | Range | Lenses | Findings | Status |
 |---|---|---|---|---|---|
+| 1 | revisor subagents (Opus), R1 and R2 | `main...a649c10` | correctness; evidence and tests | 16 reported, 10 distinct confirmed and fixed (7945fcd, 5df357a, e75b0c4); logged, not fixed: word-cap list does not pick up future step templates, mockup fonts under `file://` in Firefox (unverified) | closed |
 
 ## Results
 Per criterion: command or walkthrough run, observed result and reference to the evidence.
