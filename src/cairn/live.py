@@ -25,7 +25,7 @@ from cairn.pricing import call_cost
 from cairn.questions import QUESTIONS
 from cairn.recording import RecordingClient, RecordingKey, ReplayClient, total_cost
 
-BUDGET_USD = 10.0
+BUDGET_USD = 5.0
 # Ceiling for one model call: a generous prompt size and the largest reply the gateway allows.
 CEILING_INPUT_TOKENS = 20_000
 CEILING_OUTPUT_TOKENS = MAX_TOKENS
@@ -59,6 +59,17 @@ def call_ceiling(model: str) -> float:
 
 def record_ceiling(model: str, count: int) -> float:
     return count * MAX_CALLS * call_ceiling(model)
+
+
+def recorded_spend(directory: Path) -> float:
+    """Spend already kept in the recordings of a folder (fixtures carry no cost and count zero)."""
+    total = 0.0
+    for path in sorted(directory.glob("*.json")) if directory.is_dir() else []:
+        try:
+            total += total_cost(json.loads(path.read_text(encoding="utf-8"))) or 0.0
+        except (ValueError, KeyError, TypeError):  # not a recording: it carries no spend
+            continue
+    return total
 
 
 def smoke_ceiling() -> float:

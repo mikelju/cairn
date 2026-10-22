@@ -46,7 +46,7 @@ EXPECT: dict[str, Expect] = {
     "Q5": Expect({"run_job": {"kind": "validate_study"}}, frozenset(STUDY)),
     "Q6": Expect(allowed=frozenset(STUDY)),
     "Q7": Expect(allowed=frozenset(STUDY)),
-    "Q8": Expect(allowed=frozenset({"body_weight_change"})),
+    "Q8": Expect(allowed=frozenset({"body_weight_change", "study_design", "search_guidance"})),
     "G1": Expect({"search_guidance": {}}, frozenset({"search_guidance"}), "ich-m4sr2"),
     "G2": Expect({"search_guidance": {}}, frozenset({"search_guidance"}), "fda-2005"),
     "G3": Expect({"search_guidance": {}}, frozenset({"search_guidance"}), "ich-s9"),

@@ -32,7 +32,7 @@ STUDY_TOOLS = (
     "search_guidance",
 )
 PROMPT = (Path(__file__).parent / "prompts" / "question.md").read_text(encoding="utf-8")
-PROMPT_VERSION = "question-6"
+PROMPT_VERSION = "question-7"
 SENTENCES = TypeAdapter(list[Sentence])
 
 
