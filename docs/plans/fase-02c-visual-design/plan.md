@@ -1,0 +1,84 @@
+# Phase 02c - App visual design that invites use: plan and results
+
+Status: in progress
+Spec: `spec.md` (approved, frozen)
+Base: branch `fase-02c-visual-design` from `main` at 4236c59 (phase 02b merged)
+
+## Increments
+Each increment leaves the product working and covers specific criteria.
+This file is the durable state: a new session resumes from here and from Git.
+Every increment that changes code closes with `npm run check` green (C1) and one commit on `fase-02c-visual-design`.
+Every increment keeps C12: code changes stay under `src/cairn/web/`, tests go under `tests/`, mockups under this phase's folder; nothing under `recordings/` or elsewhere in `src/cairn/` is touched, and Q2 and Q6 are never re-recorded.
+No increment adds a runtime or development dependency, a CDN, a CSS build step or a JavaScript framework.
+
+Direction and values adopted from the approved proposal (`.lavish/fase-02c-propuesta.html`, direction A, not versioned):
+- Colour tokens: paper `#fbfaf7`, surface `#ffffff`, ink `#1b2430`, muted `#55606e`, line `#dde1e6`, control border `#7a8491`, accent `#0e4d5c`, accent tint `#e6f0f2`, real `#17663a`, recorded `#1d4f91` on tint `#eaf1fb`, simulated `#8a4a00`, fixture `#5b4a8a` on tint `#f3f0fa`, warning tint `#fff6e8`, block `#a12622` on tint `#fdf1f0`, ok `#17663a` on tint `#edf7f0`, new row `#fff3cc`, not-examined hatch `#f3f4f6`, on-accent text `#ffffff`.
+- Contrast measured in the proposal: ink on paper 15.0:1, muted on white 6.4:1, accent on white 9.4:1, white on real 7.0:1, recorded on its tint 7.2:1, simulated on white 6.9:1, fixture on its tint 6.7:1, block on its tint 6.8:1, ink on new row 14.1:1; increment 6 recomputes every pair from the stylesheet.
+- Type scale: 11, 12, 13, 15, 18, 26 and 40 px (badges and labels, metadata and footer, table/trace/evidence, body and controls, lede and answer, step title, key figure); line height 1.45 for body text; `font-variant-numeric: tabular-nums` in tables and figures.
+- Spacing 4, 8, 12, 16, 24, 32 and 48 px; radii 4 and 8 px; borders 1 px line, 1.5 px for badges and table header rule, 2 px focus outline in the accent colour with 2 px offset.
+- Fonts (U2): IBM Plex Sans 400, 600 and 700 and IBM Plex Mono 400, latin-subset `woff2` files taken from the official IBM Plex release on GitHub (`github.com/IBM/plex`), SIL Open Font License 1.1; target under 250 KB in total; system stack as the fallback in each family token.
+- Page shell: header 56 px (brand, step navigation with the current step underlined in the accent colour and locked steps muted, role on the right), footer 36 px with the "not GxP-validated" notice and the build line, main area with 48 px side padding.
+- Step header: numbered circle in the accent colour, title with its badge, one-sentence lede in the lede size and muted colour.
+- Badges (C6): REAL solid fill with a dot glyph; RECORDED tinted fill, solid border and a replay glyph; SIMULATED white fill, dashed border and a diamond glyph; FIXTURE hatched fill, dotted border and a square glyph; the word is always shown; glyphs are CSS `content` escapes so the words in the HTML do not change.
+- Step 2 layout: two columns, left at most 560 px (header, metadata line, question control, answer card with the "What the model wrote" toggle, trace, rules callout, evidence panel, "In production →" line), right the screening table card with the dose caption and the folded screening rule (S1).
+
+Counting rule for C5 and C9 (U4 and S1), implemented once in `tests/test_word_cap.py` and used by every word-cap test:
+- Parse the rendered HTML with the standard library `html.parser`; no new dependency.
+- Count only inside `<main>`; header, navigation and footer are page chrome.
+- Drop `<script>`, `<style>` and `<template>` content.
+- Each `<tbody>` counts as one word in total, whatever its cells hold; `<thead>`, `<caption>`, badges and metadata count word by word.
+- A closed `<details>` counts its `<summary>` only; an open one counts everything; the "toggle open" state of step 2 is counted with that one disclosure marked open.
+- Every `<option>` text counts, since the question control lists them.
+- A state with a result is the GET page with the POST fragment placed in its `#result` element, as HTMX does in the browser.
+- The lede is the text of the step header's lede element: one sentence of at most 25 words.
+
+States counted for C5 and screenshotted for C4: landing; step 1 before running, after running without the injected value, after running with it; step 2 before asking, after Q2, after Q2 with the toggle open, after Q6.
+Step 2 states use the real recordings under `recordings/`, so every assertion is made on what a visitor sees.
+
+- [ ] 1. Tokens and self-hosted fonts: rewrite `src/cairn/web/static/cairn.css` as one `:root` block holding every token listed above (colours, font families, type scale, spacing, radii, borders, shadows), then rules that use only `var(...)`, keeping every selector the current templates need so all pages still render; add `src/cairn/web/static/fonts/` with the four `woff2` files, `OFL.txt` and a `NOTICE.txt` naming the source URL, version and SHA-256 of each file, loaded by `@font-face` with relative `url(fonts/...)`; light theme only (U5); new `tests/test_design.py` with `test_design_tokens_*` (no colour literal, font family or raw font size outside the `:root` block, no `style=` attribute in any template, with a failing sample) and `test_no_external_resources_*` (no `http://` or `https://` in templates or CSS, every CSS `url()` resolves to a file under `static/` and the test client serves it with 200, with a failing sample) (C2, C11, C13) - verification: `uv run pytest tests/test_design.py`, the total font size printed, the brand grep of increment 9 run over the new file names and the notice, then `npm run check` - evidence:
+- [ ] 2. Shared macros: replace `_anatomy.html` by `src/cairn/web/templates/_components.html` with macros for the page shell parts, step header (number, title, badge, lede), badge with its metadata line, data table (header row, body rows, "not examined" cells with a hatch and the words, highlighted new rows with a left rule and bold first cell, so no highlight depends on colour alone), trace, evidence panel, callout (rules fired, blocked, stale recording), disclosure toggle and "In production →" line; move the current landing, step 1 and step 2 markup onto them with today's wording and layout, so behaviour is unchanged; `test_shared_components_*` (no step template writes `<table`, a `badge` class, trace or callout markup outside `_components.html`, with a failing sample) and `test_badge_*` (each of the four kinds renders its word and a distinct class, the CSS gives each kind a different fill or border style and a different glyph, RECORDED keeps date, region, model, latency and cost, SIMULATED keeps its "In production →" line) (C3, C6, C8) - verification: `uv run pytest tests/test_design.py tests/test_web.py`, every existing `tests/test_web.py` assertion kept, then `npm run check` - evidence:
+- [ ] 3. Rendered word counter: in `tests/test_word_cap.py`, add the counting rule above as one function over rendered HTML plus a helper that builds each state through the FastAPI test client; tests on samples only: an over-cap main area fails, header and footer words are ignored, a table body counts as one word, a closed `<details>` counts its summary only, a two-sentence or 26-word lede fails; the template-based test stays until increments 4 and 5 replace it page by page, so `npm run check` stays green; this increment comes before the page rebuilds so they can measure themselves (C5) - verification: `uv run pytest tests/test_word_cap.py`, then `npm run check` - evidence:
+- [ ] 4. Landing and step 1 rebuilt: new layout on the tokens and macros for the landing page (title, lede, badge legend, entry button) and step 1 in its three states (validation table with quarantined rows, injected row highlighted as new, the naive mean sentence, SIMULATED job runner line); wording shortened only where a cap needs it; `test_word_cap_rendered_*` parametrised over the four states, the template-based check removed for these pages; step 1 assertions in `tests/test_web.py` kept or strengthened (C4, C5, C8) - verification: `uv run pytest tests/test_word_cap.py tests/test_web.py`, the measured word count of each state reported, a local look at 1440x900 by the executor if a browser is at hand, then `npm run check` - evidence:
+- [ ] 5. Step 2 rebuilt with the fold: two-column layout above; the question select lists the question IDs and a `<details>` holds the question texts; the screening rule sentence from the renderer sits in a `<details>` beside the table caption (S1); toggle "What the model wrote" with markers and zero digits; trace, rules callout, evidence panel, RECORDED badge with its metadata line and the "In production →" line; Q6 shows the rules that fired in the blocked callout; `test_word_cap_rendered_*` extended to the four step 2 states and the template-based test deleted; `test_q2_replay`, `test_q6_blocked` and every step 2 assertion in `tests/test_web.py` kept or strengthened (C4, C5, C8) - verification: `uv run pytest tests/test_word_cap.py tests/test_web.py -k "step2 or q2 or q6 or word_cap"`, measured word counts reported (the proposal measured 96 before the fold), then `npm run check` - evidence:
+- [ ] 6. Contrast and focus: `test_contrast_*` reads the tokens from the `:root` block and computes the WCAG ratio of every text and background pair in use (listed in the test, one entry per rule that sets a colour on a background), 4.5:1 for body text, 3:1 for text of 18 px and above or 14 px bold, for control borders and for the focus outline against paper and surface, with a failing sample; a CSS check that `a`, `button`, `select`, `input`, `summary` and `[tabindex]` have a `:focus-visible` outline (C7) - verification: `uv run pytest tests/test_design.py -k "contrast or focus"`, then `npm run check` - evidence:
+- [ ] 7. Mockups of steps 3 to 7: `docs/plans/fase-02c-visual-design/mockups/step3.html` to `step7.html` (Explore, Analyse, Draft, Check, Review), each a static page that links `../../../../src/cairn/web/static/cairn.css`, copies the shell and component markup rendered by the macros, has no `<style>` block, no `style=` attribute and no script, carries a visible "MOCKUP" stamp and labels its placeholder content as such, and uses only the public study and public guideline names; `test_mockups_*` in `tests/test_design.py` checks the five files exist, link only the real stylesheet, have no inline styles or colour literals, show the stamp, and pass the same word counter and lede rule as C5, with a failing sample; content of each step follows the master plan and the proposal's step 3 to 7 sketches (C9, C13) - verification: `uv run pytest tests/test_design.py -k mockups`, then `npm run check` - evidence:
+- [ ] 8. Walkthrough at 1440x900, run by the supervisor: Playwright is not installed and no new dependency is added, so the supervisor captures by hand in its browser pane set to 1440x900; the app served locally (`uv run uvicorn cairn.app:create_app --factory`), the mockups served by a local static server from the repo root (`uv run python -m http.server`) so the relative stylesheet link resolves; for each of the eight app states and the five mockups: one screenshot in `docs/plans/fase-02c-visual-design/evidence/` and `document.documentElement.scrollHeight` measured and recorded in Results (at most 900); a side-by-side screenshot of the four badges; a keyboard-only pass through landing, step 1 and step 2 with the focus outline visible on every control; the network log showing every request to the local host (C4, C6, C7, C9, C11) - verification: the screenshots and the scroll height table in Results - evidence:
+- [ ] 9. Clean clone, offline check and brand grep: fresh clone of the branch with `uv sync`, `npm ci` and `npm run check`; `make demo-offline-check` (it already fetches `/`, `/step/1`, `/step/2` and posts Q2 with no network); `git diff --stat main...HEAD` showing no file under `src/cairn/` outside `src/cairn/web/` and nothing under `recordings/`; local grep of the PRD company, person and place terms (read from the git-ignored `docs/PRD_Cairn.pdf`, never written into a versioned file or a commit message) over tracked files, the mockups, the `main...HEAD` diff and the commit messages; GxP grep showing only "not GxP-validated" notices (C1, C11, C12, C13) - verification: command outputs - evidence:
+- [ ] 10. User approval of the mockups: the supervisor presents the five mockup screenshots and the app states on a Lavish page and asks the user to approve them; the literal answer is recorded in `spec.md` under User decisions and in this plan's User decisions; a requested change goes back to increment 7 and a new screenshot; this increment is not done by an ejecutor (C10) - verification: literal answer recorded in both files - evidence:
+
+After increment 10 the supervisor runs the adversarial review (sdd-review) and the delivery (sdd-delivery: push and PR to `main`, not merged), recorded below in Adversarial review and Results; increment 9 is repeated at the tip if code changes after review.
+
+Technical choices taken in this plan with the simplest option (supervisor's planner, recommended option):
+- IBM Plex Sans and IBM Plex Mono: both OFL 1.1, a matching sans and mono pair with tabular figures; the files are downloaded once from the official release and committed, no package is added.
+- Mockups live in this phase's folder (`mockups/`), are not served by the app and are not under `src/`.
+- Screenshots are manual by the supervisor because Playwright is not available in the environment and adding it would be a new development dependency.
+- The word counter uses the standard library parser and lives in the tests, not in the app.
+- Increment 3 comes before the page rebuilds, unlike the brief's indicative order, so that `npm run check` stays green on every commit and the rebuilds can measure themselves.
+
+## Briefs
+Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, failed, cancelled.
+
+| ID | Agent | Brief | Status | Result or blocker |
+|---|---|---|---|---|
+
+## User decisions
+Questions the supervisor raises with the user. Statuses: open, answered, deferred; each closes with the user's literal answer.
+The spec decisions U1 to U6 and the supervisor decision S1 are recorded in `spec.md`.
+
+| ID | Question | Options and recommendation | Status | User answer |
+|---|---|---|---|---|
+
+## Deviations
+| ID | Summary | Affects criteria | Status |
+|---|---|---|---|
+
+## Adversarial review
+| Round | Backend | Range | Lenses | Findings | Status |
+|---|---|---|---|---|---|
+
+## Results
+Per criterion: command or walkthrough run, observed result and reference to the evidence.
+Pending items, limitations and what could not be checked, stated plainly.
+
+## Candidate learnings
+Only reusable lessons with a literal quote from the session; consolidated when the phase closes.
