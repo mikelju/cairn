@@ -108,7 +108,7 @@ def test_q2_replay(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "Rules fired: none" in result
     assert result.count("<tr><td>") == 9
     assert "not examined" in result and "0/1" in result
-    assert "9 screened findings; GLAND, ADRENAL Vacuolization in F, M" in result
+    assert "9 screened findings; the clearest is GLAND, ADRENAL Vacuolization in F and M" in result
     recorded = json.loads((REAL / "q2.json").read_text(encoding="utf-8"))
     cost = sum(call["cost_usd"] for call in recorded["calls"])
     assert f"{recorded['date']} | {recorded['region']} | opus-4-6 |" in result

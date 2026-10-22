@@ -18,7 +18,7 @@ from cairn.gateway import DEFAULT_MODEL, LLMGateway, Mode
 from cairn.ingest import build_report, load_study
 from cairn.jobs import JobRunner
 from cairn.loop import PROMPT_VERSION, STUDY_TOOLS, LoopResult, LoopStatus, ask, schema_hash
-from cairn.questions import QUESTIONS
+from cairn.questions import QUESTIONS, STEP2_QUESTIONS
 from cairn.recording import (
     RECORDINGS_DIR,
     RecordingKey,
@@ -246,7 +246,7 @@ def _step2_context(question_id: str, directory: Path) -> dict[str, Any]:
 @router.get("/step/2", response_class=HTMLResponse)
 async def step2(request: Request) -> HTMLResponse:
     badge = _step2_badge(_recordings_dir())
-    return _page(request, "step2.html", current=2, questions=QUESTIONS, page_badge=badge)
+    return _page(request, "step2.html", current=2, questions=STEP2_QUESTIONS, page_badge=badge)
 
 
 @router.post("/step/2/run", response_class=HTMLResponse)

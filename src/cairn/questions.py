@@ -13,3 +13,6 @@ QUESTIONS: dict[str, str] = {
     "G2": "How is the NOAEL defined?",
     "G3": "For an anticancer drug, what nonclinical data support a first-in-human trial?",
 }
+
+# The approved step 2 design lists Q2 and Q6; the rest go to Explore and step 3 (D106).
+STEP2_QUESTIONS: dict[str, str] = {id: QUESTIONS[id] for id in ("Q2", "Q6")}
