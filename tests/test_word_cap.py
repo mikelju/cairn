@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from cairn.app import create_app
 
 STEP_WORD_CAP = 93
-REAL_RECORDINGS = Path(__file__).resolve().parents[1] / "recordings"
+REAL_RECORDINGS = Path(__file__).resolve().parent / "fixtures" / "recordings_real_shape"
 STALE_NOTICE = "stale recording"
 SENTENCE_WORD_CAP = 25
 
@@ -108,7 +108,7 @@ def open_toggle(html: str) -> str:
 
 
 def rendered_state(name: str) -> str:
-    # Step 2 states always replay the real recordings, whatever the cwd or the environment say.
+    # Step 2 states always replay the real-shape fixtures, whatever the cwd or the environment say.
     saved = os.environ.get("CAIRN_RECORDINGS")
     os.environ["CAIRN_RECORDINGS"] = str(REAL_RECORDINGS)
     try:

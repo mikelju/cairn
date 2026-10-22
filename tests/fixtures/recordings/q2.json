@@ -109,9 +109,9 @@
   ],
   "date": "2026-10-21",
   "model": "fixture",
-  "prompt_version": "question-5",
+  "prompt_version": "question-6",
   "question_id": "Q2",
   "region": "none",
   "source": "fixture",
-  "tool_schema_sha256": "b00a3757af94c652fbdc67adfef0628ac43cbc9567b048646c7dfd935439698d"
+  "tool_schema_sha256": "25276c34f9375fc85b9f4b6a4d798b5fe9974dbd21456c69d1a192f21dea167b"
 }

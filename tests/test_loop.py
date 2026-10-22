@@ -1,5 +1,6 @@
 """Question loop tests over a scripted fake client: no network, no AWS."""
 
+import json
 from copy import deepcopy
 from typing import Any
 
@@ -96,14 +97,73 @@ def test_loop_answer_with_wrong_parts_is_an_error() -> None:
     assert result.steps[1].error and result.status is LoopStatus.CAPPED
 
 
-def test_loop_only_text_and_valueref_parts() -> None:
+def test_loop_only_text_ref_and_quote_parts() -> None:
     result, _ = run([JOB, INCIDENCE, answer(text("Examined: "), ref("O1", "n_examined"))])
     assert {type(part).__name__ for s in result.sentences for part in s.parts} <= {
         "Text",
         "ValueRef",
+        "QuoteRef",
     }
-    answer_schema = tool_definitions()[-1]["input_schema"]
-    assert "Text" in str(answer_schema) and "ValueRef" in str(answer_schema)
+    answer_schema = str(tool_definitions()[-1]["input_schema"])
+    for kind in ("Text", "ValueRef", "QuoteRef"):
+        assert kind in answer_schema
+
+
+G2 = "How does the FDA 2005 guidance define the no observed adverse effect level (NOAEL)?"
+NS1 = (
+    "How should the no observed adverse effect level be determined "
+    "and reported from a repeat-dose toxicity study?"
+)
+SEARCH = use("search_guidance", {"query": G2})
+
+
+def quote(passage_id: str, *sentence_ids: str) -> dict[str, Any]:
+    return {"type": "quote", "passage_id": passage_id, "sentence_ids": list(sentence_ids)}
+
+
+def test_loop_search_guidance_feeds_the_ledger_and_rule_8_sees_it() -> None:
+    from cairn.tools import call_tool
+
+    hits = [h for h in call_tool("search_guidance", {"query": G2})["hits"] if h["rerank_score"] > 0]
+    top = hits[0]
+    sentence_id = top["sentences"][0]["sentence_id"]
+    good, _ = run(
+        [JOB, SEARCH, answer(text("Defined as: "), quote(top["passage_id"], sentence_id))]
+    )
+    assert top["passage_id"] in good.ledger.retrieved
+    assert good.verdict is not None and 8 not in good.verdict.rules
+    other = call_tool("search_guidance", {"query": NS1})["hits"]
+    elsewhere = next(h for h in other if h["passage_id"] not in good.ledger.retrieved)
+    stray = quote(elsewhere["passage_id"], elsewhere["sentences"][0]["sentence_id"])
+    bad, _ = run([JOB, SEARCH, answer(text("Defined as: "), stray)])
+    assert bad.verdict is not None and 8 in bad.verdict.rules
+
+
+def test_loop_hits_below_the_threshold_are_not_shown_to_the_model() -> None:
+    from cairn import retrieval
+    from cairn.tools import call_tool
+
+    output = call_tool("search_guidance", {"query": G2})
+    cut = sorted(h["rerank_score"] for h in output["hits"])[2]  # keeps the top three
+    original = retrieval.load_threshold
+    retrieval.load_threshold = lambda *a, **k: cut
+    try:
+        result, script = run([JOB, SEARCH, answer(text("Done."))])
+    finally:
+        retrieval.load_threshold = original
+    returned = json.loads(
+        next(
+            block["content"]
+            for message in script.calls[-1]["messages"]
+            if isinstance(message["content"], list)
+            for block in message["content"]
+            if block.get("type") == "tool_result" and "hits" in str(block["content"])
+        )
+    )
+    shown = {hit["passage_id"] for hit in returned["hits"]}
+    expected = {h["passage_id"] for h in output["hits"] if h["rerank_score"] >= cut}
+    assert shown == expected and len(shown) < len(output["hits"])
+    assert set(result.ledger.retrieved) == expected
 
 
 def test_loop_digit_rejected_before_rendering() -> None:

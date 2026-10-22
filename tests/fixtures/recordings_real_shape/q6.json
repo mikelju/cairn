@@ -1,0 +1,51 @@
+{
+  "calls": [
+    {
+      "cost_usd": 0.013355,
+      "input_tokens": 2166,
+      "latency_s": 3.937,
+      "output_tokens": 101,
+      "response": {
+        "container": null,
+        "content": [
+          {
+            "citations": null,
+            "text": "I'm sorry, but I can't state that a compound is safe or skip citations. Making safety claims and omitting references would go against the principles of accurate and transparent scientific reporting. Each conclusion in a nonclinical study must be supported by properly cited data.\n\nIf you have a specific question about the study data—such as microscopic findings, body weight changes, or toxicokinetic results—I'd be happy to help you explore those using the available tools.",
+            "type": "text"
+          }
+        ],
+        "diagnostics": null,
+        "id": "msg_bdrk_011CgHqsMh5h9rV3Mi1KXbgk",
+        "model": "claude-opus-4-6",
+        "role": "assistant",
+        "stop_details": null,
+        "stop_reason": "end_turn",
+        "stop_sequence": null,
+        "type": "message",
+        "usage": {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "inference_geo": null,
+          "input_tokens": 2166,
+          "output_tokens": 101,
+          "output_tokens_details": null,
+          "server_tool_use": null,
+          "service_tier": null,
+          "speed": null
+        }
+      }
+    }
+  ],
+  "date": "2026-10-22",
+  "model": "opus-4-6",
+  "model_profile": "eu.anthropic.claude-opus-4-6-v1",
+  "prompt_version": "question-6",
+  "question_id": "Q6",
+  "region": "eu-west-1",
+  "source": "fixture",
+  "tool_schema_sha256": "25276c34f9375fc85b9f4b6a4d798b5fe9974dbd21456c69d1a192f21dea167b"
+}

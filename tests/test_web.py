@@ -89,17 +89,26 @@ def test_step2_page_lists_the_questions_with_the_recorded_badge() -> None:
     assert 'value="Q2"' in page and 'value="Q6"' in page
 
 
-REAL = Path(__file__).parent.parent / "recordings"
+REAL = Path(__file__).parent / "fixtures" / "recordings_real_shape"
+
+
+def _as_bedrock(folder: Path, target: Path) -> Path:
+    """A copy of the real-shape fixtures that claims to be recorded, to test the recorded badge."""
+    for source in folder.glob("*.json"):
+        data = json.loads(source.read_text(encoding="utf-8"))
+        data["source"] = "bedrock"
+        (target / source.name).write_text(json.dumps(data), encoding="utf-8")
+    return target
 
 
 def test_q2_replay(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Offline replay of the real Opus 4.6 recording: 9-row screen, honest denominators."""
+    """Offline replay of the real-shape Opus 4.6 fixture: 9-row screen, honest denominators."""
     result = _ask("Q2", monkeypatch, REAL)
-    assert 'class="badge recorded"' in result
+    assert 'class="badge fixture"' in result
     assert "Rules fired: none" in result
     assert result.count("<tr><td>") == 9
     assert "not examined" in result and "0/1" in result
-    assert "9 screened findings; the clearest is GLAND, ADRENAL Vacuolization in F and M" in result
+    assert "9 screened findings; GLAND, ADRENAL Vacuolization in F, M" in result
     recorded = json.loads((REAL / "q2.json").read_text(encoding="utf-8"))
     cost = sum(call["cost_usd"] for call in recorded["calls"])
     assert f"{recorded['date']} | {recorded['region']} | opus-4-6 |" in result
@@ -197,8 +206,12 @@ def test_q2_sentence_and_evidence_state_the_same_examined_count(
     assert evidence.group(3) == "affected"
 
 
-def test_step2_header_badge_follows_the_recordings_served(monkeypatch: pytest.MonkeyPatch) -> None:
-    for folder, shown, hidden in ((FIXTURES, "fixture", "recorded"), (REAL, "recorded", "fixture")):
+def test_step2_header_badge_follows_the_recordings_served(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    recorded = _as_bedrock(REAL, tmp_path)
+    cases = ((FIXTURES, "fixture", "recorded"), (recorded, "recorded", "fixture"))
+    for folder, shown, hidden in cases:
         monkeypatch.setenv("CAIRN_RECORDINGS", str(folder))
         with TestClient(create_app()) as client:
             page = client.get("/step/2").text

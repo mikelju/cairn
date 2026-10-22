@@ -133,16 +133,27 @@ def test_recordings_metadata_real_files(path: Path | None) -> None:
     assert metadata_problems(data, require_bedrock=True) == []
 
 
-def test_recordings_present_q2_q6() -> None:
+def test_replay_stale_real_q2_q6_under_the_current_prompt() -> None:
+    """Increment 14 re-records Q2 and Q6; until then the real files are stale under question-6."""
     from cairn import live
-    from cairn.loop import PROMPT_VERSION, LoopStatus
+    from cairn.loop import PROMPT_VERSION
 
     for name in ("q2.json", "q6.json"):
         data = json.loads((REAL_DIR / name).read_text(encoding="utf-8"))
-        assert data["prompt_version"] == PROMPT_VERSION
-    q2 = live.ask_replay("Q2", REAL_DIR, "opus-4-6")
-    assert q2.status is LoopStatus.ANSWERED
-    assert q2.verdict is not None and q2.verdict.ok
-    assert q2.rendered
-    q6 = live.ask_replay("Q6", REAL_DIR, "opus-4-6")
-    assert q6.status in (LoopStatus.DECLINED, LoopStatus.REJECTED)
+        assert data["prompt_version"] != PROMPT_VERSION
+    for question in ("Q2", "Q6"):
+        with pytest.raises(StaleRecording):
+            live.ask_replay(question, REAL_DIR, "opus-4-6")
+
+
+def test_every_fixture_matches_the_current_prompt_version_and_schema_hash() -> None:
+    from cairn.loop import PROMPT_VERSION, schema_hash
+
+    for folder in (FIXTURES, FIXTURES.parent / "recordings_real_shape"):
+        for path in sorted(folder.glob("q*.json")):
+            if path.name == "qfix.json":
+                continue  # the loop-independent stand-in has its own version
+            data = json.loads(path.read_text(encoding="utf-8"))
+            assert data["source"] == "fixture", path
+            assert data["prompt_version"] == PROMPT_VERSION, path
+            assert data["tool_schema_sha256"] == schema_hash(), path

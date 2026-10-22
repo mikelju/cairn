@@ -108,7 +108,9 @@ def _known_model(model: str) -> str:
 
 @app.command("ask")
 def ask_command(
-    question: Annotated[str, typer.Argument(help="Question ID (Q1-Q8, G1-G3) or free text with --live")],
+    question: Annotated[
+        str, typer.Argument(help="Question ID (Q1-Q8, G1-G3) or free text with --live")
+    ],
     live_mode: Annotated[bool, typer.Option("--live", help="Call Bedrock")] = False,
     model: Annotated[
         str | None, typer.Option(help="Model key; replay reads it from the file")
