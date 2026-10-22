@@ -1,0 +1,222 @@
+{
+  "description": "E4 retrieval evaluation: hand-labelled questions. in_library entries name the guideline, the answer passage, the page range of that passage and the anchor sentence that answers the question; out_of_library questions have no answer in the library.",
+  "in_library": [
+    {
+      "question": "How does the no observed adverse effect level differ from the no observed effect level?",
+      "guideline": "fda-2005",
+      "passage_id": "FDA-IV-02",
+      "page_start": 8,
+      "page_end": 8,
+      "anchor_sentence_id": "FDA-IV-02.s1"
+    },
+    {
+      "question": "What default safety factor is applied to the human equivalent dose to obtain the starting dose?",
+      "guideline": "fda-2005",
+      "passage_id": "FDA-VII-01",
+      "page_start": 12,
+      "page_end": 13,
+      "anchor_sentence_id": "FDA-VII-01.s5"
+    },
+    {
+      "question": "Under which circumstances may a safety factor smaller than the default be justified?",
+      "guideline": "fda-2005",
+      "passage_id": "FDA-VII.B-01",
+      "page_start": 14,
+      "page_end": 15,
+      "anchor_sentence_id": "FDA-VII.B-01.s1"
+    },
+    {
+      "question": "For which categories of therapeutics is dose scaling by milligrams per square metre not recommended?",
+      "guideline": "fda-2005",
+      "passage_id": "FDA-V.C-01",
+      "page_start": 11,
+      "page_end": 12,
+      "anchor_sentence_id": "FDA-V.C-01.s1"
+    },
+    {
+      "question": "Which factors can justify not defaulting to the most sensitive species when choosing the species for the human equivalent dose?",
+      "guideline": "fda-2005",
+      "passage_id": "FDA-VI-02",
+      "page_start": 12,
+      "page_end": 12,
+      "anchor_sentence_id": "FDA-VI-02.s1"
+    },
+    {
+      "question": "How can a pharmacologically active dose be compared with the maximum recommended starting dose?",
+      "guideline": "fda-2005",
+      "passage_id": "FDA-VIII-01",
+      "page_start": 15,
+      "page_end": 15,
+      "anchor_sentence_id": "FDA-VIII-01.s2"
+    },
+    {
+      "question": "Which dose should be used to calculate the human equivalent dose when drug absorption saturates below a toxic dose?",
+      "guideline": "fda-2005",
+      "passage_id": "FDA-IV-02",
+      "page_start": 8,
+      "page_end": 8,
+      "anchor_sentence_id": "FDA-IV-02.s9"
+    },
+    {
+      "question": "Are separate single-dose toxicity studies needed when acute toxicity information comes from other studies?",
+      "guideline": "ich-m3r2",
+      "passage_id": "M3-4-01",
+      "page_start": 11,
+      "page_end": 12,
+      "anchor_sentence_id": "M3-4-01.s3"
+    },
+    {
+      "question": "Which repeated-dose studies generally support clinical dosing for longer than six months?",
+      "guideline": "ich-m3r2",
+      "passage_id": "M3-5.1-01",
+      "page_start": 12,
+      "page_end": 13,
+      "anchor_sentence_id": "M3-5.1-01.s3"
+    },
+    {
+      "question": "Which genotoxicity assay is generally sufficient to support single-dose clinical trials?",
+      "guideline": "ich-m3r2",
+      "passage_id": "M3-9-01",
+      "page_start": 23,
+      "page_end": 23,
+      "anchor_sentence_id": "M3-9-01.s1"
+    },
+    {
+      "question": "Are stand-alone local tolerance studies recommended or should they be part of the general toxicity studies?",
+      "guideline": "ich-m3r2",
+      "passage_id": "M3-8-01",
+      "page_start": 23,
+      "page_end": 23,
+      "anchor_sentence_id": "M3-8-01.s1"
+    },
+    {
+      "question": "When should abuse liability be evaluated for a drug that acts on the central nervous system?",
+      "guideline": "ich-m3r2",
+      "passage_id": "M3-15-01",
+      "page_start": 27,
+      "page_end": 27,
+      "anchor_sentence_id": "M3-15-01.s1"
+    },
+    {
+      "question": "Are combination safety pharmacology or genotoxicity studies recommended when each agent was tested on its own?",
+      "guideline": "ich-m3r2",
+      "passage_id": "M3-17-03",
+      "page_start": 29,
+      "page_end": 29,
+      "anchor_sentence_id": "M3-17-03.s1"
+    },
+    {
+      "question": "When must juvenile animal studies be completed relative to long-term paediatric clinical trials?",
+      "guideline": "ich-m3r2",
+      "passage_id": "M3-12-02",
+      "page_start": 26,
+      "page_end": 26,
+      "anchor_sentence_id": "M3-12-02.s4"
+    },
+    {
+      "question": "In what order should repeat-dose toxicity studies be arranged in the toxicology written summary?",
+      "guideline": "ich-m4sr2",
+      "passage_id": "M4S-2.6.6.3-01",
+      "page_start": 13,
+      "page_end": 13,
+      "anchor_sentence_id": "M4S-2.6.6.3-01.s1"
+    },
+    {
+      "question": "How many pages should the brief summary of the toxicology written summary generally take?",
+      "guideline": "ich-m4sr2",
+      "passage_id": "M4S-2.6.6.1-01",
+      "page_start": 12,
+      "page_end": 13,
+      "anchor_sentence_id": "M4S-2.6.6.1-01.s1"
+    },
+    {
+      "question": "What is the expected length limit of the Nonclinical Overview?",
+      "guideline": "ich-m4sr2",
+      "passage_id": "M4S-2.4-01",
+      "page_start": 5,
+      "page_end": 5,
+      "anchor_sentence_id": "M4S-2.4-01.s2"
+    },
+    {
+      "question": "What must the table of contents of the nonclinical study reports list?",
+      "guideline": "ich-m4sr2",
+      "passage_id": "M4S-4.1-01",
+      "page_start": 16,
+      "page_end": 16,
+      "anchor_sentence_id": "M4S-4.1-01.s1"
+    },
+    {
+      "question": "What should the pharmacokinetics summary say about methods of analysis of biological samples?",
+      "guideline": "ich-m4sr2",
+      "passage_id": "M4S-2.6.4.2-01",
+      "page_start": 11,
+      "page_end": 11,
+      "anchor_sentence_id": "M4S-2.6.4.2-01.s1"
+    },
+    {
+      "question": "Are carcinogenicity studies needed to support marketing of therapeutics for advanced cancer?",
+      "guideline": "ich-s9",
+      "passage_id": "S9-2.7-01",
+      "page_start": 9,
+      "page_end": 9,
+      "anchor_sentence_id": "S9-2.7-01.s2"
+    },
+    {
+      "question": "What is the usual basis for scaling animal doses to a human start dose for small molecule cancer drugs?",
+      "guideline": "ich-s9",
+      "passage_id": "S9-3.1-01",
+      "page_start": 9,
+      "page_end": 9,
+      "anchor_sentence_id": "S9-3.1-01.s3"
+    },
+    {
+      "question": "Do toxicology studies of combinations of anticancer drugs need to be run in general?",
+      "guideline": "ich-s9",
+      "passage_id": "S9-3.5-01",
+      "page_start": 10,
+      "page_end": 11,
+      "anchor_sentence_id": "S9-3.5-01.s3"
+    },
+    {
+      "question": "Are juvenile animal studies usually run to include paediatric cancer patients in trials?",
+      "guideline": "ich-s9",
+      "passage_id": "S9-3.6-01",
+      "page_start": 11,
+      "page_end": 11,
+      "anchor_sentence_id": "S9-3.6-01.s3"
+    },
+    {
+      "question": "What toxicokinetic evaluation applies to a conjugated anticancer product?",
+      "guideline": "ich-s9",
+      "passage_id": "S9-4.1-01",
+      "page_start": 11,
+      "page_end": 11,
+      "anchor_sentence_id": "S9-4.1-01.s5"
+    },
+    {
+      "question": "Are dedicated immunotoxicity studies needed for anticancer pharmaceuticals?",
+      "guideline": "ich-s9",
+      "passage_id": "S9-2.8-01",
+      "page_start": 9,
+      "page_end": 9,
+      "anchor_sentence_id": "S9-2.8-01.s1"
+    }
+  ],
+  "out_of_library": [
+    {
+      "question": "How do I cache dependencies in a continuous integration pipeline?"
+    },
+    {
+      "question": "Which stability storage conditions apply to a drug product in a hot and humid climate?"
+    },
+    {
+      "question": "What is the best way to train for a half marathon in twelve weeks?"
+    },
+    {
+      "question": "How is the sample size of a bioequivalence study with a crossover design calculated?"
+    },
+    {
+      "question": "Explain how a binary search tree keeps its keys sorted."
+    }
+  ]
+}
