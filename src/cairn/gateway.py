@@ -11,12 +11,16 @@ from anthropic import AnthropicBedrock
 REGION = "eu-west-1"
 TIMEOUT_SECONDS = 45
 MAX_RETRIES = 0
+DEFAULT_MODEL = "opus-4-6"
+
+MAX_TOKENS = 4096
 
 # EU inference profile IDs, confirmed by the smoke test (ADR-001).
 MODEL_PROFILES: dict[str, str] = {
     "opus-4-6": "eu.anthropic.claude-opus-4-6-v1",
     "sonnet-4-6": "eu.anthropic.claude-sonnet-4-6",
 }
+DEFAULT_MODEL = "opus-4-6"
 
 
 class Mode(StrEnum):
@@ -107,7 +111,7 @@ class LLMGateway:
         system: str = "",
         tools: list[dict[str, Any]] | None = None,
         tool_choice: dict[str, Any] | None = None,
-        max_tokens: int = 4096,
+        max_tokens: int = MAX_TOKENS,
     ) -> GatewayResult:
         if self.client is None:
             raise GatewayError("no client: replay needs a recording client")

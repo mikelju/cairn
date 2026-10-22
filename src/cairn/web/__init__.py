@@ -1,6 +1,5 @@
 """Web pages: landing page, steps 1 and 2 and /healthz, rendered with Jinja2 and local HTMX."""
 
-import json
 import os
 import subprocess
 from pathlib import Path
@@ -13,13 +12,20 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from cairn import __version__
-from cairn.content import Text, ValueRef
-from cairn.gateway import MODEL_PROFILES, LLMGateway, Mode
+from cairn.content import Text
+from cairn.gateway import DEFAULT_MODEL, LLMGateway, Mode
 from cairn.ingest import build_report, load_study
 from cairn.jobs import JobRunner
-from cairn.loop import PROMPT_VERSION, LoopResult, LoopStatus, ask, schema_hash
+from cairn.loop import PROMPT_VERSION, STUDY_TOOLS, LoopResult, LoopStatus, ask, schema_hash
 from cairn.questions import QUESTIONS
-from cairn.recording import RecordingKey, ReplayClient, StaleRecording, recording_path, total_cost
+from cairn.recording import (
+    RECORDINGS_DIR,
+    RecordingKey,
+    ReplayClient,
+    StaleRecording,
+    recorded_model,
+    total_cost,
+)
 from cairn.validate import RULE_AUC, RULE_CONC, validate_study
 
 HERE = Path(__file__).parent
@@ -120,13 +126,11 @@ async def step1_run(request: Request, inject: Annotated[str | None, Form()] = No
     )
 
 
-DEFAULT_MODEL = "opus-4-6"
 SCREEN_KIND = "incidence_screen"
-SHOWN_STEPS = ("run_job", "study_design", "incidence", "body_weight_change", "tk_summary")
 
 
 def _recordings_dir() -> Path:
-    return Path(os.environ.get("CAIRN_RECORDINGS", "recordings"))
+    return Path(os.environ.get("CAIRN_RECORDINGS", str(RECORDINGS_DIR)))
 
 
 def _marker(field: str) -> str:
@@ -139,7 +143,6 @@ def _written(result: LoopResult) -> str:
     return " ".join(
         "".join(part.text if isinstance(part, Text) else _marker(part.field) for part in s.parts)
         for s in result.sentences
-        if all(isinstance(part, Text | ValueRef) for part in s.parts)
     )
 
 
@@ -182,11 +185,7 @@ def _evidence(result: LoopResult) -> list[dict[str, str]]:
 
 
 def _step2_context(question_id: str, directory: Path) -> dict[str, Any]:
-    path = recording_path(directory, question_id)
-    model = DEFAULT_MODEL
-    if path.is_file():
-        recorded = str(json.loads(path.read_text(encoding="utf-8")).get("model"))
-        model = recorded if recorded in MODEL_PROFILES else DEFAULT_MODEL
+    model = recorded_model(directory, question_id, DEFAULT_MODEL)
     key = RecordingKey(question_id, PROMPT_VERSION, schema_hash(), model)
     client = ReplayClient.load(directory, key)
     recording = client.recording
@@ -196,7 +195,7 @@ def _step2_context(question_id: str, directory: Path) -> dict[str, Any]:
     latency = sum(float(call.get("latency_s", 0.0)) for call in recording["calls"])
     fixture = recording.get("source") == "fixture"
     doses, rows = _screen(result)
-    trace = " -> ".join(step.tool for step in result.steps if step.tool in SHOWN_STEPS)
+    trace = " -> ".join(step.tool for step in result.steps if step.tool in STUDY_TOOLS)
     return {
         "badge": "FIXTURE" if fixture else "RECORDED",
         "meta": (

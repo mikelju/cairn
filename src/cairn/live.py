@@ -4,22 +4,31 @@ Nothing in the web package imports this module (decision D8).
 """
 
 import json
+import re
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 from typing import Any
 
-from cairn.gateway import MODEL_PROFILES, REGION, LLMGateway, Mode, Status, build_client
-from cairn.loop import MAX_CALLS, PROMPT, PROMPT_VERSION, LoopResult, ask, schema_hash
+from cairn.gateway import (
+    MAX_TOKENS,
+    MODEL_PROFILES,
+    REGION,
+    LLMGateway,
+    Mode,
+    Status,
+    build_client,
+)
+from cairn.loop import MAX_CALLS, PROMPT, PROMPT_VERSION, LoopResult, LoopStatus, ask, schema_hash
 from cairn.loop import tool_definitions as loop_tools
 from cairn.pricing import call_cost
 from cairn.questions import QUESTIONS
 from cairn.recording import RecordingClient, RecordingKey, ReplayClient, total_cost
 
 BUDGET_USD = 10.0
-# Ceiling for one model call: a generous prompt size and the largest reply the loop allows.
+# Ceiling for one model call: a generous prompt size and the largest reply the gateway allows.
 CEILING_INPUT_TOKENS = 20_000
-CEILING_OUTPUT_TOKENS = 2_048
+CEILING_OUTPUT_TOKENS = MAX_TOKENS
 SMOKE_CALLS_PER_PROFILE = 3
 SMOKE_MAX_TOKENS = 512
 SMOKE_PATH = Path("docs/adr/evidence/bedrock-smoke.json")
@@ -73,11 +82,21 @@ def ask_live(text: str, model: str) -> LoopResult:
     return ask(text, LLMGateway(Mode.LIVE, client=make_client(Mode.LIVE)), model)
 
 
+# Outcomes worth keeping as a recording; a truncated, capped or failed run is not saved.
+SAVED_STATUSES = (LoopStatus.ANSWERED, LoopStatus.DECLINED, LoopStatus.REJECTED)
+
+
 @dataclass
 class RecordReport:
     saved: list[Path] = field(default_factory=list)
     spent: float = 0.0
     stopped: str = ""
+    outcomes: dict[str, str] = field(default_factory=dict)
+
+    @property
+    def unsaved(self) -> list[str]:
+        saved = {path.stem.upper() for path in self.saved}
+        return [question for question in self.outcomes if question not in saved]
 
 
 def record_questions(
@@ -91,11 +110,32 @@ def record_questions(
             report.stopped = f"stopped before {question_id}: ceiling would pass {budget:.2f} USD"
             break
         key = RecordingKey(question_id, PROMPT_VERSION, schema_hash(), model)
-        recorder = RecordingClient(make_client(Mode.RECORD), key, REGION)
-        ask(QUESTIONS[question_id], LLMGateway(Mode.RECORD, client=recorder), model)
-        report.saved.append(recorder.save(directory))
+        recorder: RecordingClient | None = None
+        try:
+            recorder = RecordingClient(make_client(Mode.RECORD), key, REGION)
+            result = ask(QUESTIONS[question_id], LLMGateway(Mode.RECORD, client=recorder), model)
+        except Exception as error:  # keep what is saved, report the spending and stop
+            if recorder is not None:
+                report.spent += total_cost({"calls": recorder.calls}) or 0.0
+            report.outcomes[question_id] = f"{type(error).__name__}: {error}"
+            report.stopped = f"error: {question_id}: {report.outcomes[question_id]}"
+            break
         report.spent += total_cost({"calls": recorder.calls}) or 0.0
+        report.outcomes[question_id] = result.status.value
+        if result.status in SAVED_STATUSES:
+            report.saved.append(recorder.save(directory))
     return report
+
+
+def mask_account_ids(node: Any) -> Any:
+    """Replace any run of 12 digits, the length of an AWS account ID, in every string."""
+    if isinstance(node, str):
+        return re.sub(r"\d{12}", "[masked]", node)
+    if isinstance(node, list):
+        return [mask_account_ids(item) for item in node]
+    if isinstance(node, dict):
+        return {key: mask_account_ids(value) for key, value in node.items()}
+    return node
 
 
 def _smoke_call(
@@ -106,7 +146,7 @@ def _smoke_call(
         reply = gateway.create(model, messages, max_tokens=SMOKE_MAX_TOKENS, **kwargs)
     except Exception as error:  # the smoke test records every failure and goes on
         status = getattr(error, "status_code", None)
-        entry["error"] = f"{type(error).__name__}: {error}"
+        entry["error"] = type(error).__name__  # the message can carry an account ID or a role ARN
         entry["status_code"] = status
         entry["quota_error"] = status == 429 or "Throttl" in type(error).__name__
         return entry
@@ -153,5 +193,6 @@ def smoke(path: Path = SMOKE_PATH, budget: float = BUDGET_USD) -> dict[str, Any]
         spent += sum(c.get("cost_usd", 0.0) for c in calls)
     evidence["total_cost_usd"] = spent
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    text = json.dumps(mask_account_ids(evidence), indent=2, sort_keys=True) + "\n"
+    path.write_text(text, encoding="utf-8")
     return evidence

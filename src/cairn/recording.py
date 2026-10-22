@@ -41,6 +41,15 @@ def recording_path(directory: Path, question_id: str) -> Path:
     return directory / f"{question_id.lower()}.json"
 
 
+def recorded_model(directory: Path, question_id: str, default: str) -> str:
+    """The model a recording was made with, or the default when it is missing or unknown."""
+    path = recording_path(directory, question_id)
+    if not path.is_file():
+        return default
+    recorded = str(json.loads(path.read_text(encoding="utf-8")).get("model"))
+    return recorded if recorded in MODEL_PROFILES else default
+
+
 def load_recording(directory: Path, key: RecordingKey) -> dict[str, Any]:
     """Load the recording for a key or raise StaleRecording."""
     path = recording_path(directory, key.question_id)

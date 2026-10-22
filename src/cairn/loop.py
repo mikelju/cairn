@@ -14,7 +14,7 @@ from typing import Any
 from pydantic import TypeAdapter, ValidationError, validate_call
 
 from cairn.content import ObservationLedger, Sentence, Text
-from cairn.gateway import GatewayResult, LLMGateway, Status
+from cairn.gateway import DEFAULT_MODEL, GatewayResult, LLMGateway, Status
 from cairn.observation import Observation
 from cairn.recording import tool_schema_hash
 from cairn.tools import REGISTRY, argument_problems
@@ -210,7 +210,7 @@ def _handle(
     return error, error, False
 
 
-def ask(question: str, gateway: LLMGateway, model: str = "opus-4-6") -> LoopResult:
+def ask(question: str, gateway: LLMGateway, model: str = DEFAULT_MODEL) -> LoopResult:
     """Run the loop for one question over a gateway and return everything that happened."""
     tools = tool_definitions()
     result = LoopResult(

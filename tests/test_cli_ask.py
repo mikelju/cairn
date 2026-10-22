@@ -9,8 +9,9 @@ from typer.testing import CliRunner
 
 from cairn import live
 from cairn.cli import app
-from cairn.gateway import MODEL_PROFILES
+from cairn.gateway import DEFAULT_MODEL, MAX_TOKENS, MODEL_PROFILES
 from cairn.loop import STUDY_TOOLS, tool_definitions
+from cairn.pricing import call_cost
 from cairn.questions import QUESTIONS
 
 runner = CliRunner()
@@ -180,3 +181,127 @@ def test_tool_schemas_are_strict_compatible() -> None:
         assert _walk(definition["input_schema"], definition["name"]) == []
     run_job = definitions[0]["input_schema"]["properties"]
     assert "params" not in run_job and QUESTIONS
+
+
+class Raising:
+    """Answers the first calls from a script, then fails like the SDK would."""
+
+    def __init__(self, replies: list[dict[str, Any]], fail_after: int, error: Exception):
+        self.script = Script(replies)
+        self.messages = self
+        self.fail_after = fail_after
+        self.error = error
+
+    def create(self, **kwargs: Any) -> dict[str, Any]:
+        if len(self.script.calls) >= self.fail_after:
+            raise self.error
+        return self.script.create(**kwargs)
+
+
+def _prior(tmp_path: Path) -> Path:
+    path = tmp_path / "q2.json"
+    path.write_text("previous recording", encoding="utf-8")
+    return path
+
+
+def test_record_does_not_overwrite_on_truncated_capped_or_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prior = _prior(tmp_path)
+    cut = {"stop_reason": "max_tokens", "content": [], "usage": {"input_tokens": 5}}
+    for client in (Script([cut]), Script([REPLIES[0]]), Raising([], 0, RuntimeError("403 denied"))):
+        monkeypatch.setattr(live, "make_client", lambda mode, client=client: client)
+        done = runner.invoke(app, ["record", "Q2", "--recordings", str(tmp_path)])
+        assert done.exit_code == 1, done.output
+        assert "not saved: Q2" in done.output or "error:" in done.output
+        assert "spent:" in done.output
+        assert prior.read_text(encoding="utf-8") == "previous recording"
+
+
+def test_record_prints_each_status_and_saves_a_declined_question(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    refusal = {"stop_reason": "refusal", "content": [], "usage": {"input_tokens": 5}}
+    monkeypatch.setattr(live, "make_client", lambda mode: Script([refusal]))
+    done = runner.invoke(app, ["record", "Q6", "--recordings", str(tmp_path)])
+    assert done.exit_code == 0, done.output
+    assert "Q6: declined" in done.output
+    assert (tmp_path / "q6.json").is_file()
+
+
+def test_record_midway_error_keeps_saved_files_and_reports_spending(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = Raising(REPLIES, 3, RuntimeError("Too many requests"))
+    monkeypatch.setattr(live, "make_client", lambda mode: client)
+    done = runner.invoke(app, ["record", "Q2", "Q6", "--recordings", str(tmp_path)])
+    assert done.exit_code == 1, done.output
+    assert (tmp_path / "q2.json").is_file() and not (tmp_path / "q6.json").exists()
+    assert "Q2: answered" in done.output and "saved" in done.output
+    assert "error: Q6: RuntimeError: Too many requests" in done.output
+    assert "spent:" in done.output
+
+
+def test_ask_live_sdk_error_is_a_plain_message(monkeypatch: pytest.MonkeyPatch) -> None:
+    client = Raising([], 0, RuntimeError("403 not available"))
+    monkeypatch.setattr(live, "make_client", lambda mode: client)
+    done = runner.invoke(app, ["ask", "My own question", "--live"])
+    assert done.exit_code == 1
+    assert "error: RuntimeError: 403 not available" in done.output
+    assert "Traceback" not in done.output
+
+
+def test_unknown_model_is_a_plain_error_before_any_ceiling() -> None:
+    for args in (["ask", "Q2", "--live"], ["ask", "Q2"], ["record", "Q2"]):
+        done = runner.invoke(app, [*args, "--model", "x"])
+        assert done.exit_code == 2, done.output
+        assert "error: unknown model: x" in done.output
+        assert "ceiling" not in done.output and not isinstance(done.exception, KeyError)
+
+
+def test_replay_reads_the_model_from_the_recording(
+    fake: Script, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    done = runner.invoke(
+        app, ["record", "Q2", "--model", "sonnet-4-6", "--recordings", str(tmp_path)]
+    )
+    assert done.exit_code == 0, done.output
+    replay = runner.invoke(app, ["ask", "Q2", "--recordings", str(tmp_path)])
+    assert replay.exit_code == 0 and "status: answered" in replay.output, replay.output
+
+
+def test_ceiling_uses_the_gateway_token_limit(fake: Script, tmp_path: Path) -> None:
+    assert live.CEILING_OUTPUT_TOKENS == MAX_TOKENS
+    runner.invoke(app, ["ask", "My own question", "--live"])
+    assert fake.calls[0]["max_tokens"] == MAX_TOKENS
+    expected = call_cost("opus-4-6", live.CEILING_INPUT_TOKENS, MAX_TOKENS)
+    assert live.call_ceiling("opus-4-6") == pytest.approx(expected)
+
+
+def test_smoke_keeps_only_the_error_type_and_masks_account_ids(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class AccessDenied(Exception):
+        status_code = 403
+
+    message = "User: arn:aws:sts::123456789012:assumed-role/dev/x is not authorized"
+    client = Raising([], 0, AccessDenied(message))
+    monkeypatch.setattr(live, "make_client", lambda mode: client)
+    out = tmp_path / "smoke.json"
+    done = runner.invoke(app, ["smoke", "--output", str(out)])
+    assert done.exit_code == 0, done.output
+    text = out.read_text(encoding="utf-8")
+    assert "123456789012" not in text and "arn:aws" not in text
+    call = json.loads(text)["profiles"][0]["calls"][0]
+    assert call["error"] == "AccessDenied" and call["status_code"] == 403
+    assert live.mask_account_ids("a 123456789012 b 12345") == "a [masked] b 12345"
+
+
+def test_one_source_for_the_default_model_and_the_recordings_folder() -> None:
+    root = Path(__file__).parents[1] / "src" / "cairn"
+    for path in root.rglob("*.py"):
+        if path.name not in ("gateway.py", "pricing.py"):
+            assert '"opus-4-6"' not in path.read_text(encoding="utf-8"), path
+        if path.name != "recording.py":
+            assert 'Path("recordings")' not in path.read_text(encoding="utf-8"), path
+    assert DEFAULT_MODEL in MODEL_PROFILES
