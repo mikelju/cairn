@@ -114,6 +114,7 @@ Phase 03 brief IDs start at E101 and review rounds at R101, so they never collid
 | E114 | ejecutor (Sonnet) | Batch F (inc 10-11) | failed | context exhausted; increment 10 in db943b7, increment 11 left uncommitted |
 | E115 | ejecutor (Sonnet) | Finish increment 11 and close batch F records | done | 614bcaf (inc 11); records in the next commit |
 | E116 | ejecutor (Sonnet) | Batch G (inc 12), E4 evaluation | done | see commits for increment 12; records in the same commit |
+| E117 | ejecutor (Sonnet) | Batch H (inc 13) after merging main with change 002 | in progress | merge check, loop, prompt and questions edits committed as work in progress; fixtures, E3 harness and test fixes pending |
 
 ## User decisions
 Questions the supervisor raises with the user. Statuses: open, answered, deferred; each closes with the user's literal answer.
@@ -135,6 +136,7 @@ O1-O6 were decided on 2026-10-22 by the user's main session (the Jefe) under the
 | D102 | Increment 18 brought main in with a merge (app sync tool) instead of a rebase | none | accepted |
 | D103 | Reranker weights come from `onnx-community/bge-reranker-v2-m3-ONNX` `onnx/model_int8.onnx` (pinned revision and SHA-256) instead of the fastembed `BAAI/bge-reranker-v2-m3-int8` id named in O1; same model, int8 | C5 | accepted (accepted 2026-10-22 by the Jefe: "D103 accepted.") |
 | D104 | Adding `QuoteRef` to `Part` would change the `write_answer` schema and stale the Q2 and Q6 recordings, so `loop._without_quotes` keeps it out of the schema until increment 13; one line in `src/cairn/web/__init__.py` (`_written`) now narrows `ValueRef` so mypy passes with the wider union (a one-line, mypy-only change, accepted by the supervisor) | C8, C11 | accepted |
+| D105 | Main with change 002 (PR 10) merged into the branch before increment 13 (merge a5bd3b7, not a rebase, as in D102), ordered by the user via the lead session. 002 changed `PROMPT_VERSION` to question-5, the prompt (one sentence: n_findings screened findings and the clearest finding with its sexes; decline safe-claim requests in plain text), `incidence` (new `n_findings` value) and re-recorded Q2 and Q6; its integrated record is cherry-picked as 99e9f70. Increment 13 starts from that prompt. Merge check: `npm run check` ran on a5bd3b7 (result in the increment 13 evidence) | C11 | accepted (supervisor) |
 
 ## Adversarial review
 | Round | Backend | Range | Lenses | Findings | Status |

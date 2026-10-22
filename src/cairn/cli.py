@@ -108,7 +108,7 @@ def _known_model(model: str) -> str:
 
 @app.command("ask")
 def ask_command(
-    question: Annotated[str, typer.Argument(help="Question ID (Q2, Q6) or free text with --live")],
+    question: Annotated[str, typer.Argument(help="Question ID (Q1-Q8, G1-G3) or free text with --live")],
     live_mode: Annotated[bool, typer.Option("--live", help="Call Bedrock")] = False,
     model: Annotated[
         str | None, typer.Option(help="Model key; replay reads it from the file")
@@ -128,7 +128,7 @@ def ask_command(
             chosen = model or recorded_model(recordings, question_id, DEFAULT_MODEL)
             result = live.ask_replay(question_id, recordings, chosen)
         else:
-            typer.echo("error: replay needs a question ID (Q2, Q6); use --live", err=True)
+            typer.echo("error: replay needs a question ID (Q1-Q8, G1-G3); use --live", err=True)
             raise typer.Exit(2)
     except typer.Exit:
         raise
@@ -157,7 +157,7 @@ def record_command(
     _known_model(model)
     ids = [live.question_text(q)[0] for q in questions]
     if not all(ids):
-        typer.echo("error: record takes question IDs (Q2, Q6)", err=True)
+        typer.echo("error: record takes question IDs (Q1-Q8, G1-G3)", err=True)
         raise typer.Exit(2)
     typer.echo(f"ceiling: {live.record_ceiling(model, len(ids)):.2f} USD of {live.BUDGET_USD:.2f}")
     report = live.record_questions(ids, recordings, model)
