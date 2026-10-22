@@ -161,3 +161,20 @@ def test_loop_text_only_end_turn_is_declined() -> None:
     result, script = run([JOB, chatter])
     assert result.status is LoopStatus.DECLINED and result.rendered is None
     assert result.message == "the model declined" and len(script.calls) == 2
+
+
+def test_loop_tool_exception_returns_to_the_model_and_counts() -> None:
+    bad = use("run_job", {"kind": "validate"})  # a valid string the job runner does not know
+    result, script = run([bad, JOB, INCIDENCE, answer(text("Examined: "), ref("O1", "n_examined"))])
+    assert result.steps[0].error and "unknown job kind" in result.steps[0].error
+    feedback = script.calls[1]["messages"][-1]["content"][0]
+    assert feedback["is_error"] is True and "tool error" in feedback["content"]
+    assert result.calls == 4
+    assert result.status is LoopStatus.ANSWERED
+
+
+def test_loop_failed_run_job_does_not_unlock_other_tools() -> None:
+    bad = use("run_job", {"kind": "validate"})
+    result, _ = run([bad, INCIDENCE, bad])
+    assert result.steps[1].error and "first tool call must be run_job" in result.steps[1].error
+    assert result.status is LoopStatus.CAPPED and result.calls == MAX_CALLS

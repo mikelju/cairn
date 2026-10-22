@@ -155,6 +155,9 @@ def _run_tool(name: str, arguments: dict[str, Any], result: LoopResult) -> tuple
     except (ValidationError, TypeError) as error:
         step.error = argument_problems(error) if isinstance(error, ValidationError) else str(error)
         return f"invalid arguments: {step.error}", step, True
+    except Exception as error:  # a failing tool goes back to the model; it counts toward the cap
+        step.error = f"{type(error).__name__}: {error}"
+        return f"tool error: {step.error}", step, True
     if isinstance(output, Observation):
         step.obs_id = result.ledger.add(output)
         return _shown(step.obs_id, output), step, False
@@ -240,7 +243,7 @@ def ask(question: str, gateway: LLMGateway, model: str = "opus-4-6") -> LoopResu
             error, text, finished = _handle(use, result, first_done)
             if finished:
                 return result
-            first_done = first_done or str(use.get("name")) == FIRST_TOOL
+            first_done = first_done or (str(use.get("name")) == FIRST_TOOL and error is None)
             block: dict[str, Any] = {
                 "type": "tool_result",
                 "tool_use_id": use["id"],
