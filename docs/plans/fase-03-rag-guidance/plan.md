@@ -114,7 +114,9 @@ Phase 03 brief IDs start at E101 and review rounds at R101, so they never collid
 | E114 | ejecutor (Sonnet) | Batch F (inc 10-11) | failed | context exhausted; increment 10 in db943b7, increment 11 left uncommitted |
 | E115 | ejecutor (Sonnet) | Finish increment 11 and close batch F records | done | 614bcaf (inc 11); records in the next commit |
 | E116 | ejecutor (Sonnet) | Batch G (inc 12), E4 evaluation | done | see commits for increment 12; records in the same commit |
-| E117 | ejecutor (Sonnet) | Batch H (inc 13) after merging main with change 002 | in progress | merge check, loop, prompt and questions edits committed as work in progress; fixtures, E3 harness and test fixes pending |
+| E117 | ejecutor (Sonnet) | Batch H (inc 13) after merging main with change 002 | failed | ran out of context; partial commit b44c44a (loop, prompt and questions edits) |
+| E118 | ejecutor (Sonnet) | Resume of E117: fixtures and test fixes | failed | died with work uncommitted; resumed by E120 |
+| E120 | ejecutor (Sonnet) | Increment 13 part 2: tests over real-shape fixtures, loop tests | done | daa1ab8; npm run check green (409 passed, coverage 97.41%); Q2 / Q6 tests run over `tests/fixtures/recordings_real_shape/`, the real recordings are asserted stale under question-6, loop tests cover add_guidance with rule 8, text/ref/quote parts and hits hidden below the threshold; increment 13 stays unticked until the E3 eval |
 
 ## User decisions
 Questions the supervisor raises with the user. Statuses: open, answered, deferred; each closes with the user's literal answer.
