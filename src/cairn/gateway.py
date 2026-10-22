@@ -107,7 +107,7 @@ class LLMGateway:
         system: str = "",
         tools: list[dict[str, Any]] | None = None,
         tool_choice: dict[str, Any] | None = None,
-        max_tokens: int = 2048,
+        max_tokens: int = 4096,
     ) -> GatewayResult:
         if self.client is None:
             raise GatewayError("no client: replay needs a recording client")
