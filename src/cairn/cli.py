@@ -8,7 +8,7 @@ import typer
 import uvicorn
 from pydantic import ValidationError
 
-from cairn import live
+from cairn import live, passages
 from cairn.canonical import canonical_json
 from cairn.gateway import DEFAULT_MODEL, MODEL_PROFILES, GatewayError
 from cairn.recording import RECORDINGS_DIR, StaleRecording, recorded_model
@@ -16,6 +16,8 @@ from cairn.tools import argument_problems, result_sha256
 from cairn.tools import call_tool as registry_call
 
 app = typer.Typer(help="Cairn: traceable agentic demo for drug safety science.")
+guidance_app = typer.Typer(help="Guideline passages for guidance retrieval.")
+app.add_typer(guidance_app, name="guidance")
 
 
 def call_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
@@ -164,6 +166,13 @@ def smoke_command(output: Path = live.SMOKE_PATH) -> None:
     typer.echo(f"ceiling: {live.smoke_ceiling():.2f} USD of {live.BUDGET_USD:.2f}")
     evidence = live.smoke(output)
     typer.echo(f"wrote {output}; spent {evidence['total_cost_usd']:.4f} USD")
+
+
+@guidance_app.command("build")
+def guidance_build_command(output: Path = passages.PASSAGES_PATH) -> None:
+    """Rebuild data/guidance/passages.json from the pinned guideline PDFs."""
+    count = passages.write_passages(output)
+    typer.echo(f"wrote {output}: {count} passages")
 
 
 @app.command()

@@ -8,7 +8,7 @@ SERVICE ?= cairn
 REGION ?= eu-west-1
 POWER ?= medium
 
-.PHONY: build demo demo-offline-check deploy
+.PHONY: build demo demo-offline-check deploy guidance
 
 build:
 	docker build --platform $(PLATFORM) --build-arg COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo unknown) -t $(IMAGE) .
@@ -65,3 +65,7 @@ live:
 smoke:
 	$(if $(AWS_PROFILE),,$(error set AWS_PROFILE=<profile>))
 	uv run cairn smoke
+
+# Rebuilds the generated guidance files from the pinned guideline PDFs (never edit them by hand).
+guidance:
+	uv run cairn guidance build
