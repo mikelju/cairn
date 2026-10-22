@@ -1,6 +1,6 @@
 # 001 - Step 2 animal count matches its evidence
 
-Status: ready locally
+Status: integrated
 
 ## Contract
 Goal and reason: the step 2 answer says "examined a total of 80 animals" while its evidence line says "n=80, 37 animals"; the visible sentence and the evidence must state the same count, placed by code from the data.

@@ -25,7 +25,7 @@ FIRST_TOOL = "run_job"
 ANSWER_TOOL = "write_answer"
 STUDY_TOOLS = ("run_job", "study_design", "incidence", "body_weight_change", "tk_summary")
 PROMPT = (Path(__file__).parent / "prompts" / "question.md").read_text(encoding="utf-8")
-PROMPT_VERSION = "question-3"
+PROMPT_VERSION = "question-5"
 SENTENCES = TypeAdapter(list[Sentence])
 
 
