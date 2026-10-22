@@ -8,7 +8,7 @@ import typer
 import uvicorn
 from pydantic import ValidationError
 
-from cairn import live, passages, weights
+from cairn import live, passages, retrieval, weights
 from cairn.canonical import canonical_json
 from cairn.gateway import DEFAULT_MODEL, MODEL_PROFILES, GatewayError
 from cairn.recording import RECORDINGS_DIR, StaleRecording, recorded_model
@@ -169,10 +169,22 @@ def smoke_command(output: Path = live.SMOKE_PATH) -> None:
 
 
 @guidance_app.command("build")
-def guidance_build_command(output: Path = passages.PASSAGES_PATH) -> None:
-    """Rebuild data/guidance/passages.json from the pinned guideline PDFs."""
+def guidance_build_command(
+    output: Path = passages.PASSAGES_PATH,
+    calibration: Path = retrieval.CALIBRATION_PATH,
+    passages_only: bool = False,
+) -> None:
+    """Rebuild the generated guidance files: passages, then the calibration scores and threshold.
+
+    The second step embeds and reranks (needs the weights: run `cairn guidance weights` once).
+    """
     count = passages.write_passages(output)
     typer.echo(f"wrote {output}: {count} passages")
+    if passages_only:
+        return
+    index = retrieval.build_index(output)
+    calibration.write_text(retrieval.calibrate(index, calibration), encoding="utf-8", newline="\n")
+    typer.echo(f"wrote {calibration}: threshold {retrieval.load_threshold(calibration):.4f}")
 
 
 @guidance_app.command("weights")

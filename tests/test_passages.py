@@ -99,7 +99,9 @@ def test_passages_rebuild_hash_equals_committed_file(tmp_path: Path) -> None:
 
 def test_passages_cli_build_writes_file(tmp_path: Path) -> None:
     target = tmp_path / "passages.json"
-    result = CliRunner().invoke(app, ["guidance", "build", "--output", str(target)])
+    result = CliRunner().invoke(
+        app, ["guidance", "build", "--passages-only", "--output", str(target)]
+    )
     assert result.exit_code == 0, result.output
     assert target.read_bytes() == passages.PASSAGES_PATH.read_bytes()
 

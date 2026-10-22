@@ -6,7 +6,8 @@ The two rankings are fused with reciprocal rank fusion, k = 60, and ties are bro
 so the order does not depend on array layout or platform.
 """
 
-from dataclasses import dataclass
+import json
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +16,7 @@ import numpy as np
 from pydantic import BaseModel, ConfigDict
 
 from cairn import weights
-from cairn.passages import PASSAGES_PATH, Passage, load_passages
+from cairn.passages import GUIDANCE_DIR, PASSAGES_PATH, Passage, load_passages
 
 RRF_K = 60
 # Depth of each ranking that enters the fusion, and size of the fused list returned.
@@ -26,6 +27,20 @@ CANDIDATES = 20
 # may differ in the last digits between Windows and Linux (cosine scores are in [-1, 1]).
 # Ranks and fused scores are compared exactly except where two scores lie within this tolerance.
 SCORE_TOLERANCE = 1e-4
+
+# The reranker (bge-reranker-v2-m3, int8) rescores the RRF top `CANDIDATES`; `TOP` are returned.
+TOP = 5
+# int8 dynamic quantisation makes a pair's score depend a little on its batch, so the batch size is
+# fixed (and the candidates always arrive in RRF order): same query, same batches, same scores.
+# Four threads were measured faster than the 12 of this laptop (oversubscription); scores agree.
+RERANK_BATCH = 4
+RERANK_THREADS = 4
+# Reranker logits span about -10..10; the same query agrees to this absolute tolerance across runs
+# and platforms. The abstention margin (half the gap between the calibration ranges) is far larger.
+RERANK_TOLERANCE = 1e-2
+CALIBRATION_PATH = GUIDANCE_DIR / "calibration.json"
+CALIBRATION_SETS = ("in_library", "out_of_library")
+ABSTENTION = "no supporting passage in the library"
 
 
 class Hit(BaseModel):
@@ -60,12 +75,92 @@ def _order(scores: np.ndarray[Any, Any], ids: list[str], depth: int) -> list[int
     return order[:depth]
 
 
+class RankedHit(Hit):
+    """A hit rescored by the reranker, with the ranks of the RRF stage it came from."""
+
+    rerank_rank: int
+    rerank_score: float
+
+
+class Guidance(BaseModel):
+    """What `search_guidance` returns: the top hits, or an explicit abstention with no passage."""
+
+    model_config = ConfigDict(frozen=True)
+
+    query: str
+    abstained: bool
+    best_score: float
+    threshold: float
+    message: str | None
+    hits: list[RankedHit]
+
+
+def _read(path: Path) -> dict[str, Any]:
+    data: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
+    return data
+
+
+def load_calibration(path: Path = CALIBRATION_PATH) -> dict[str, Any]:
+    return _read(path)
+
+
+def load_threshold(path: Path = CALIBRATION_PATH) -> float:
+    return float(_read(path)["threshold"])
+
+
+def compute_threshold(in_library_best: list[float], out_of_library_best: list[float]) -> float:
+    """Midpoint between the lowest in-library and the highest out-of-library best score."""
+    lowest, highest = min(in_library_best), max(out_of_library_best)
+    if lowest <= highest:
+        raise ValueError(
+            f"in-library and out-of-library best scores overlap: lowest in-library {lowest:.4f}, "
+            f"highest out-of-library {highest:.4f}"
+        )
+    return (lowest + highest) / 2
+
+
+def decide(query: str, hits: list[RankedHit], threshold: float | None = None) -> Guidance:
+    """Abstain when the best reranker score is below the threshold; the RRF score never decides."""
+    limit = load_threshold() if threshold is None else threshold
+    best = hits[0].rerank_score if hits else float("-inf")
+    abstained = best < limit
+    return Guidance(
+        query=query,
+        abstained=abstained,
+        best_score=best,
+        threshold=limit,
+        message=ABSTENTION if abstained else None,
+        hits=[] if abstained else hits,
+    )
+
+
 @dataclass
 class Index:
     ids: list[str]
     retriever: Any
     vectors: np.ndarray[Any, Any]
     embedder: Any
+    texts: dict[str, str] = field(default_factory=dict)
+    models: Path | None = None
+    reranker: Any = None
+
+    def rerank(self, query: str) -> list[RankedHit]:
+        """The RRF top 20 rescored by the cross-encoder; the best `TOP` by reranker score."""
+        candidates = self.search(query, CANDIDATES)
+        if self.reranker is None:
+            self.reranker = _load_reranker(self.models)
+        scores = list(
+            self.reranker.rerank(
+                query, [self.texts[h.passage_id] for h in candidates], batch_size=RERANK_BATCH
+            )
+        )
+        ordered = sorted(
+            zip(candidates, scores, strict=True), key=lambda c: (-c[1], c[0].passage_id)
+        )
+        return [
+            RankedHit(**hit.model_dump(), rerank_rank=rank, rerank_score=float(score))
+            for rank, (hit, score) in enumerate(ordered[:TOP], start=1)
+        ]
 
     def search(self, query: str, limit: int = CANDIDATES) -> list[Hit]:
         tokens = bm25s.tokenize(query, stopwords="en", return_ids=False, show_progress=False)
@@ -105,4 +200,49 @@ def build_index(path: Path = PASSAGES_PATH, models: Path | None = None) -> Index
     retriever.index(corpus, show_progress=False)
     embedder = weights.load_embedder(models)
     vectors = np.asarray(list(embedder.embed(texts)), dtype=np.float64)
-    return Index(ids=ids, retriever=retriever, vectors=vectors, embedder=embedder)
+    return Index(
+        ids=ids,
+        retriever=retriever,
+        vectors=vectors,
+        embedder=embedder,
+        texts=dict(zip(ids, texts, strict=True)),
+        models=models,
+    )
+
+
+def _load_reranker(models: Path | None) -> Any:
+    """The int8 cross-encoder from the verified cache (offline), on `RERANK_THREADS` threads."""
+    import os
+
+    os.environ["HF_HUB_OFFLINE"] = "1"
+    from fastembed.rerank.cross_encoder import TextCrossEncoder
+
+    folder = weights.verify_model(weights.RERANKER, models or weights.models_dir())
+    return TextCrossEncoder(
+        weights.RERANKER,
+        specific_model_path=str(folder),
+        local_files_only=True,
+        threads=RERANK_THREADS,
+    )
+
+
+def search_guidance(index: Index, query: str, threshold: float | None = None) -> Guidance:
+    """Hybrid retrieval, reranking and abstention for one query (live path, needs the weights)."""
+    return decide(query, index.rerank(query), threshold)
+
+
+def calibrate(index: Index, path: Path = CALIBRATION_PATH) -> str:
+    """The calibration file as JSON text: best score of each stored question and the threshold."""
+    data = _read(path)
+    best: dict[str, list[float]] = {}
+    for key in CALIBRATION_SETS:
+        for entry in data[key]:
+            entry["best_score"] = round(index.rerank(entry["question"])[0].rerank_score, 4)
+        best[key] = [e["best_score"] for e in data[key]]
+    data["model"] = weights.RERANKER
+    data["method"] = (
+        "threshold = midpoint between the lowest in-library and the highest out-of-library "
+        "best reranker score (decision O4); abstain when the best score is below it"
+    )
+    data["threshold"] = round(compute_threshold(best["in_library"], best["out_of_library"]), 4)
+    return json.dumps(data, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
