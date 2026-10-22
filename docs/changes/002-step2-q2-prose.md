@@ -71,4 +71,4 @@ Questions the supervisor raises with the user. Statuses: open, answered, deferre
 ## Delivery
 Branch `cambio-002-step2-q2-prose`, six commits over `origin/main` (36333e3), the first of them the record of change 001 as integrated (PR 9 merged).
 Local checks: `npm run check` green (324 passed); adversarial review not run for this standalone change.
-Pending: PR URL and CI result are recorded after the push.
+PR: https://github.com/mikelju/cairn/pull/10 (not merged). CI (evals, push and pull_request runs) passed on the delivery commit.
