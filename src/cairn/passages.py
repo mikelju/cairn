@@ -87,10 +87,16 @@ class Passage(BaseModel):
     passage_id: str
     doc: str
     section: str
+    title: str = ""
     page_start: int
     page_end: int
     text: str
     sentences: list[Sentence]
+
+    @property
+    def indexed_text(self) -> str:
+        """What retrieval indexes: the heading (number and title) before the body text."""
+        return f"{self.section} {self.title}. {self.text}" if self.title else self.text
 
 
 def _clean_page(raw: str, header: re.Pattern[str]) -> str:
@@ -131,6 +137,7 @@ Line = tuple[int, str]  # (page number, text of one line)
 @dataclass
 class Section:
     section: str
+    title: str = ""
     lines: list[Line] = field(default_factory=list)
 
 
@@ -198,10 +205,14 @@ def split_sections(key: str, pages: list[str]) -> list[Section]:
                 label = found
                 roman, letter = _roman_state(found)
             following = lines[index + 1 :]
-            while following and _wrapped(title, following[0]):
+            while (
+                following
+                and _heading(key, following[0], numbered, roman, letter)[0] is None
+                and _wrapped(title, following[0])
+            ):
                 title += " " + following.pop(0)
                 skip += 1
-            sections.append(Section(label))
+            sections.append(Section(label, normalize_whitespace(title)))
     return sections
 
 
@@ -323,6 +334,7 @@ def build_passages(directory: Path = GUIDELINES_DIR) -> list[Passage]:
                         passage_id=passage_id,
                         doc=key,
                         section=section.section,
+                        title=section.title,
                         page_start=chunk[0][0],
                         page_end=chunk[-1][0],
                         text=text,

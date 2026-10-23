@@ -10,7 +10,7 @@ from cairn.cli import app
 from cairn.passages import Passage, Sentence
 
 ID_FORM = re.compile(r"^(M4S|M3|S9|FDA)-[A-Z0-9.]+-\d{2}$")
-FIELDS = ("passage_id", "doc", "section", "page_start", "page_end", "text", "sentences")
+FIELDS = ("passage_id", "doc", "section", "title", "page_start", "page_end", "text", "sentences")
 
 
 @pytest.fixture(scope="module")
@@ -23,7 +23,7 @@ def test_passages_every_field_present(built: list[Passage]) -> None:
     for passage in built:
         dumped = passage.model_dump()
         assert tuple(dumped) == FIELDS
-        assert passage.text and passage.sentences and passage.section
+        assert passage.text and passage.sentences and passage.section and passage.title
         assert 1 <= passage.page_start <= passage.page_end
 
 
@@ -119,3 +119,35 @@ def test_index_sentences_verbatim_fails_on_altered_sentence() -> None:
     problems = passages.verify_sentences([planted])
     assert len(problems) == 1
     assert problems[0].startswith(altered.sentence_id)
+
+
+def test_passages_consecutive_numbered_headings_are_separate_sections() -> None:
+    pages = [
+        "\n".join(
+            [
+                "2.4 Nonclinical Overview",
+                "Body of the overview.",
+                "2.6.5 Pharmacokinetics Tabulated Summary",
+                "2.6.6 Toxicology Written Summary",
+                "The sequence of the toxicology summary should be as follows.",
+                "2.6.6.1 Brief Summary",
+                "The principal findings are listed here.",
+            ]
+        )
+    ]
+    sections = passages.split_sections("ich-m4sr2", pages)
+    assert [(s.section, s.title) for s in sections] == [
+        ("2.4", "Nonclinical Overview"),
+        ("2.6.5", "Pharmacokinetics Tabulated Summary"),
+        ("2.6.6", "Toxicology Written Summary"),
+        ("2.6.6.1", "Brief Summary"),
+    ]
+
+
+def test_passages_heading_kept_and_indexed_without_touching_text(built: list[Passage]) -> None:
+    found = next(p for p in built if p.passage_id == "M4S-2.6.6.3-01")
+    assert found.title.startswith("Repeat-Dose Toxicity")
+    assert found.indexed_text.startswith("2.6.6.3 Repeat-Dose Toxicity")
+    assert found.indexed_text.endswith(found.text)
+    assert not found.text.startswith("2.6.6.3")
+    assert " ".join(s.text for s in found.sentences) == found.text

@@ -198,7 +198,7 @@ def build_index(path: Path = PASSAGES_PATH, models: Path | None = None) -> Index
     """Index the committed passages; embeds them with the cached bge-small weights."""
     passages: list[Passage] = sorted(load_passages(path), key=lambda p: p.passage_id)
     ids = [p.passage_id for p in passages]
-    texts = [p.text for p in passages]
+    texts = [p.indexed_text for p in passages]
     corpus = bm25s.tokenize(texts, stopwords="en", return_ids=False, show_progress=False)
     retriever = bm25s.BM25()
     retriever.index(corpus, show_progress=False)

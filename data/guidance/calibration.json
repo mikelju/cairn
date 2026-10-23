@@ -1,43 +1,43 @@
 {
   "in_library": [
     {
-      "best_score": 7.5777,
+      "best_score": 7.4307,
       "question": "How long should repeat-dose toxicity studies in rodents and non-rodents last to support a clinical trial of a given duration?"
     },
     {
-      "best_score": 0.7949,
+      "best_score": 1.0099,
       "question": "How should toxicokinetic data be presented in the written toxicology summary of the Common Technical Document?"
     },
     {
-      "best_score": 2.3119,
+      "best_score": 2.1144,
       "question": "Which animal species are expected for general toxicity testing of anticancer pharmaceuticals?"
     },
     {
-      "best_score": 3.2681,
+      "best_score": 3.6825,
       "question": "How is the maximum recommended starting dose for a first clinical trial derived from animal studies?"
     },
     {
-      "best_score": 3.9599,
+      "best_score": 4.3959,
       "question": "How are doses scaled between animal species and humans using body surface area?"
     },
     {
-      "best_score": 1.5571,
+      "best_score": 3.2279,
       "question": "When are embryo-fetal development studies needed for women of childbearing potential in clinical trials?"
     },
     {
-      "best_score": 2.783,
+      "best_score": 3.1053,
       "question": "Which safety pharmacology studies are recommended before the first administration to humans?"
     },
     {
-      "best_score": 2.0099,
+      "best_score": 1.4133,
       "question": "Which genotoxicity tests should be completed before the first human exposure?"
     },
     {
-      "best_score": 3.9949,
+      "best_score": 4.3515,
       "question": "How are nonclinical study summaries organised in the Common Technical Document?"
     },
     {
-      "best_score": 4.2694,
+      "best_score": 4.0187,
       "question": "Do toxicity studies of anticancer drugs need a recovery period?"
     }
   ],
@@ -45,45 +45,45 @@
   "model": "BAAI/bge-reranker-v2-m3-int8",
   "out_of_library": [
     {
-      "best_score": -10.2047,
+      "best_score": -9.6455,
       "question": "What is the capital of Australia?"
     },
     {
-      "best_score": -10.7414,
+      "best_score": -10.7564,
       "question": "How do I configure a PostgreSQL replica with automatic failover?"
     },
     {
-      "best_score": -10.8992,
+      "best_score": -10.8286,
       "question": "Give me a recipe for a sourdough bread starter."
     },
     {
-      "best_score": -3.9964,
+      "best_score": -3.96,
       "question": "What is the recommended paracetamol dose for an adult with a fever?"
     },
     {
-      "best_score": -5.6708,
+      "best_score": -4.6486,
       "question": "Who won the football world cup in 2014?"
     },
     {
-      "best_score": -10.9299,
+      "best_score": -10.9055,
       "question": "How do I renew a passport that expires next month?"
     },
     {
-      "best_score": -6.6155,
+      "best_score": -7.9771,
       "question": "What is the difference between TCP and UDP?"
     },
     {
-      "best_score": -10.5093,
+      "best_score": -10.1377,
       "question": "How does a fixed rate mortgage differ from a variable rate mortgage?"
     },
     {
-      "best_score": -4.6687,
+      "best_score": -4.442,
       "question": "How should an HPLC assay for a drug substance be validated for linearity and precision?"
     },
     {
-      "best_score": -4.2968,
+      "best_score": -3.9453,
       "question": "How many participants does a phase 3 hypertension trial need to show a blood pressure difference?"
     }
   ],
-  "threshold": -1.6007
+  "threshold": -1.4677
 }
