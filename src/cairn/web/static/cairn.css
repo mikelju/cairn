@@ -149,6 +149,8 @@ h1 { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); f
 .badge.real::before { content: "\25CF"; }
 .badge.recorded { background: var(--color-recorded-tint); border-color: var(--color-recorded); color: var(--color-recorded); }
 .badge.recorded::before { content: "\21BB"; }
+.badge.computed-at-build { background: var(--color-recorded-tint); border-color: var(--color-recorded); color: var(--color-recorded); }
+.badge.computed-at-build::before { content: "\25A3"; }
 .badge.simulated { background: var(--color-surface); border-style: dashed; border-color: var(--color-simulated); color: var(--color-simulated); }
 .badge.simulated::before { content: "\25C6"; }
 .badge.fixture {

@@ -124,6 +124,8 @@ def _rendered_state(name: str) -> str:
     with TestClient(create_app()) as client:
         if name == "landing":
             return client.get("/").text
+        if name == "step3":
+            return client.get("/step/3").text
         if name.startswith("step2_"):
             page = client.get("/step/2").text
             if name == "step2_before":
@@ -197,6 +199,7 @@ def test_result_fragment_lands_inside_the_result_element() -> None:
         "step2_q2",
         "step2_q2_open",
         "step2_q6",
+        "step3",
     ],
 )
 def test_word_cap_rendered(state: str) -> None:

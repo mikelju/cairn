@@ -12,12 +12,15 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from cairn import __version__
+from cairn import __version__, retrieval
 from cairn.content import Text, ValueRef
 from cairn.gateway import DEFAULT_MODEL, LLMGateway, Mode
+from cairn.guidelines import load_manifest
+from cairn.highlight import load_highlights
 from cairn.ingest import build_report, load_study
 from cairn.jobs import JobRunner
 from cairn.loop import PROMPT_VERSION, STUDY_TOOLS, LoopResult, LoopStatus, ask, schema_hash
+from cairn.passages import load_passages, normalize_whitespace
 from cairn.questions import QUESTIONS, STEP2_QUESTIONS
 from cairn.recording import (
     RECORDINGS_DIR,
@@ -260,6 +263,63 @@ def step2_run(request: Request, question: Annotated[str, Form()]) -> HTMLRespons
     except StaleRecording as error:
         return templates.TemplateResponse(request, "step2_result.html", {"stale": str(error)})
     return templates.TemplateResponse(request, "step2_result.html", {"r": context})
+
+
+SHOWN_HITS = 3
+NS_QUERIES = "nonclinical-summary"
+
+
+def _rank(value: int | None) -> str:
+    return "-" if value is None else str(value)
+
+
+def _step3_context() -> dict[str, Any]:
+    """The two fixed workflow queries from the build-time cache, with the quotation check.
+
+    A quotation is the first stored sentence of a shown passage; it counts as verbatim on the cited
+    page when the build located exactly that text on a page of the passage.
+    """
+    guidelines = load_manifest()["guidelines"]
+    passages = {p.passage_id: p for p in load_passages()}
+    located: dict[str, list[dict[str, Any]]] = {}
+    for entry in load_highlights():
+        located.setdefault(entry["sentence_id"], []).append(entry)
+    queries, quotes, verbatim = [], [], 0
+    for fixed in retrieval.load_fixed_queries():
+        if fixed["used_by"] != NS_QUERIES:
+            continue
+        rows: list[list[str]] = []
+        folded: list[list[str]] = []
+        for number, hit in enumerate(retrieval.cached_guidance(fixed["query"]).hits, start=1):
+            passage = passages[hit.passage_id]
+            title = guidelines[passage.doc]["title"]
+            row = [
+                " ".join(title.split()[:2]),
+                passage.section,
+                str(passage.page_start),
+                _rank(hit.lexical_rank),
+                _rank(hit.semantic_rank),
+                _rank(hit.fused_rank),
+            ]
+            (rows if number <= SHOWN_HITS else folded).append(row)
+            if number > SHOWN_HITS:
+                continue
+            sentence = passage.sentences[0]
+            marks = located.get(sentence.sentence_id, [])
+            if any(
+                normalize_whitespace(m["text"]) == normalize_whitespace(sentence.text)
+                and passage.page_start <= m["page"] <= passage.page_end
+                for m in marks
+            ):
+                verbatim += 1
+            quotes.append({"id": fixed["id"], "text": sentence.text, "cite": " ".join(row[:3])})
+        queries.append({"id": fixed["id"], "query": fixed["query"], "rows": rows, "folded": folded})
+    return {"queries": queries, "quotes": quotes, "verbatim": verbatim}
+
+
+@router.get("/step/3", response_class=HTMLResponse)
+async def step3(request: Request) -> HTMLResponse:
+    return _page(request, "step3.html", current=3, r=_step3_context())
 
 
 @router.get("/explore", response_class=HTMLResponse)

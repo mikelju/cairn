@@ -20,8 +20,8 @@ def test_healthz_and_landing_page() -> None:
     assert "Public sample data · fictional compound · not GxP-validated" in page
     assert "Role: Study toxicologist (simulated)" in page
     assert re.search(r"v0\.1\.0 · commit \S+ · snapshot [0-9a-f]{12}", page)
-    assert page.count('class="locked"') == 5
-    assert 'href="/step/2"' in page
+    assert page.count('class="locked"') == 4
+    assert 'href="/step/2"' in page and 'href="/step/3"' in page
     assert "/static/vendor/htmx.min.js" in page
 
 
@@ -305,3 +305,37 @@ def test_explore_guideline_questions_render_quotes_from_quoteref(question: str) 
 def test_explore_rejects_an_unknown_question() -> None:
     with TestClient(create_app()) as client:
         assert client.post("/explore/run", data={"question": "Q99"}).status_code == 422
+
+
+def test_step3_shows_the_two_fixed_queries_with_ranks_and_the_build_badge() -> None:
+    from cairn import retrieval
+
+    with TestClient(create_app()) as client:
+        page = client.get("/step/3").text
+    fixed = [q for q in retrieval.load_fixed_queries() if q["used_by"] == "nonclinical-summary"]
+    assert len(fixed) == 2
+    for query in fixed:
+        assert query["query"] in page
+        top = retrieval.cached_guidance(query["query"]).hits[0]
+        assert f"<td>{top.fused_rank}</td>" in page
+    assert page.count("<tr>") >= 2 * (1 + 3)  # a header row and three passages per query
+    assert 'class="badge computed-at-build"' in page and "COMPUTED AT BUILD" in page
+    assert "Lower ranks" in page and "In production" in page
+    assert "<th>Lex</th>" in page and "<th>Sem</th>" in page and "<th>Fused</th>" in page
+
+
+def test_step3_counts_quotes_verbatim_on_the_cited_page() -> None:
+    with TestClient(create_app()) as client:
+        page = client.get("/step/3").text
+    match = re.search(r"Quotes: (\d+) · verbatim on the cited page: (\d+)/(\d+)", page)
+    assert match, "no quotes line"
+    total, verbatim, of = map(int, match.groups())
+    assert total == of == 6
+    assert verbatim == total
+
+
+def test_navigation_unlocks_step_3_and_keeps_the_rest_locked() -> None:
+    with TestClient(create_app()) as client:
+        page = client.get("/step/3").text
+    assert '<a href="/step/3" aria-current="step">3 Explore</a>' in page
+    assert page.count('class="locked"') == 4
