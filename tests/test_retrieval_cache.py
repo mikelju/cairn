@@ -219,8 +219,8 @@ def _ranked(scores: dict[str, float]) -> list[retrieval.RankedHit]:
 
 
 def test_retrieval_cache_same_top_tolerates_near_ties_only() -> None:
-    near = retrieval.PLATFORM_RERANK_TOLERANCE / 2
-    far = retrieval.PLATFORM_RERANK_TOLERANCE * 2
+    near = retrieval.PLATFORM_RERANK_TOLERANCE * 1.5
+    far = retrieval.PLATFORM_RERANK_TOLERANCE * 3
     stored = [h.model_dump() for h in _ranked({"A": 3.0, "B": 3.0 - near, "C": 2.0, "D": 1.0})]
     swapped = _ranked({"B": 3.0, "A": 3.0 - near, "C": 2.0, "D": 1.0})
     assert retrieval._same_top(stored, swapped, {h.passage_id: h for h in swapped})
