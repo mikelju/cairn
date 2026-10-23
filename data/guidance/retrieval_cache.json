@@ -172,63 +172,6 @@
         "semantic_score": 0.506235
       }
     ],
-    "What does ICH M4S(R2) section 2.6.6.3 require in the toxicology written summary?": [
-      {
-        "fused_rank": 8,
-        "fused_score": 0.028169,
-        "lexical_rank": 11,
-        "lexical_score": 2.419777,
-        "passage_id": "M4S-2.6.6.1-01",
-        "rerank_rank": 1,
-        "rerank_score": 0.143949,
-        "semantic_rank": 11,
-        "semantic_score": 0.740365
-      },
-      {
-        "fused_rank": 1,
-        "fused_score": 0.032522,
-        "lexical_rank": 2,
-        "lexical_score": 5.040359,
-        "passage_id": "M4S-2.6.6-01",
-        "rerank_rank": 2,
-        "rerank_score": -0.642072,
-        "semantic_rank": 1,
-        "semantic_score": 0.810791
-      },
-      {
-        "fused_rank": 2,
-        "fused_score": 0.031258,
-        "lexical_rank": 5,
-        "lexical_score": 4.181611,
-        "passage_id": "M4S-2.6-01",
-        "rerank_rank": 3,
-        "rerank_score": -0.72967,
-        "semantic_rank": 3,
-        "semantic_score": 0.782385
-      },
-      {
-        "fused_rank": 6,
-        "fused_score": 0.028783,
-        "lexical_rank": 16,
-        "lexical_score": 2.037503,
-        "passage_id": "M3-1.3-01",
-        "rerank_rank": 4,
-        "rerank_score": -0.911726,
-        "semantic_rank": 4,
-        "semantic_score": 0.768633
-      },
-      {
-        "fused_rank": 7,
-        "fused_score": 0.028783,
-        "lexical_rank": 4,
-        "lexical_score": 4.589675,
-        "passage_id": "M4S-2.6.7-02",
-        "rerank_rank": 5,
-        "rerank_score": -0.920421,
-        "semantic_rank": 16,
-        "semantic_score": 0.738335
-      }
-    ],
     "What dose and exposure information belongs in the nonclinical written summary of a toxicity study?": [
       {
         "fused_rank": 1,
@@ -341,6 +284,63 @@
         "rerank_score": 0.344523,
         "semantic_rank": 7,
         "semantic_score": 0.772265
+      }
+    ],
+    "What should the repeat-dose toxicity written summary contain?": [
+      {
+        "fused_rank": 1,
+        "fused_score": 0.032787,
+        "lexical_rank": 1,
+        "lexical_score": 6.630199,
+        "passage_id": "M4S-2.6.6-01",
+        "rerank_rank": 1,
+        "rerank_score": 4.064241,
+        "semantic_rank": 1,
+        "semantic_score": 0.83198
+      },
+      {
+        "fused_rank": 2,
+        "fused_score": 0.030018,
+        "lexical_rank": 12,
+        "lexical_score": 2.460309,
+        "passage_id": "M4S-2.6.6.3-01",
+        "rerank_rank": 2,
+        "rerank_score": 2.804903,
+        "semantic_rank": 2,
+        "semantic_score": 0.817177
+      },
+      {
+        "fused_rank": 5,
+        "fused_score": 0.029199,
+        "lexical_rank": 9,
+        "lexical_score": 3.129763,
+        "passage_id": "M4S-2.6.6.1-01",
+        "rerank_rank": 3,
+        "rerank_score": 1.404216,
+        "semantic_rank": 8,
+        "semantic_score": 0.773476
+      },
+      {
+        "fused_rank": 9,
+        "fused_score": 0.027638,
+        "lexical_rank": 25,
+        "lexical_score": 1.154029,
+        "passage_id": "M3-5-01",
+        "rerank_rank": 4,
+        "rerank_score": 0.701034,
+        "semantic_rank": 3,
+        "semantic_score": 0.788965
+      },
+      {
+        "fused_rank": 7,
+        "fused_score": 0.027984,
+        "lexical_rank": 10,
+        "lexical_score": 2.937706,
+        "passage_id": "M4S-2.6.6.5-01",
+        "rerank_rank": 5,
+        "rerank_score": -0.715236,
+        "semantic_rank": 13,
+        "semantic_score": 0.759764
       }
     ],
     "nonclinical data to support first-in-human clinical trial anticancer drug": [
