@@ -27,6 +27,7 @@ from cairn.recording import (
     recorded_model,
     total_cost,
 )
+from cairn.render import quotations
 from cairn.validate import RULE_AUC, RULE_CONC, validate_study
 
 HERE = Path(__file__).parent
@@ -240,6 +241,7 @@ def _step2_context(question_id: str, directory: Path) -> dict[str, Any]:
             "",
         ),
         "evidence": _evidence(result),
+        "quotes": quotations(result.sentences) if result.rendered else [],
     }
 
 
@@ -251,6 +253,23 @@ async def step2(request: Request) -> HTMLResponse:
 
 @router.post("/step/2/run", response_class=HTMLResponse)
 def step2_run(request: Request, question: Annotated[str, Form()]) -> HTMLResponse:
+    if question not in QUESTIONS:
+        raise HTTPException(status_code=422, detail="unknown question")
+    try:
+        context = _step2_context(question, _recordings_dir())
+    except StaleRecording as error:
+        return templates.TemplateResponse(request, "step2_result.html", {"stale": str(error)})
+    return templates.TemplateResponse(request, "step2_result.html", {"r": context})
+
+
+@router.get("/explore", response_class=HTMLResponse)
+async def explore(request: Request) -> HTMLResponse:
+    badge = _step2_badge(_recordings_dir())
+    return _page(request, "explore.html", current=3, questions=QUESTIONS, page_badge=badge)
+
+
+@router.post("/explore/run", response_class=HTMLResponse)
+def explore_run(request: Request, question: Annotated[str, Form()]) -> HTMLResponse:
     if question not in QUESTIONS:
         raise HTTPException(status_code=422, detail="unknown question")
     try:

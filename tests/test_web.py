@@ -268,3 +268,40 @@ def test_q2_prose_counts_the_screened_findings_by_reference(
     assert rows == incidence().values["n_findings"]
     toggle = re.search(r"<details>.*?</details>", result, flags=re.S)
     assert toggle and "[n_findings]" in toggle.group(0) and not re.search(r"\d", toggle.group(0))
+
+
+def _explore(question: str) -> str:
+    with TestClient(create_app()) as client:
+        return client.post("/explore/run", data={"question": question}).text
+
+
+def test_explore_page_has_a_button_for_every_question() -> None:
+    from cairn.questions import QUESTIONS
+
+    with TestClient(create_app()) as client:
+        page = client.get("/explore").text
+    for question_id in QUESTIONS:
+        assert f'"question": "{question_id}"' in page
+    assert len(QUESTIONS) == 11
+    assert "In production" in page and 'class="badge recorded"' in page
+
+
+@pytest.mark.parametrize("question", ["Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8"])
+def test_explore_study_questions_replay_offline(question: str) -> None:
+    result = _explore(question)
+    assert 'class="badge recorded"' in result
+    assert "Rules fired:" in result
+
+
+@pytest.mark.parametrize("question", ["G1", "G2", "G3"])
+def test_explore_guideline_questions_render_quotes_from_quoteref(question: str) -> None:
+    result = _explore(question)
+    assert 'class="badge recorded"' in result
+    assert "<blockquote" in result
+    assert "official page" in result and "#page=" in result
+    assert "Rules fired: none" in result
+
+
+def test_explore_rejects_an_unknown_question() -> None:
+    with TestClient(create_app()) as client:
+        assert client.post("/explore/run", data={"question": "Q99"}).status_code == 422
