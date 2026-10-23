@@ -301,3 +301,52 @@ def cached_guidance(
     if stored is None:
         raise StaleRetrievalCache(query)
     return decide(query, [RankedHit(**hit) for hit in stored], threshold)
+
+
+# Linux arm64 against the Windows build of the cache (measured at the image build): reranker logits
+# moved by up to 0.28, cosine scores by up to 4.2e-4, and passages with near-equal reranker scores
+# swapped places at the foot of the top 5. The image check allows these, and nothing larger.
+PLATFORM_RERANK_TOLERANCE = 0.5
+PLATFORM_SEMANTIC_TOLERANCE = 1e-3
+
+
+def check_cache(index: Index, path: Path = CACHE_PATH) -> list[str]:
+    """Differences between the committed cache and a fresh retrieval of every cached query.
+
+    Built for the image build, which may run on another platform than the one that wrote the cache.
+    Per query: the best passage is the same; at most one of the five passages differs (the last one;
+    foot of the top 5); the reranker score at every position agrees within
+    `PLATFORM_RERANK_TOLERANCE`; for passages in both lists, lexical and fused scores agree within
+    `SCORE_TOLERANCE`, semantic scores within `PLATFORM_SEMANTIC_TOLERANCE`, and the lexical,
+    semantic and fused ranks are equal. An empty list means the cache is current.
+    """
+    problems: list[str] = []
+    for query, stored in sorted(_read(path)["queries"].items()):
+        fresh = index.rerank(query)
+        old_ids = [h["passage_id"] for h in stored]
+        new_ids = [h.passage_id for h in fresh]
+        found = {h.passage_id: h for h in fresh}
+        common = [h for h in stored if h["passage_id"] in found]
+        if old_ids[0] != new_ids[0] or len(common) < len(stored) - 1:
+            problems.append(f"{query}: ranked passages differ: {old_ids} vs {new_ids}")
+            continue
+        for position, (old, new) in enumerate(zip(stored, fresh, strict=True), start=1):
+            delta = abs(old["rerank_score"] - new.rerank_score)
+            if delta > PLATFORM_RERANK_TOLERANCE:
+                problems.append(f"{query}: position {position} rerank_score differs by {delta:.4f}")
+        for old in common:
+            new = found[old["passage_id"]]
+            for name, tolerance in (
+                ("fused_score", SCORE_TOLERANCE),
+                ("lexical_score", SCORE_TOLERANCE),
+                ("semantic_score", PLATFORM_SEMANTIC_TOLERANCE),
+            ):
+                delta = abs(old[name] - getattr(new, name))
+                if delta > tolerance:
+                    problems.append(f"{query}: {new.passage_id} {name} differs by {delta:.6f}")
+            for name in ("fused_rank", "lexical_rank", "semantic_rank"):
+                if old[name] != getattr(new, name):
+                    problems.append(
+                        f"{query}: {new.passage_id} {name} {old[name]} vs {getattr(new, name)}"
+                    )
+    return problems

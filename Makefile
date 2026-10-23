@@ -8,7 +8,7 @@ SERVICE ?= cairn
 REGION ?= eu-west-1
 POWER ?= medium
 
-.PHONY: build demo demo-offline-check deploy guidance weights
+.PHONY: build demo demo-offline-check deploy guidance guidance-check weights
 
 build:
 	docker build --platform $(PLATFORM) --build-arg COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo unknown) -t $(IMAGE) .
@@ -73,3 +73,7 @@ guidance:
 # Downloads the pinned model weights into CAIRN_MODELS (default ~/.cache/cairn/models) and verifies every SHA-256.
 weights:
 	uv run cairn guidance weights
+
+# Compares the committed retrieval cache with a fresh retrieval (the image build runs the same check).
+guidance-check:
+	uv run cairn guidance check

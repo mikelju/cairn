@@ -123,3 +123,66 @@ def test_retrieval_cache_replay_never_imports_the_models() -> None:
     )
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
     assert out.stdout.strip() == "CLEAN []", out.stdout + out.stderr
+
+
+class _StubIndex:
+    """Serves the cached hits back, optionally changed, so the check needs no model."""
+
+    def __init__(self, cache: dict[str, list[dict[str, object]]], drift: float = 0.0) -> None:
+        self.cache = cache
+        self.drift = drift
+
+    def hits(self, query: str) -> list[dict[str, object]]:
+        hits = [dict(h) for h in self.cache[query]]
+        hits[0]["rerank_score"] = float(str(hits[0]["rerank_score"])) + self.drift
+        return hits
+
+    def rerank(self, query: str) -> list[retrieval.RankedHit]:
+        return [retrieval.RankedHit(**h) for h in self.hits(query)]  # type: ignore[arg-type]
+
+
+def test_retrieval_cache_check_accepts_platform_drift(
+    cache: dict[str, list[dict[str, object]]],
+) -> None:
+    stub = _StubIndex(cache, drift=retrieval.PLATFORM_RERANK_TOLERANCE / 2)
+    assert retrieval.check_cache(stub, retrieval.CACHE_PATH) == []  # type: ignore[arg-type]
+
+
+def test_retrieval_cache_check_accepts_a_swap_and_a_changed_last_passage(
+    cache: dict[str, list[dict[str, object]]],
+) -> None:
+    class Moved(_StubIndex):
+        def hits(self, query: str) -> list[dict[str, object]]:
+            hits = super().hits(query)
+            scores = (hits[2]["rerank_score"], hits[3]["rerank_score"])
+            hits[2], hits[3] = hits[3], hits[2]
+            hits[2]["rerank_score"], hits[3]["rerank_score"] = scores
+            hits[4]["passage_id"] = "OTHER-01"
+            return hits
+
+    assert retrieval.check_cache(Moved(cache), retrieval.CACHE_PATH) == []  # type: ignore[arg-type]
+
+
+def test_retrieval_cache_check_reports_a_stale_cache(
+    cache: dict[str, list[dict[str, object]]],
+) -> None:
+    drifted = retrieval.check_cache(_StubIndex(cache, drift=1.0), retrieval.CACHE_PATH)  # type: ignore[arg-type]
+    assert drifted and all("rerank_score differs by 1.0000" in p for p in drifted)
+
+    class NewBest(_StubIndex):
+        def hits(self, query: str) -> list[dict[str, object]]:
+            hits = super().hits(query)
+            hits[0]["passage_id"] = "OTHER-01"
+            return hits
+
+    best = retrieval.check_cache(NewBest(cache), retrieval.CACHE_PATH)  # type: ignore[arg-type]
+    assert best and all("ranked passages differ" in p for p in best)
+
+    class Reordered(_StubIndex):
+        def hits(self, query: str) -> list[dict[str, object]]:
+            hits = super().hits(query)
+            hits[1]["semantic_rank"] = 99
+            return hits
+
+    ranks = retrieval.check_cache(Reordered(cache), retrieval.CACHE_PATH)  # type: ignore[arg-type]
+    assert ranks and all("semantic_rank" in p for p in ranks)

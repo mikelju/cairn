@@ -218,6 +218,17 @@ def guidance_build_command(
     typer.echo(f"wrote {highlight.HIGHLIGHTS_PATH}: {highlight.write_highlights(cache)} highlights")
 
 
+@guidance_app.command("check")
+def guidance_check_command(cache: Path = retrieval.CACHE_PATH) -> None:  # pragma: no cover
+    """Compare the committed retrieval cache with a fresh retrieval (needs the weights)."""
+    problems = retrieval.check_cache(retrieval.build_index(), cache)
+    for problem in problems:
+        typer.echo(problem, err=True)
+    if problems:
+        raise typer.Exit(1)
+    typer.echo(f"guidance cache matches a fresh retrieval: {cache}")
+
+
 @guidance_app.command("weights")
 def guidance_weights_command() -> None:  # pragma: no cover
     """Download the pinned model weights into CAIRN_MODELS and verify every SHA-256."""
