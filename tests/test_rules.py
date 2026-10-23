@@ -153,6 +153,33 @@ def test_rule_5_quarantined_data_without_the_note_fails(world: World) -> None:
     only(verify(far_away, world.ledger), 5)
 
 
+def _note_with_field(world: World, field: str) -> Sentence:
+    return Sentence(
+        parts=[
+            text("Data quality note: the value of animal "),
+            world.ref(world.tk, field),
+            text(
+                " was quarantined by validation as not physically possible; "
+                "the mean is shown with and without it."
+            ),
+        ]
+    )
+
+
+def test_rule_5_note_accepts_the_animal_field_with_or_without_the_values_prefix(
+    world: World,
+) -> None:
+    mean = passing(world)[1]
+    for field in ("quarantined_rows.0.usubjid", "values.quarantined_rows.0.usubjid"):
+        assert verify([mean, _note_with_field(world, field)], world.ledger).ok
+
+
+def test_rule_5_note_with_another_animal_field_fails(world: World) -> None:
+    mean = passing(world)[1]
+    other = _note_with_field(world, "values.quarantined_rows.1.usubjid")
+    assert 5 in {failure.rule for failure in verify([mean, other], world.ledger).failures}
+
+
 def test_rule_6_neutral_wording_passes(world: World) -> None:
     sentence = Sentence(parts=[text("The screen listed "), world.ref(world.incidence, "screen")])
     assert verify([sentence], world.ledger).ok

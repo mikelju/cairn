@@ -160,6 +160,20 @@ def data_quality_note(obs_id: str) -> Sentence:
     )
 
 
+def _is_data_quality_note(sentence: Sentence, obs_id: str) -> bool:
+    """The fixed note, with the animal field written with or without the "values." prefix."""
+    note = data_quality_note(obs_id)
+    if len(sentence.parts) != len(note.parts):
+        return False
+    canonical = [
+        part.model_copy(update={"field": part.field.removeprefix("values.")})
+        if isinstance(part, ValueRef)
+        else part
+        for part in sentence.parts
+    ]
+    return canonical == note.parts
+
+
 @dataclass(frozen=True)
 class Failure:
     rule: int
@@ -381,12 +395,11 @@ def verify(sentences: list[Sentence], ledger: ObservationLedger) -> Verdict:
         if any(_is_incidence_count(ref) and not _has_denominator(ref, refs) for ref in refs):
             fail(4, index)
     for index, sentence in enumerate(sentences):  # rule 5
-        if sentence in (data_quality_note(ref.obs_id) for ref in _refs(sentence)):
+        if any(_is_data_quality_note(sentence, ref.obs_id) for ref in _refs(sentence)):
             continue
         quarantined = [ref for ref in _refs(sentence) if _cites_quarantine(ref, ledger)]
         for obs_id in dict.fromkeys(ref.obs_id for ref in quarantined):
-            note = data_quality_note(obs_id)
-            if note not in sentences[index : index + 2]:
+            if not any(_is_data_quality_note(s, obs_id) for s in sentences[index : index + 2]):
                 fail(5, index)
     for index, match in _search_final(SAFETY_PATTERN, rendered):  # rule 6, final rendered text
         fail(6, index, f'"{match.group(0)}"')

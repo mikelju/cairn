@@ -1,0 +1,176 @@
+{
+  "calls": [
+    {
+      "cost_usd": 0.01643,
+      "input_tokens": 3006,
+      "latency_s": 2.266,
+      "output_tokens": 56,
+      "response": {
+        "container": null,
+        "content": [
+          {
+            "caller": null,
+            "id": "toolu_bdrk_01D9oSN3DHuYqoQfATqjZTDY",
+            "input": {
+              "kind": "validate_study"
+            },
+            "name": "run_job",
+            "toolset_name": null,
+            "type": "tool_use"
+          }
+        ],
+        "diagnostics": null,
+        "id": "msg_bdrk_011CgJA4Ljh7rdbh6rtvXn6p",
+        "model": "claude-opus-4-6",
+        "role": "assistant",
+        "stop_details": null,
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "type": "message",
+        "usage": {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "inference_geo": null,
+          "input_tokens": 3006,
+          "output_tokens": 56,
+          "output_tokens_details": null,
+          "server_tool_use": null,
+          "service_tier": null,
+          "speed": null
+        }
+      }
+    },
+    {
+      "cost_usd": 0.017165,
+      "input_tokens": 3088,
+      "latency_s": 3.969,
+      "output_tokens": 69,
+      "response": {
+        "container": null,
+        "content": [
+          {
+            "caller": null,
+            "id": "toolu_bdrk_01Lngsyj3UtDXTcsXM2pGXbK",
+            "input": {
+              "query": "nonclinical data to support first-in-human clinical trial anticancer drug"
+            },
+            "name": "search_guidance",
+            "toolset_name": null,
+            "type": "tool_use"
+          }
+        ],
+        "diagnostics": null,
+        "id": "msg_bdrk_011CgJA4V3kYNVSBD5n9k84W",
+        "model": "claude-opus-4-6",
+        "role": "assistant",
+        "stop_details": null,
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "type": "message",
+        "usage": {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "inference_geo": null,
+          "input_tokens": 3088,
+          "output_tokens": 69,
+          "output_tokens_details": null,
+          "server_tool_use": null,
+          "service_tier": null,
+          "speed": null
+        }
+      }
+    },
+    {
+      "cost_usd": 0.03187,
+      "input_tokens": 5424,
+      "latency_s": 3.422,
+      "output_tokens": 190,
+      "response": {
+        "container": null,
+        "content": [
+          {
+            "caller": null,
+            "id": "toolu_bdrk_01SExjcb3MLfgDWqcDSq1igt",
+            "input": {
+              "sentences": [
+                {
+                  "parts": [
+                    {
+                      "text": "The guidance says: ",
+                      "type": "text"
+                    },
+                    {
+                      "passage_id": "S9-1.2-01",
+                      "sentence_ids": [
+                        "S9-1.2-01.s3"
+                      ],
+                      "type": "quote"
+                    }
+                  ]
+                },
+                {
+                  "parts": [
+                    {
+                      "text": "It also says: ",
+                      "type": "text"
+                    },
+                    {
+                      "passage_id": "S9-1.3-01",
+                      "sentence_ids": [
+                        "S9-1.3-01.s5",
+                        "S9-1.3-01.s6"
+                      ],
+                      "type": "quote"
+                    }
+                  ]
+                }
+              ]
+            },
+            "name": "write_answer",
+            "toolset_name": null,
+            "type": "tool_use"
+          }
+        ],
+        "diagnostics": null,
+        "id": "msg_bdrk_011CgJA6NyvjFFY97nYBiiws",
+        "model": "claude-opus-4-6",
+        "role": "assistant",
+        "stop_details": null,
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "type": "message",
+        "usage": {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "inference_geo": null,
+          "input_tokens": 5424,
+          "output_tokens": 190,
+          "output_tokens_details": null,
+          "server_tool_use": null,
+          "service_tier": null,
+          "speed": null
+        }
+      }
+    }
+  ],
+  "date": "2026-10-23",
+  "model": "opus-4-6",
+  "model_profile": "eu.anthropic.claude-opus-4-6-v1",
+  "prompt_version": "question-7",
+  "question_id": "G3",
+  "region": "eu-west-1",
+  "source": "bedrock",
+  "tool_schema_sha256": "25276c34f9375fc85b9f4b6a4d798b5fe9974dbd21456c69d1a192f21dea167b"
+}

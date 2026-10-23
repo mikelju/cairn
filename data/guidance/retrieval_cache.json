@@ -115,6 +115,63 @@
         "semantic_score": 0.791689
       }
     ],
+    "NOAEL definition": [
+      {
+        "fused_rank": 4,
+        "fused_score": 0.031281,
+        "lexical_rank": 6,
+        "lexical_score": 1.203195,
+        "passage_id": "FDA-GLOSSARY-02",
+        "rerank_rank": 1,
+        "rerank_score": 4.631526,
+        "semantic_rank": 2,
+        "semantic_score": 0.680668
+      },
+      {
+        "fused_rank": 1,
+        "fused_score": 0.032522,
+        "lexical_rank": 2,
+        "lexical_score": 1.475504,
+        "passage_id": "FDA-IV-01",
+        "rerank_rank": 2,
+        "rerank_score": 4.280595,
+        "semantic_rank": 1,
+        "semantic_score": 0.70547
+      },
+      {
+        "fused_rank": 2,
+        "fused_score": 0.032266,
+        "lexical_rank": 1,
+        "lexical_score": 3.414455,
+        "passage_id": "FDA-IV-02",
+        "rerank_rank": 3,
+        "rerank_score": 2.842764,
+        "semantic_rank": 3,
+        "semantic_score": 0.679397
+      },
+      {
+        "fused_rank": 14,
+        "fused_score": 0.026671,
+        "lexical_rank": 16,
+        "lexical_score": 0.716653,
+        "passage_id": "M3-6-01",
+        "rerank_rank": 4,
+        "rerank_score": 1.398216,
+        "semantic_rank": 14,
+        "semantic_score": 0.535085
+      },
+      {
+        "fused_rank": 16,
+        "fused_score": 0.025808,
+        "lexical_rank": 18,
+        "lexical_score": 0.5778,
+        "passage_id": "S9-2.4-01",
+        "rerank_rank": 5,
+        "rerank_score": 0.777461,
+        "semantic_rank": 17,
+        "semantic_score": 0.49888
+      }
+    ],
     "What does ICH M4S(R2) section 2.6.6.3 require in the toxicology written summary?": [
       {
         "fused_rank": 1,
@@ -284,6 +341,177 @@
         "rerank_score": 0.352005,
         "semantic_rank": 27,
         "semantic_score": 0.714654
+      }
+    ],
+    "nonclinical data to support first-in-human clinical trial anticancer drug": [
+      {
+        "fused_rank": 4,
+        "fused_score": 0.030769,
+        "lexical_rank": 5,
+        "lexical_score": 3.694036,
+        "passage_id": "S9-1.3-01",
+        "rerank_rank": 1,
+        "rerank_score": 3.67255,
+        "semantic_rank": 5,
+        "semantic_score": 0.809028
+      },
+      {
+        "fused_rank": 1,
+        "fused_score": 0.032266,
+        "lexical_rank": 3,
+        "lexical_score": 4.225967,
+        "passage_id": "S9-1.2-01",
+        "rerank_rank": 2,
+        "rerank_score": 3.076039,
+        "semantic_rank": 1,
+        "semantic_score": 0.843681
+      },
+      {
+        "fused_rank": 2,
+        "fused_score": 0.031545,
+        "lexical_rank": 1,
+        "lexical_score": 4.544841,
+        "passage_id": "S9-3.4-01",
+        "rerank_rank": 3,
+        "rerank_score": 2.489957,
+        "semantic_rank": 6,
+        "semantic_score": 0.808313
+      },
+      {
+        "fused_rank": 6,
+        "fused_score": 0.029631,
+        "lexical_rank": 8,
+        "lexical_score": 3.173937,
+        "passage_id": "S9-1.1-01",
+        "rerank_rank": 4,
+        "rerank_score": 2.411139,
+        "semantic_rank": 7,
+        "semantic_score": 0.801976
+      },
+      {
+        "fused_rank": 13,
+        "fused_score": 0.026154,
+        "lexical_rank": 18,
+        "lexical_score": 2.501029,
+        "passage_id": "S9-3.3-01",
+        "rerank_rank": 5,
+        "rerank_score": 2.137139,
+        "semantic_rank": 15,
+        "semantic_score": 0.77844
+      }
+    ],
+    "repeat-dose toxicity written summary contents": [
+      {
+        "fused_rank": 1,
+        "fused_score": 0.032787,
+        "lexical_rank": 1,
+        "lexical_score": 6.277084,
+        "passage_id": "M4S-2.6.5-01",
+        "rerank_rank": 1,
+        "rerank_score": 3.16366,
+        "semantic_rank": 1,
+        "semantic_score": 0.828314
+      },
+      {
+        "fused_rank": 3,
+        "fused_score": 0.028986,
+        "lexical_rank": 9,
+        "lexical_score": 2.149233,
+        "passage_id": "M4S-2.6.6.1-01",
+        "rerank_rank": 2,
+        "rerank_score": 0.312172,
+        "semantic_rank": 9,
+        "semantic_score": 0.768966
+      },
+      {
+        "fused_rank": 7,
+        "fused_score": 0.026879,
+        "lexical_rank": 5,
+        "lexical_score": 2.97121,
+        "passage_id": "M4S-2.6.6.5-01",
+        "rerank_rank": 3,
+        "rerank_score": 0.128981,
+        "semantic_rank": 27,
+        "semantic_score": 0.742997
+      },
+      {
+        "fused_rank": 2,
+        "fused_score": 0.03031,
+        "lexical_rank": 7,
+        "lexical_score": 2.685201,
+        "passage_id": "M4S-4.2-01",
+        "rerank_rank": 4,
+        "rerank_score": -0.034617,
+        "semantic_rank": 5,
+        "semantic_score": 0.78545
+      },
+      {
+        "fused_rank": 17,
+        "fused_score": 0.023434,
+        "lexical_rank": 39,
+        "lexical_score": 0.823401,
+        "passage_id": "M3-7.3-02",
+        "rerank_rank": 5,
+        "rerank_score": -0.122626,
+        "semantic_rank": 15,
+        "semantic_score": 0.756933
+      }
+    ],
+    "repeat-dose toxicity written summary section content requirements what to include": [
+      {
+        "fused_rank": 1,
+        "fused_score": 0.032787,
+        "lexical_rank": 1,
+        "lexical_score": 6.277084,
+        "passage_id": "M4S-2.6.5-01",
+        "rerank_rank": 1,
+        "rerank_score": 2.396979,
+        "semantic_rank": 1,
+        "semantic_score": 0.835995
+      },
+      {
+        "fused_rank": 4,
+        "fused_score": 0.02967,
+        "lexical_rank": 10,
+        "lexical_score": 2.720781,
+        "passage_id": "M4S-2.6.6.1-01",
+        "rerank_rank": 2,
+        "rerank_score": 1.319938,
+        "semantic_rank": 5,
+        "semantic_score": 0.776472
+      },
+      {
+        "fused_rank": 7,
+        "fused_score": 0.028405,
+        "lexical_rank": 8,
+        "lexical_score": 2.97121,
+        "passage_id": "M4S-2.6.6.5-01",
+        "rerank_rank": 3,
+        "rerank_score": 0.745828,
+        "semantic_rank": 13,
+        "semantic_score": 0.750974
+      },
+      {
+        "fused_rank": 9,
+        "fused_score": 0.027056,
+        "lexical_rank": 24,
+        "lexical_score": 1.708812,
+        "passage_id": "M3-5-01",
+        "rerank_rank": 4,
+        "rerank_score": 0.413431,
+        "semantic_rank": 6,
+        "semantic_score": 0.767417
+      },
+      {
+        "fused_rank": 8,
+        "fused_score": 0.027584,
+        "lexical_rank": 7,
+        "lexical_score": 3.222737,
+        "passage_id": "S9-2.4-01",
+        "rerank_rank": 5,
+        "rerank_score": -0.300629,
+        "semantic_rank": 19,
+        "semantic_score": 0.744057
       }
     ]
   }

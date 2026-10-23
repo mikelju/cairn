@@ -133,17 +133,16 @@ def test_recordings_metadata_real_files(path: Path | None) -> None:
     assert metadata_problems(data, require_bedrock=True) == []
 
 
-def test_replay_stale_real_q2_q6_under_the_current_prompt() -> None:
-    """Increment 14 re-records Q2 and Q6; until then the real files are stale under question-6."""
+def test_real_q2_q6_are_current_under_the_current_prompt() -> None:
+    """Increment 14 re-recorded Q2 and Q6 under the current prompt, so they replay."""
     from cairn import live
     from cairn.loop import PROMPT_VERSION
 
     for name in ("q2.json", "q6.json"):
         data = json.loads((REAL_DIR / name).read_text(encoding="utf-8"))
-        assert data["prompt_version"] != PROMPT_VERSION
+        assert data["prompt_version"] == PROMPT_VERSION
     for question in ("Q2", "Q6"):
-        with pytest.raises(StaleRecording):
-            live.ask_replay(question, REAL_DIR, "opus-4-6")
+        live.ask_replay(question, REAL_DIR, "opus-4-6")  # raises StaleRecording if stale
 
 
 def test_every_fixture_matches_the_current_prompt_version_and_schema_hash() -> None:
