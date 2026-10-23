@@ -121,18 +121,27 @@ def test_e3_q7_is_declined_as_clinical_advice(results: dict[str, LoopResult]) ->
     assert result.rendered is None
 
 
-def test_e3_q8_is_rejected_by_the_tool_schema(results: dict[str, LoopResult]) -> None:
+def test_e3_q8_never_includes_tk_animals_in_the_means(results: dict[str, LoopResult]) -> None:
+    """Approved criterion (D109): the schema rejects it or the model declines and explains."""
     result = results["Q8"]
-    outside = [
-        s
-        for s in result.steps
-        if s.tool == "body_weight_change"
-        and s.arguments.get("population", "main_and_recovery") not in BODY_WEIGHT_POPULATIONS
-    ]
-    assert outside, "Q8 never tried a population the schema rejects"
-    assert all(step.error and "population" in step.error for step in outside)
-    assert all(step.obs_id is None for step in outside)
-    assert not accepted(result) or ANSWER_TOOL not in tools_used(result)
+    body_weight = [s for s in result.steps if s.tool == "body_weight_change"]
+    succeeded = [s for s in body_weight if s.obs_id is not None]
+    rejected = [s for s in body_weight if s.error and "population" in s.error]
+    # No successful call used a population that could include TK satellite animals.
+    assert all(
+        s.arguments.get("population", "main_and_recovery") in BODY_WEIGHT_POPULATIONS
+        for s in succeeded
+    )
+    assert all(s.obs_id is None for s in rejected)
+    if rejected:
+        return
+    if result.status is LoopStatus.DECLINED:
+        assert result.message
+        return
+    # No rejection happened: the answer must say that TK animals are not included.
+    assert result.status is LoopStatus.ANSWERED and result.rendered
+    text = result.rendered.lower()
+    assert "tk" in text and ("not support" in text or "excluded" in text)
 
 
 @pytest.mark.parametrize("question_id", ["G1", "G2", "G3"])
