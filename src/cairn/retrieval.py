@@ -362,7 +362,11 @@ def check_cache(index: Index, path: Path = CACHE_PATH) -> list[str]:
         found = {h.passage_id: h for h in fresh}
         common = [h for h in stored if h["passage_id"] in found]
         if not _same_top(stored, fresh, found):
-            problems.append(f"{query}: ranked passages differ: {old_ids} vs {new_ids}")
+            old_scores = [round(h["rerank_score"], 3) for h in stored]
+            new_scores = [round(h.rerank_score, 3) for h in fresh]
+            problems.append(
+                f"{query}: ranked passages differ: {old_ids} {old_scores} vs {new_ids} {new_scores}"
+            )
             continue
         for position, (old, new) in enumerate(zip(stored, fresh, strict=True), start=1):
             delta = abs(old["rerank_score"] - new.rerank_score)
