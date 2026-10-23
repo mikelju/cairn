@@ -74,6 +74,11 @@ def test_retrieval_cache_recorded_queries_are_read_from_recordings(tmp_path: Pat
 def test_retrieval_cache_equals_fresh_retrieval(
     index: retrieval.Index, cache: dict[str, list[dict[str, object]]]
 ) -> None:
+    written_on = json.loads(retrieval.CACHE_PATH.read_text(encoding="utf-8")).get("platform")
+    if written_on != retrieval.build_platform():
+        # D113: the strict comparison holds only on the platform that built the cache
+        assert retrieval.check_cache(index) == []
+        return
     for query, stored in cache.items():
         fresh = index.rerank(query)
         assert [h["passage_id"] for h in stored] == [h.passage_id for h in fresh], query

@@ -1,5 +1,6 @@
 {
   "model": "BAAI/bge-reranker-v2-m3-int8",
+  "platform": "windows-arm64",
   "queries": {
     "How does the FDA 2005 guidance define the no observed adverse effect level (NOAEL)?": [
       {

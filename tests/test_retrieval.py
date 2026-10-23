@@ -157,17 +157,22 @@ def test_threshold_recomputed_equals_stored(
     lowest_in = min(best[e["question"]] for e in calibration["in_library"])
     highest_out = max(best[e["question"]] for e in calibration["out_of_library"])
     assert lowest_in > highest_out, "in-library and out-of-library best scores overlap"
+    # D113: logits agree to 1e-2 only on the platform that wrote the file; across platforms the
+    # tolerance is the one of the image-build check (the abstention margin is far larger).
+    tolerance = (
+        retrieval.RERANK_TOLERANCE
+        if calibration.get("platform") == retrieval.build_platform()
+        else retrieval.PLATFORM_RERANK_TOLERANCE
+    )
     recomputed = retrieval.compute_threshold(
         [best[e["question"]] for e in calibration["in_library"]],
         [best[e["question"]] for e in calibration["out_of_library"]],
     )
-    assert recomputed == pytest.approx(calibration["threshold"], abs=retrieval.RERANK_TOLERANCE)
+    assert recomputed == pytest.approx(calibration["threshold"], abs=tolerance)
     assert retrieval.load_threshold() == calibration["threshold"]
     for key in retrieval.CALIBRATION_SETS:
         for entry in calibration[key]:
-            assert best[entry["question"]] == pytest.approx(
-                entry["best_score"], abs=retrieval.RERANK_TOLERANCE
-            )
+            assert best[entry["question"]] == pytest.approx(entry["best_score"], abs=tolerance)
 
 
 def test_search_guidance_abstains_on_every_out_of_library_question(

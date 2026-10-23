@@ -7,6 +7,7 @@ so the order does not depend on array layout or platform.
 """
 
 import json
+import platform
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -235,6 +236,11 @@ def search_guidance(index: Index, query: str, threshold: float | None = None) ->
     return decide(query, index.rerank(query), threshold)
 
 
+def build_platform() -> str:
+    """The system and machine the scores are computed on, recorded in the generated files."""
+    return f"{platform.system()}-{platform.machine()}".lower()
+
+
 def calibrate(index: Index, path: Path = CALIBRATION_PATH) -> str:
     """The calibration file as JSON text: best score of each stored question and the threshold."""
     data = _read(path)
@@ -244,6 +250,7 @@ def calibrate(index: Index, path: Path = CALIBRATION_PATH) -> str:
             entry["best_score"] = round(index.rerank(entry["question"])[0].rerank_score, 4)
         best[key] = [e["best_score"] for e in data[key]]
     data["model"] = weights.RERANKER
+    data["platform"] = build_platform()
     data["method"] = (
         "threshold = midpoint between the lowest in-library and the highest out-of-library "
         "best reranker score (decision O4); abstain when the best score is below it"
@@ -289,7 +296,7 @@ def build_cache(
         ]
         for query in queries
     }
-    data = {"model": weights.RERANKER, "queries": results}
+    data = {"model": weights.RERANKER, "platform": build_platform(), "queries": results}
     return json.dumps(data, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
 
 

@@ -85,5 +85,6 @@
       "question": "How many participants does a phase 3 hypertension trial need to show a blood pressure difference?"
     }
   ],
+  "platform": "windows-arm64",
   "threshold": -1.4677
 }
