@@ -346,10 +346,10 @@ def check_cache(index: Index, path: Path = CACHE_PATH) -> list[str]:
     """Differences between the committed cache and a fresh retrieval of every cached query.
 
     Built for the image build, which may run on another platform than the one that wrote the cache.
-    Per query: the best passage is the same, or the other list's best scores within
-    twice `PLATFORM_RERANK_TOLERANCE` of it (a near-tie that the platforms order differently); a passage
-    in only one of the two top 5 lists scores within twice that tolerance of the foot of its list (a
-    near-tie at the cut, E138); the reranker score at every position agrees within
+    Per query: the best passage is the same, or the other list's best scores within twice
+    `PLATFORM_RERANK_TOLERANCE` of it (a near-tie that the platforms order differently); a passage
+    in only one of the two top 5 lists scores within twice that tolerance of the foot of its list
+    (a near-tie at the cut, E138); the reranker score at every position agrees within
     `PLATFORM_RERANK_TOLERANCE`; for passages in both lists, lexical and fused scores agree within
     `SCORE_TOLERANCE`, fused scores within `PLATFORM_FUSED_TOLERANCE`, semantic scores within
     `PLATFORM_SEMANTIC_TOLERANCE`; the lexical rank is equal and the semantic and fused ranks differ
