@@ -186,8 +186,8 @@ def test_retrieval_cache_check_accepts_a_one_rank_shift_of_a_near_tie(
 def test_retrieval_cache_check_reports_a_stale_cache(
     cache: dict[str, list[dict[str, object]]],
 ) -> None:
-    drifted = retrieval.check_cache(_StubIndex(cache, drift=1.0), retrieval.CACHE_PATH)  # type: ignore[arg-type]
-    assert drifted and all("rerank_score differs by 1.0000" in p for p in drifted)
+    drifted = retrieval.check_cache(_StubIndex(cache, drift=2.0), retrieval.CACHE_PATH)  # type: ignore[arg-type]
+    assert drifted and all("rerank_score differs by 2.0000" in p for p in drifted)
 
     class NewBest(_StubIndex):
         def hits(self, query: str) -> list[dict[str, object]]:
@@ -228,5 +228,5 @@ def test_retrieval_cache_same_top_tolerates_near_ties_only() -> None:
     assert retrieval._same_top(stored, entered, {h.passage_id: h for h in entered})
     clear = _ranked({"B": 3.0 + far, "A": 3.0, "C": 2.0, "D": 1.0})
     assert not retrieval._same_top(stored, clear, {h.passage_id: h for h in clear})
-    clear_entry = _ranked({"A": 3.0, "B": 2.9, "E": 2.8, "C": 1.2})
+    clear_entry = _ranked({"A": 5.0, "B": 4.9, "E": 4.8, "C": 1.2})
     assert not retrieval._same_top(stored, clear_entry, {h.passage_id: h for h in clear_entry})

@@ -313,8 +313,10 @@ def cached_guidance(
 
 # Linux arm64 against the Windows build of the cache (measured at the image build): reranker logits
 # moved by up to 0.28, cosine scores by up to 4.2e-4, and passages with near-equal reranker scores
-# swapped places at the foot of the top 5. The image check allows these, and nothing larger.
-PLATFORM_RERANK_TOLERANCE = 0.5
+# swapped places at the foot of the top 5. On linux/amd64 CI with single-pair batches (E138, D114)
+# logits moved by up to 0.54 against the Windows build. The abstention margin (half the gap
+# between the calibration ranges, about 2.5) stays more than twice this tolerance.
+PLATFORM_RERANK_TOLERANCE = 1.0
 PLATFORM_SEMANTIC_TOLERANCE = 1e-3
 # D113: on linux/amd64 near-tied cosine scores moved a passage by one semantic rank, which moves
 # its fused rank by one and its RRF score by at most 1/(60+r) - 1/(61+r), under 3e-4 for r >= 1.
