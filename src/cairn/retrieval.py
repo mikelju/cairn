@@ -322,12 +322,33 @@ PLATFORM_RANK_SHIFT = 1
 PLATFORM_FUSED_TOLERANCE = 5e-4
 
 
+def _same_top(
+    stored: list[dict[str, Any]], fresh: list[RankedHit], found: dict[str, RankedHit]
+) -> bool:
+    """Whether two top-5 lists agree up to near-ties (scores within the platform tolerance)."""
+    tolerance = PLATFORM_RERANK_TOLERANCE
+    best = stored[0]["passage_id"]
+    if best != fresh[0].passage_id and (
+        best not in found or fresh[0].rerank_score - found[best].rerank_score > tolerance
+    ):
+        return False
+    foot_old, foot_new = stored[-1]["rerank_score"], fresh[-1].rerank_score
+    kept = {h.passage_id for h in fresh}
+    lost = [h for h in stored if h["passage_id"] not in kept]
+    gained = [h for h in fresh if h.passage_id not in {s["passage_id"] for s in stored}]
+    return all(foot_old - h["rerank_score"] <= tolerance for h in lost) and all(
+        h.rerank_score - foot_new <= tolerance for h in gained
+    )
+
+
 def check_cache(index: Index, path: Path = CACHE_PATH) -> list[str]:
     """Differences between the committed cache and a fresh retrieval of every cached query.
 
     Built for the image build, which may run on another platform than the one that wrote the cache.
-    Per query: the best passage is the same; at most one of the five passages differs (the last one;
-    foot of the top 5); the reranker score at every position agrees within
+    Per query: the best passage is the same, or the other list's best scores within
+    `PLATFORM_RERANK_TOLERANCE` of it (a near-tie that the platforms order differently); a passage
+    in only one of the two top 5 lists scores within that tolerance of the foot of its list (a
+    near-tie at the cut, E138); the reranker score at every position agrees within
     `PLATFORM_RERANK_TOLERANCE`; for passages in both lists, lexical and fused scores agree within
     `SCORE_TOLERANCE`, fused scores within `PLATFORM_FUSED_TOLERANCE`, semantic scores within
     `PLATFORM_SEMANTIC_TOLERANCE`; the lexical rank is equal and the semantic and fused ranks differ
@@ -340,7 +361,7 @@ def check_cache(index: Index, path: Path = CACHE_PATH) -> list[str]:
         new_ids = [h.passage_id for h in fresh]
         found = {h.passage_id: h for h in fresh}
         common = [h for h in stored if h["passage_id"] in found]
-        if old_ids[0] != new_ids[0] or len(common) < len(stored) - 1:
+        if not _same_top(stored, fresh, found):
             problems.append(f"{query}: ranked passages differ: {old_ids} vs {new_ids}")
             continue
         for position, (old, new) in enumerate(zip(stored, fresh, strict=True), start=1):

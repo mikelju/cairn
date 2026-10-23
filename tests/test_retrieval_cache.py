@@ -206,3 +206,27 @@ def test_retrieval_cache_check_reports_a_stale_cache(
 
     ranks = retrieval.check_cache(Reordered(cache), retrieval.CACHE_PATH)  # type: ignore[arg-type]
     assert ranks and all("semantic_rank" in p for p in ranks)
+
+
+def _ranked(scores: dict[str, float]) -> list[retrieval.RankedHit]:
+    return [
+        retrieval.RankedHit(
+            passage_id=pid, fused_rank=i, fused_score=0.01, lexical_rank=i, lexical_score=1.0,
+            semantic_rank=i, semantic_score=0.5, rerank_rank=i, rerank_score=score,
+        )
+        for i, (pid, score) in enumerate(scores.items(), start=1)
+    ]  # fmt: skip
+
+
+def test_retrieval_cache_same_top_tolerates_near_ties_only() -> None:
+    near = retrieval.PLATFORM_RERANK_TOLERANCE / 2
+    far = retrieval.PLATFORM_RERANK_TOLERANCE * 2
+    stored = [h.model_dump() for h in _ranked({"A": 3.0, "B": 3.0 - near, "C": 2.0, "D": 1.0})]
+    swapped = _ranked({"B": 3.0, "A": 3.0 - near, "C": 2.0, "D": 1.0})
+    assert retrieval._same_top(stored, swapped, {h.passage_id: h for h in swapped})
+    entered = _ranked({"A": 3.0, "B": 2.9, "C": 2.0, "E": 1.0 + near})
+    assert retrieval._same_top(stored, entered, {h.passage_id: h for h in entered})
+    clear = _ranked({"B": 3.0 + far, "A": 3.0, "C": 2.0, "D": 1.0})
+    assert not retrieval._same_top(stored, clear, {h.passage_id: h for h in clear})
+    clear_entry = _ranked({"A": 3.0, "B": 2.9, "E": 2.8, "C": 1.2})
+    assert not retrieval._same_top(stored, clear_entry, {h.passage_id: h for h in clear_entry})
