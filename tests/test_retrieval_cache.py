@@ -77,7 +77,8 @@ def test_retrieval_cache_equals_fresh_retrieval(
     written_on = json.loads(retrieval.CACHE_PATH.read_text(encoding="utf-8")).get("platform")
     if written_on != retrieval.build_platform():
         # D113: the strict comparison holds only on the platform that built the cache
-        assert retrieval.check_cache(index) == []
+        problems = retrieval.check_cache(index)
+        assert not problems, " | ".join(problems)
         return
     for query, stored in cache.items():
         fresh = index.rerank(query)
@@ -166,6 +167,20 @@ def test_retrieval_cache_check_accepts_a_swap_and_a_changed_last_passage(
             return hits
 
     assert retrieval.check_cache(Moved(cache), retrieval.CACHE_PATH) == []  # type: ignore[arg-type]
+
+
+def test_retrieval_cache_check_accepts_a_one_rank_shift_of_a_near_tie(
+    cache: dict[str, list[dict[str, object]]],
+) -> None:
+    class Shifted(_StubIndex):
+        def hits(self, query: str) -> list[dict[str, object]]:
+            hits = super().hits(query)
+            hits[1]["semantic_rank"] = int(str(hits[1]["semantic_rank"])) + 1
+            hits[1]["fused_rank"] = int(str(hits[1]["fused_rank"])) + 1
+            hits[1]["fused_score"] = float(str(hits[1]["fused_score"])) - 2.5e-4
+            return hits
+
+    assert retrieval.check_cache(Shifted(cache), retrieval.CACHE_PATH) == []  # type: ignore[arg-type]
 
 
 def test_retrieval_cache_check_reports_a_stale_cache(

@@ -315,6 +315,10 @@ def cached_guidance(
 # swapped places at the foot of the top 5. The image check allows these, and nothing larger.
 PLATFORM_RERANK_TOLERANCE = 0.5
 PLATFORM_SEMANTIC_TOLERANCE = 1e-3
+# D113: on linux/amd64 near-tied cosine scores moved a passage by one semantic rank, which moves
+# its fused rank by one and its RRF score by at most 1/(60+r) - 1/(61+r), under 3e-4 for r >= 1.
+PLATFORM_RANK_SHIFT = 1
+PLATFORM_FUSED_TOLERANCE = 5e-4
 
 
 def check_cache(index: Index, path: Path = CACHE_PATH) -> list[str]:
@@ -324,8 +328,9 @@ def check_cache(index: Index, path: Path = CACHE_PATH) -> list[str]:
     Per query: the best passage is the same; at most one of the five passages differs (the last one;
     foot of the top 5); the reranker score at every position agrees within
     `PLATFORM_RERANK_TOLERANCE`; for passages in both lists, lexical and fused scores agree within
-    `SCORE_TOLERANCE`, semantic scores within `PLATFORM_SEMANTIC_TOLERANCE`, and the lexical,
-    semantic and fused ranks are equal. An empty list means the cache is current.
+    `SCORE_TOLERANCE`, fused scores within `PLATFORM_FUSED_TOLERANCE`, semantic scores within
+    `PLATFORM_SEMANTIC_TOLERANCE`; the lexical rank is equal and the semantic and fused ranks differ
+    by at most `PLATFORM_RANK_SHIFT`. An empty list means the cache is current.
     """
     problems: list[str] = []
     for query, stored in sorted(_read(path)["queries"].items()):
@@ -344,7 +349,7 @@ def check_cache(index: Index, path: Path = CACHE_PATH) -> list[str]:
         for old in common:
             new = found[old["passage_id"]]
             for name, tolerance in (
-                ("fused_score", SCORE_TOLERANCE),
+                ("fused_score", PLATFORM_FUSED_TOLERANCE),
                 ("lexical_score", SCORE_TOLERANCE),
                 ("semantic_score", PLATFORM_SEMANTIC_TOLERANCE),
             ):
@@ -352,8 +357,8 @@ def check_cache(index: Index, path: Path = CACHE_PATH) -> list[str]:
                 if delta > tolerance:
                     problems.append(f"{query}: {new.passage_id} {name} differs by {delta:.6f}")
             for name in ("fused_rank", "lexical_rank", "semantic_rank"):
-                if old[name] != getattr(new, name):
-                    problems.append(
-                        f"{query}: {new.passage_id} {name} {old[name]} vs {getattr(new, name)}"
-                    )
+                was, now = old[name], getattr(new, name)
+                shift = PLATFORM_RANK_SHIFT if name != "lexical_rank" else 0
+                if (was is None) != (now is None) or (was is not None and abs(was - now) > shift):
+                    problems.append(f"{query}: {new.passage_id} {name} {was} vs {now}")
     return problems
