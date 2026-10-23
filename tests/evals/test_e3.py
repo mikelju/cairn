@@ -52,6 +52,7 @@ EXPECT: dict[str, Expect] = {
     "G3": Expect({"search_guidance": {}}, frozenset({"search_guidance"}), "ich-s9"),
 }
 PASSAGE_DOC = {p.passage_id: p.doc for p in load_passages()}
+PASSAGE_SECTION = {p.passage_id: p.section for p in load_passages()}
 
 
 def replay(question_id: str) -> LoopResult:
@@ -158,6 +159,10 @@ def test_e3_guidance_answers_quote_the_expected_guideline(
     assert quotes, "the answer holds no QuoteRef"
     assert {PASSAGE_DOC[q.passage_id] for q in quotes} == {EXPECT[question_id].doc}
     assert all(q.passage_id in result.ledger.retrieved for q in quotes)
+    if question_id == "G1":  # spec: a verbatim passage on ICH M4S(R2) section 2.6.6.3
+        assert any(q.sentence_ids and PASSAGE_SECTION[q.passage_id] == "2.6.6.3" for q in quotes), (
+            "G1 quotes no sentence of section 2.6.6.3"
+        )
     own = [
         part.text
         for sentence in result.sentences

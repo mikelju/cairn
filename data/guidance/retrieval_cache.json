@@ -456,63 +456,6 @@
         "semantic_rank": 24,
         "semantic_score": 0.74281
       }
-    ],
-    "repeat-dose toxicity written summary section content requirements what to include": [
-      {
-        "fused_rank": 1,
-        "fused_score": 0.032787,
-        "lexical_rank": 1,
-        "lexical_score": 6.520568,
-        "passage_id": "M4S-2.6.6-01",
-        "rerank_rank": 1,
-        "rerank_score": 1.911367,
-        "semantic_rank": 1,
-        "semantic_score": 0.832605
-      },
-      {
-        "fused_rank": 6,
-        "fused_score": 0.029644,
-        "lexical_rank": 9,
-        "lexical_score": 3.55913,
-        "passage_id": "M4S-2.6.6.1-01",
-        "rerank_rank": 2,
-        "rerank_score": 1.724834,
-        "semantic_rank": 6,
-        "semantic_score": 0.775704
-      },
-      {
-        "fused_rank": 5,
-        "fused_score": 0.029828,
-        "lexical_rank": 13,
-        "lexical_score": 2.358866,
-        "passage_id": "M4S-2.6.6.3-01",
-        "rerank_rank": 3,
-        "rerank_score": 1.657851,
-        "semantic_rank": 2,
-        "semantic_score": 0.803978
-      },
-      {
-        "fused_rank": 10,
-        "fused_score": 0.027013,
-        "lexical_rank": 26,
-        "lexical_score": 1.686671,
-        "passage_id": "M3-5-01",
-        "rerank_rank": 4,
-        "rerank_score": 0.727072,
-        "semantic_rank": 5,
-        "semantic_score": 0.775935
-      },
-      {
-        "fused_rank": 9,
-        "fused_score": 0.027973,
-        "lexical_rank": 12,
-        "lexical_score": 2.57696,
-        "passage_id": "M4S-4.2-01",
-        "rerank_rank": 5,
-        "rerank_score": 0.078714,
-        "semantic_rank": 11,
-        "semantic_score": 0.76067
-      }
     ]
   }
 }

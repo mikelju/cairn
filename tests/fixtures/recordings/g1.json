@@ -60,13 +60,13 @@
                 {
                   "parts": [
                     {
-                      "text": "The guideline gives the sequence of the summary: ",
+                      "text": "The guideline says how the studies are summarised: ",
                       "type": "text"
                     },
                     {
-                      "passage_id": "M4S-2.6.5-01",
+                      "passage_id": "M4S-2.6.6.3-01",
                       "sentence_ids": [
-                        "M4S-2.6.5-01.s1"
+                        "M4S-2.6.6.3-01.s1"
                       ],
                       "type": "quote"
                     }
