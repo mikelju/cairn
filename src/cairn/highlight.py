@@ -218,6 +218,10 @@ def write_highlights(
     passages = load_passages()
     entries = build_highlights(passages, top_sentence_ids(passages, cache), images_dir)
     path.write_text(highlights_json(entries), encoding="utf-8", newline="\n")
+    kept = {Path(str(e["image"])).name for e in entries}
+    for stale in images_dir.glob("*.png"):
+        if stale.name not in kept:
+            stale.unlink()
     return len(entries)
 
 

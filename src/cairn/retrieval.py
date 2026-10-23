@@ -32,10 +32,11 @@ SCORE_TOLERANCE = 1e-4
 
 # The reranker (bge-reranker-v2-m3, int8) rescores the RRF top `CANDIDATES`; `TOP` are returned.
 TOP = 5
-# int8 dynamic quantisation makes a pair's score depend a little on its batch, so the batch size is
-# fixed (and the candidates always arrive in RRF order): same query, same batches, same scores.
+# int8 dynamic quantisation makes a pair's score depend on its batch (measured up to 0.59 between
+# batch compositions, E138), so each pair is scored alone: the score no longer depends on the
+# order of the candidates, which can shift when near-tied RRF scores resolve differently.
 # Four threads were measured faster than the 12 of this laptop (oversubscription); scores agree.
-RERANK_BATCH = 4
+RERANK_BATCH = 1
 RERANK_THREADS = 4
 # Reranker logits span about -10..10; the same query agrees to this absolute tolerance across runs
 # and platforms. The abstention margin (half the gap between the calibration ranges) is far larger.
