@@ -16,7 +16,7 @@
 <h2>Quotations</h2>
 <p class="meta">Quotes: {{ r.quotes|length }} · verbatim on the cited page: {{ r.verbatim }}/{{ r.quotes|length }}</p>
 {% call a.disclosure("Quoted sentences") %}
-{% for q in r.quotes %}<blockquote class="quote"><p>{{ q.text }}</p><p class="meta">{{ q.id }} · {{ q.cite }}</p></blockquote>{% endfor %}
+{% for q in r.quotes %}<blockquote class="quote"><p>{{ q.text }}</p><p class="meta">{{ q.id }} · {{ q.cite }}{% if q.highlight %} · <a href="{{ q.highlight }}">highlighted page</a>{% endif %} · <a href="{{ q.link }}">official page</a></p></blockquote>{% endfor %}
 {% endcall %}
 </div>
 {% endcall %}

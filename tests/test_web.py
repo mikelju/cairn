@@ -339,3 +339,43 @@ def test_navigation_unlocks_step_3_and_keeps_the_rest_locked() -> None:
         page = client.get("/step/3").text
     assert '<a href="/step/3" aria-current="step">3 Explore</a>' in page
     assert page.count('class="locked"') == 4
+
+
+def test_highlight_route_serves_only_committed_pngs() -> None:
+    from cairn.highlight import load_highlights
+
+    entry = load_highlights()[0]
+    name = Path(entry["image"]).name
+    with TestClient(create_app()) as client:
+        ok = client.get(f"/highlights/{name}")
+        assert ok.status_code == 200 and ok.headers["content-type"] == "image/png"
+        assert ok.content.startswith(b"\x89PNG")
+        assert client.get("/highlights/nope.png").status_code == 404
+        assert client.get("/highlights/..%2Fhighlights.json").status_code == 404
+
+
+def test_highlight_route_page_shows_the_image_and_the_official_link() -> None:
+    from cairn.highlight import load_highlights
+
+    entry = load_highlights()[0]
+    with TestClient(create_app()) as client:
+        page = client.get(f"/highlight/{entry['sentence_id']}").text
+        assert client.get("/highlight/unknown.s9").status_code == 404
+    assert f'src="/{entry["image"]}"' in page
+    assert f'href="{entry["link"]}"' in page and "#page=" in entry["link"]
+
+
+def test_highlight_route_links_every_step3_quotation() -> None:
+    with TestClient(create_app()) as client:
+        page = client.get("/step/3").text
+        links = re.findall(r'href="(/highlight/[^"]+)">highlighted page', page)
+        assert len(links) == 6
+        for link in links:
+            assert client.get(link).status_code == 200
+    assert page.count("official page") == 6 and "#page=" in page
+
+
+def test_explore_quotations_link_the_highlighted_page() -> None:
+    result = _explore("G2")
+    assert "highlighted page" in result and 'href="/highlight/' in result
+    assert "official page" in result and "#page=" in result

@@ -14,7 +14,7 @@
 {% call a.disclosure("What the model wrote") %}<p>{{ r.written }}</p>{% endcall %}</div>
 {% endif %}
 {% for q in r.quotes %}
-<blockquote class="quote"><p>{{ q.text }}</p><p class="meta">{{ q.citation }} · <a href="{{ q.link }}">official page</a></p></blockquote>
+<blockquote class="quote"><p>{{ q.text }}</p><p class="meta">{{ q.citation }}{% if q.highlight %} · <a href="{{ q.highlight }}">highlighted page</a>{% endif %} · <a href="{{ q.link }}">official page</a></p></blockquote>
 {% endfor %}
 {{ a.trace(r.trace) }}
 {% if r.message or r.failures %}

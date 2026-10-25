@@ -8,7 +8,7 @@ from typing import Annotated, Any
 
 import pandas as pd
 from fastapi import APIRouter, FastAPI, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -16,7 +16,7 @@ from cairn import __version__, retrieval
 from cairn.content import Text, ValueRef
 from cairn.gateway import DEFAULT_MODEL, LLMGateway, Mode
 from cairn.guidelines import load_manifest
-from cairn.highlight import load_highlights
+from cairn.highlight import IMAGES_DIR, load_highlights
 from cairn.ingest import build_report, load_study
 from cairn.jobs import JobRunner
 from cairn.loop import PROMPT_VERSION, STUDY_TOOLS, LoopResult, LoopStatus, ask, schema_hash
@@ -211,6 +211,16 @@ def _evidence(result: LoopResult) -> list[dict[str, str]]:
     return evidence
 
 
+def _highlighted(sentence_id: str) -> list[dict[str, Any]]:
+    return [e for e in load_highlights() if e["sentence_id"] == sentence_id]
+
+
+def _with_highlight(quote: dict[str, Any]) -> dict[str, Any]:
+    """Add the viewer link when the build highlighted the first quoted sentence."""
+    first = quote["sentence_ids"][0]
+    return {**quote, "highlight": f"/highlight/{first}" if _highlighted(first) else ""}
+
+
 def _step2_context(question_id: str, directory: Path) -> dict[str, Any]:
     model = recorded_model(directory, question_id, DEFAULT_MODEL)
     key = RecordingKey(question_id, PROMPT_VERSION, schema_hash(), model)
@@ -244,7 +254,9 @@ def _step2_context(question_id: str, directory: Path) -> dict[str, Any]:
             "",
         ),
         "evidence": _evidence(result),
-        "quotes": quotations(result.sentences) if result.rendered else [],
+        "quotes": [_with_highlight(q) for q in quotations(result.sentences)]
+        if result.rendered
+        else [],
     }
 
 
@@ -312,7 +324,15 @@ def _step3_context() -> dict[str, Any]:
                 for m in marks
             ):
                 verbatim += 1
-            quotes.append({"id": fixed["id"], "text": sentence.text, "cite": " ".join(row[:3])})
+            quotes.append(
+                {
+                    "id": fixed["id"],
+                    "text": sentence.text,
+                    "cite": " ".join(row[:3]),
+                    "highlight": f"/highlight/{sentence.sentence_id}" if marks else "",
+                    "link": f"{guidelines[passage.doc]['page_link_base']}#page={passage.page_start}",
+                }
+            )
         queries.append({"id": fixed["id"], "query": fixed["query"], "rows": rows, "folded": folded})
     return {"queries": queries, "quotes": quotes, "verbatim": verbatim}
 
@@ -320,6 +340,29 @@ def _step3_context() -> dict[str, Any]:
 @router.get("/step/3", response_class=HTMLResponse)
 async def step3(request: Request) -> HTMLResponse:
     return _page(request, "step3.html", current=3, r=_step3_context())
+
+
+@router.get("/highlight/{sentence_id}", response_class=HTMLResponse)
+async def highlight_view(request: Request, sentence_id: str) -> HTMLResponse:
+    entries = _highlighted(sentence_id)
+    if not entries:
+        raise HTTPException(status_code=404, detail="no highlighted page for this sentence")
+    passage = next(p for p in load_passages() if p.passage_id == entries[0]["passage_id"])
+    return _page(
+        request,
+        "highlight.html",
+        current=3,
+        pages=entries,
+        sentence=next(s.text for s in passage.sentences if s.sentence_id == sentence_id),
+    )
+
+
+@router.get("/highlights/{name}")
+async def highlight_image(name: str) -> FileResponse:
+    known = {Path(str(e["image"])).name for e in load_highlights()}
+    if name not in known:
+        raise HTTPException(status_code=404, detail="unknown highlight")
+    return FileResponse(IMAGES_DIR / name, media_type="image/png")
 
 
 @router.get("/explore", response_class=HTMLResponse)

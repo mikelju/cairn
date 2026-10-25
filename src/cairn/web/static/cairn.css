@@ -231,3 +231,7 @@ h2 { font-size: var(--text-md); line-height: 1.2; margin: 0 0 var(--space-2); }
   .legend { grid-template-columns: minmax(0, 1fr); }
   .controls { flex-wrap: wrap; }
 }
+
+.page-images { display: flex; gap: var(--space-4); }
+.page-images figure { margin: 0; }
+.page-image { display: block; max-height: 60vh; width: auto; max-width: 100%; border: var(--border-1) solid var(--color-line); }
