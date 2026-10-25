@@ -379,3 +379,10 @@ def test_explore_quotations_link_the_highlighted_page() -> None:
     result = _explore("G2")
     assert "highlighted page" in result and 'href="/highlight/' in result
     assert "official page" in result and "#page=" in result
+
+
+def test_explore_guideline_quotations_sit_in_the_right_column() -> None:
+    result = _explore("G1")
+    right = result.split('<div class="col-right card">', 1)[1]
+    assert right.count("<blockquote") >= 1
+    assert "<blockquote" not in result.split('<div class="col-right card">', 1)[0]

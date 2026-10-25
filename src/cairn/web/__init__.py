@@ -317,6 +317,7 @@ def _step3_context() -> dict[str, Any]:
             if number > SHOWN_HITS:
                 continue
             sentence = passage.sentences[0]
+            base = guidelines[passage.doc]["page_link_base"]
             marks = located.get(sentence.sentence_id, [])
             if any(
                 normalize_whitespace(m["text"]) == normalize_whitespace(sentence.text)
@@ -330,7 +331,7 @@ def _step3_context() -> dict[str, Any]:
                     "text": sentence.text,
                     "cite": " ".join(row[:3]),
                     "highlight": f"/highlight/{sentence.sentence_id}" if marks else "",
-                    "link": f"{guidelines[passage.doc]['page_link_base']}#page={passage.page_start}",
+                    "link": f"{base}#page={passage.page_start}",
                 }
             )
         queries.append({"id": fixed["id"], "query": fixed["query"], "rows": rows, "folded": folded})
