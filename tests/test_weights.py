@@ -3,6 +3,7 @@
 import hashlib
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -93,8 +94,23 @@ def test_weights_embedder_loads_offline() -> None:
     assert vector.shape == (384,)
 
 
-def test_weights_reranker_loads_offline() -> None:
-    model = weights.load_reranker()
+def test_weights_reranker_loads_offline_with_the_retrieval_threads(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from fastembed.rerank import cross_encoder
+
+    from cairn import retrieval
+
+    seen: dict[str, Any] = {}
+
+    class Spy(cross_encoder.TextCrossEncoder):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            seen.update(kwargs)
+            super().__init__(*args, **kwargs)
+
+    monkeypatch.setattr(cross_encoder, "TextCrossEncoder", Spy)
+    model = retrieval._load_reranker(None)
+    assert seen["threads"] == retrieval.RERANK_THREADS and seen["local_files_only"] is True
     query = "What is the highest dose with no observed adverse effect?"
     documents = [
         "The NOAEL is the highest dose level that does not produce adverse effects.",

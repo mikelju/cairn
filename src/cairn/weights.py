@@ -108,12 +108,3 @@ def load_embedder(models: Path | None = None) -> Any:
 
     folder = verify_model(EMBEDDER, models or models_dir())
     return TextEmbedding(EMBEDDER, specific_model_path=str(folder), local_files_only=True)
-
-
-def load_reranker(models: Path | None = None) -> Any:
-    """bge-reranker-v2-m3 (int8 ONNX) from the verified cache; never downloads."""
-    _offline()
-    from fastembed.rerank.cross_encoder import TextCrossEncoder
-
-    folder = verify_model(RERANKER, models or models_dir())
-    return TextCrossEncoder(RERANKER, specific_model_path=str(folder), local_files_only=True)
