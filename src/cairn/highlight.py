@@ -16,7 +16,7 @@ from typing import Any
 import pypdfium2 as pdfium  # type: ignore[import-untyped]
 from PIL import Image, ImageDraw
 
-from cairn.guidelines import GUIDELINES_DIR, load_manifest
+from cairn.guidelines import GUIDELINES_DIR, load_manifest, verify_dir
 from cairn.passages import (
     GUIDANCE_DIR,
     HEADER_PATTERNS,
@@ -142,7 +142,9 @@ def build_highlights(
 ) -> list[dict[str, Any]]:
     """Render the pages and return the highlight entries, writing one PNG per entry."""
     by_id = {p.passage_id: p for p in passages}
-    manifest = load_manifest()["guidelines"]
+    full = load_manifest()
+    verify_dir(full, directory)
+    manifest = full["guidelines"]
     images_dir.mkdir(parents=True, exist_ok=True)
     entries: list[dict[str, Any]] = []
     documents: dict[str, Any] = {}

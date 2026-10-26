@@ -1,5 +1,6 @@
 import hashlib
 import re
+import shutil
 from pathlib import Path
 
 import pytest
@@ -7,6 +8,7 @@ from typer.testing import CliRunner
 
 from cairn import passages
 from cairn.cli import app
+from cairn.guidelines import GUIDELINES_DIR, load_manifest
 from cairn.passages import Passage, Sentence
 
 ID_FORM = re.compile(r"^(M4S|M3|S9|FDA)-[A-Z0-9.]+-\d{2}$")
@@ -151,3 +153,36 @@ def test_passages_heading_kept_and_indexed_without_touching_text(built: list[Pas
     assert found.indexed_text.endswith(found.text)
     assert not found.text.startswith("2.6.6.3")
     assert " ".join(s.text for s in found.sentences) == found.text
+
+
+def _tampered_copy(tmp_path: Path) -> Path:
+    """A copy of the pinned PDFs with one byte appended to the first; `data/` stays untouched."""
+    folder = tmp_path / "guidelines"
+    folder.mkdir()
+    entries = load_manifest()["guidelines"]
+    for entry in entries.values():
+        shutil.copy(GUIDELINES_DIR / entry["filename"], folder / entry["filename"])
+    first = folder / sorted(e["filename"] for e in entries.values())[0]
+    first.write_bytes(first.read_bytes() + b"\n")
+    return folder
+
+
+def test_passages_build_stops_on_a_tampered_pdf(tmp_path: Path) -> None:
+    from cairn.guidelines import ChecksumMismatch
+
+    folder = _tampered_copy(tmp_path)
+    target = tmp_path / "passages.json"
+    with pytest.raises(ChecksumMismatch):
+        passages.write_passages(target, folder)
+    assert not target.exists()
+
+
+def test_highlights_build_stops_on_a_tampered_pdf(tmp_path: Path) -> None:
+    from cairn import highlight
+    from cairn.guidelines import ChecksumMismatch
+
+    folder = _tampered_copy(tmp_path)
+    with pytest.raises(ChecksumMismatch):
+        highlight.build_highlights(
+            passages.load_passages(), ["FDA-IV-01.s1"], tmp_path / "png", folder
+        )

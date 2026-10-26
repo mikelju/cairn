@@ -17,7 +17,7 @@ from typing import Any
 import pypdfium2 as pdfium  # type: ignore[import-untyped]
 from pydantic import BaseModel, ConfigDict
 
-from cairn.guidelines import GUIDELINES_DIR, load_manifest, snapshot_hash
+from cairn.guidelines import GUIDELINES_DIR, load_manifest, snapshot_hash, verify_dir
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 GUIDANCE_DIR = REPO_ROOT / "data" / "guidance"
@@ -322,6 +322,7 @@ def split_sentences(text: str) -> list[str]:
 
 
 def build_passages(directory: Path = GUIDELINES_DIR) -> list[Passage]:
+    verify_dir(load_manifest(), directory)
     passages: list[Passage] = []
     for key in sorted(DOC_CODES):
         for section in split_sections(key, page_texts(key, directory)):
