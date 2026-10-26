@@ -194,3 +194,25 @@ def test_registry_same_hash_search_guidance(server_url: str) -> None:
     assert result_sha256(anyio.run(mcp_call, server_url, name, arguments)) == direct
     assert result_sha256(rest_call(server_url, name, arguments)) == direct
     assert cli_hash(name, arguments) == direct
+
+
+def test_uncached_guidance_query_is_a_422_over_rest_and_a_tool_error_over_mcp(
+    server_url: str,
+) -> None:
+    import httpx
+
+    arguments = {"query": "a question nobody cached"}
+    response = httpx.post(f"{server_url}/api/tools/search_guidance", json=arguments, timeout=60)
+    assert response.status_code == 422
+    assert "query not in the replay cache" in response.json()["detail"]
+
+    async def failed() -> str:
+        async with Client(f"{server_url}/mcp") as client:
+            try:
+                result = await client.call_tool("search_guidance", arguments)
+            except Exception as error:
+                return str(error)
+        assert result.is_error
+        return str(result.content)
+
+    assert "stale retrieval cache" in anyio.run(failed)

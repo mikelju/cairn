@@ -8,6 +8,7 @@ from fastmcp import FastMCP
 from pydantic import BaseModel, Field, ValidationError
 
 from cairn.jobs import Job, JobRunner
+from cairn.retrieval import StaleRetrievalCache
 from cairn.tools import REGISTRY, argument_problems, call_tool
 from cairn.web import mount_web
 
@@ -56,6 +57,9 @@ def create_app() -> FastAPI:
             return call_tool(name, arguments or {})
         except ValidationError as error:
             raise HTTPException(status_code=422, detail=argument_problems(error)) from error
+        except StaleRetrievalCache as error:
+            detail = f"query not in the replay cache: {error}"
+            raise HTTPException(status_code=422, detail=detail) from error
 
     mount_web(app)
     app.mount("/", mcp_app)
