@@ -386,3 +386,45 @@ def test_explore_guideline_quotations_sit_in_the_right_column() -> None:
     right = result.split('<div class="col-right card">', 1)[1]
     assert right.count("<blockquote") >= 1
     assert "<blockquote" not in result.split('<div class="col-right card">', 1)[0]
+
+
+def test_step3_quote_link_and_nav_follow_the_cited_sentence_page() -> None:
+    from cairn.highlight import cited_page
+    from cairn.passages import stored_passages
+
+    passage = stored_passages()["M4S-2.6-01"]
+    assert cited_page(passage, "M4S-2.6-01.s12") == 8 != passage.page_start
+    with TestClient(create_app()) as client:
+        explore = client.get("/explore").text
+        entry = client.get("/highlight/M4S-2.6-01.s12").text
+    assert 'aria-current="step"' not in explore
+    assert 'aria-current="step"' not in entry
+
+
+def test_web_parses_passages_and_highlights_once_per_process(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from cairn import highlight, passages
+
+    calls = {"passages": 0, "highlights": 0}
+    real_p, real_h = passages.load_passages, highlight.load_highlights
+
+    def count_p(*args: object) -> object:
+        calls["passages"] += 1
+        return real_p(*args)  # type: ignore[arg-type]
+
+    def count_h(*args: object) -> object:
+        calls["highlights"] += 1
+        return real_h(*args)  # type: ignore[arg-type]
+
+    passages.stored_passages.cache_clear()
+    highlight.highlights_by_sentence.cache_clear()
+    monkeypatch.setattr(passages, "load_passages", count_p)
+    monkeypatch.setattr(highlight, "load_highlights", count_h)
+    with TestClient(create_app()) as client:
+        for _ in range(3):
+            assert client.get("/step/3").status_code == 200
+            assert client.get("/highlight/M4S-2.6-01.s12").status_code == 200
+    assert calls == {"passages": 1, "highlights": 1}
+    passages.stored_passages.cache_clear()
+    highlight.highlights_by_sentence.cache_clear()

@@ -16,11 +16,11 @@ from cairn import __version__, retrieval
 from cairn.content import Text, ValueRef
 from cairn.gateway import DEFAULT_MODEL, LLMGateway, Mode
 from cairn.guidelines import load_manifest
-from cairn.highlight import IMAGES_DIR, load_highlights
+from cairn.highlight import IMAGES_DIR, cited_page, highlights_by_sentence
 from cairn.ingest import build_report, load_study
 from cairn.jobs import JobRunner
 from cairn.loop import PROMPT_VERSION, STUDY_TOOLS, LoopResult, LoopStatus, ask, schema_hash
-from cairn.passages import load_passages, normalize_whitespace
+from cairn.passages import normalize_whitespace, stored_passages
 from cairn.questions import QUESTIONS, STEP2_QUESTIONS
 from cairn.recording import (
     RECORDINGS_DIR,
@@ -212,7 +212,11 @@ def _evidence(result: LoopResult) -> list[dict[str, str]]:
 
 
 def _highlighted(sentence_id: str) -> list[dict[str, Any]]:
-    return [e for e in load_highlights() if e["sentence_id"] == sentence_id]
+    return highlights_by_sentence().get(sentence_id, [])
+
+
+def _all_highlights() -> list[dict[str, Any]]:
+    return [e for entries in highlights_by_sentence().values() for e in entries]
 
 
 def _with_highlight(quote: dict[str, Any]) -> dict[str, Any]:
@@ -292,10 +296,7 @@ def _step3_context() -> dict[str, Any]:
     page when the build located exactly that text on a page of the passage.
     """
     guidelines = load_manifest()["guidelines"]
-    passages = {p.passage_id: p for p in load_passages()}
-    located: dict[str, list[dict[str, Any]]] = {}
-    for entry in load_highlights():
-        located.setdefault(entry["sentence_id"], []).append(entry)
+    passages = stored_passages()
     queries, quotes, verbatim = [], [], 0
     for fixed in retrieval.load_fixed_queries():
         if fixed["used_by"] != NS_QUERIES:
@@ -317,8 +318,9 @@ def _step3_context() -> dict[str, Any]:
             if number > SHOWN_HITS:
                 continue
             sentence = passage.sentences[0]
+            page = cited_page(passage, sentence.sentence_id)
             base = guidelines[passage.doc]["page_link_base"]
-            marks = located.get(sentence.sentence_id, [])
+            marks = _highlighted(sentence.sentence_id)
             if any(
                 normalize_whitespace(m["text"]) == normalize_whitespace(sentence.text)
                 and passage.page_start <= m["page"] <= passage.page_end
@@ -329,9 +331,9 @@ def _step3_context() -> dict[str, Any]:
                 {
                     "id": fixed["id"],
                     "text": sentence.text,
-                    "cite": " ".join(row[:3]),
+                    "cite": " ".join([*row[:2], str(page)]),
                     "highlight": f"/highlight/{sentence.sentence_id}" if marks else "",
-                    "link": f"{base}#page={passage.page_start}",
+                    "link": f"{base}#page={page}",
                 }
             )
         queries.append({"id": fixed["id"], "query": fixed["query"], "rows": rows, "folded": folded})
@@ -348,11 +350,11 @@ async def highlight_view(request: Request, sentence_id: str) -> HTMLResponse:
     entries = _highlighted(sentence_id)
     if not entries:
         raise HTTPException(status_code=404, detail="no highlighted page for this sentence")
-    passage = next(p for p in load_passages() if p.passage_id == entries[0]["passage_id"])
+    passage = stored_passages()[entries[0]["passage_id"]]
     return _page(
         request,
         "highlight.html",
-        current=3,
+        current=0,
         pages=entries,
         sentence=next(s.text for s in passage.sentences if s.sentence_id == sentence_id),
     )
@@ -360,7 +362,7 @@ async def highlight_view(request: Request, sentence_id: str) -> HTMLResponse:
 
 @router.get("/highlights/{name}")
 async def highlight_image(name: str) -> FileResponse:
-    known = {Path(str(e["image"])).name for e in load_highlights()}
+    known = {Path(str(e["image"])).name for e in _all_highlights()}
     if name not in known:
         raise HTTPException(status_code=404, detail="unknown highlight")
     return FileResponse(IMAGES_DIR / name, media_type="image/png")
@@ -369,7 +371,7 @@ async def highlight_image(name: str) -> FileResponse:
 @router.get("/explore", response_class=HTMLResponse)
 async def explore(request: Request) -> HTMLResponse:
     badge = _step2_badge(_recordings_dir())
-    return _page(request, "explore.html", current=3, questions=QUESTIONS, page_badge=badge)
+    return _page(request, "explore.html", current=0, questions=QUESTIONS, page_badge=badge)
 
 
 @router.post("/explore/run", response_class=HTMLResponse)

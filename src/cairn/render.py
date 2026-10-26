@@ -1,7 +1,6 @@
 """The deterministic renderer: numbers and study terms come from references, not the model."""
 
 from collections.abc import Callable
-from functools import lru_cache
 from typing import Any
 
 from cairn.content import (
@@ -13,7 +12,8 @@ from cairn.content import (
     ValueRef,
 )
 from cairn.guidelines import load_manifest
-from cairn.passages import Passage, load_passages
+from cairn.highlight import cited_page
+from cairn.passages import stored_passages
 
 THOUSAND = 1000
 
@@ -35,17 +35,12 @@ def format_value(value: Any) -> str:
     raise UnresolvedRef(f"value of type {type(value).__name__} cannot be formatted")
 
 
-@lru_cache(maxsize=1)
-def _stored_passages() -> dict[str, Passage]:
-    return {passage.passage_id: passage for passage in load_passages()}
-
-
 def quote_data(ref: QuoteRef) -> dict[str, Any]:
     """The quotation of a QuoteRef as data: the stored sentences copied verbatim, with source.
 
     `link` is the official document link with `#page=N`, for the UI; nothing here is model text.
     """
-    passage = _stored_passages().get(ref.passage_id)
+    passage = stored_passages().get(ref.passage_id)
     if passage is None:
         raise UnresolvedRef(f"unknown passage {ref.passage_id}")
     stored = {sentence.sentence_id: sentence.text for sentence in passage.sentences}
@@ -60,15 +55,16 @@ def quote_data(ref: QuoteRef) -> dict[str, Any]:
         if passage.page_start == passage.page_end
         else f"pages {passage.page_start}-{passage.page_end}"
     )
+    page = cited_page(passage, ref.sentence_ids[0])
     return {
         "passage_id": ref.passage_id,
         "sentence_ids": list(ref.sentence_ids),
         "text": " ".join(stored[sid] for sid in ref.sentence_ids),
         "guideline": guideline["title"],
         "section": passage.section,
-        "page": passage.page_start,
+        "page": page,
         "citation": f"{guideline['title']}, section {passage.section}, {pages}",
-        "link": f"{guideline['page_link_base']}#page={passage.page_start}",
+        "link": f"{guideline['page_link_base']}#page={page}",
     }
 
 

@@ -12,7 +12,7 @@ from cairn.gateway import Mode, mode_from_env
 from cairn.incidence import incidence
 from cairn.jobs import execute, inputs_hash
 from cairn.observation import Observation, build_observation, query
-from cairn.passages import Passage, load_passages
+from cairn.passages import stored_passages
 from cairn.tk_summary import tk_summary
 
 
@@ -60,11 +60,6 @@ def study_design() -> Observation:
 
 
 @lru_cache(maxsize=1)
-def _passages() -> dict[str, Passage]:
-    return {passage.passage_id: passage for passage in load_passages()}
-
-
-@lru_cache(maxsize=1)
 def _live_index() -> Any:  # pragma: no cover - needs the weights; record and live modes only
     from cairn import retrieval
 
@@ -85,7 +80,7 @@ def search_guidance(query: str) -> dict[str, Any]:
     else:  # pragma: no cover - needs the weights
         guidance = retrieval.search_guidance(_live_index(), query)
     result = guidance.model_dump(mode="json")
-    passages = _passages()
+    passages = stored_passages()
     for hit in result["hits"]:
         passage = passages[hit["passage_id"]]
         hit.update(

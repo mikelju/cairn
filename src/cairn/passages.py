@@ -10,6 +10,7 @@ import json
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -367,6 +368,12 @@ def write_passages(path: Path = PASSAGES_PATH, directory: Path = GUIDELINES_DIR)
 
 def load_passages(path: Path = PASSAGES_PATH) -> list[Passage]:
     return [Passage.model_validate(p) for p in json.loads(path.read_text("utf-8"))["passages"]]
+
+
+@lru_cache(maxsize=1)
+def stored_passages() -> dict[str, Passage]:
+    """The committed passages by id, parsed once per process."""
+    return {passage.passage_id: passage for passage in load_passages()}
 
 
 def verify_sentences(

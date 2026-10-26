@@ -9,6 +9,7 @@ A sentence that runs over a page break gets one entry per page.
 import json
 import re
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -228,3 +229,18 @@ def write_highlights(
 def load_highlights(path: Path = HIGHLIGHTS_PATH) -> list[dict[str, Any]]:
     entries: list[dict[str, Any]] = json.loads(path.read_text(encoding="utf-8"))["highlights"]
     return entries
+
+
+@lru_cache(maxsize=1)
+def highlights_by_sentence() -> dict[str, list[dict[str, Any]]]:
+    """The committed highlight entries grouped by sentence id, parsed once per process."""
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for entry in load_highlights():
+        grouped.setdefault(entry["sentence_id"], []).append(entry)
+    return grouped
+
+
+def cited_page(passage: Passage, sentence_id: str) -> int:
+    """The page a citation links to: where the build located the sentence, else the passage."""
+    entries = highlights_by_sentence().get(sentence_id)
+    return min(int(e["page"]) for e in entries) if entries else passage.page_start

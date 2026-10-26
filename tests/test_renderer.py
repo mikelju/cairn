@@ -205,3 +205,14 @@ def test_renderer_quoteref_pages_range_for_multi_page_passage() -> None:
     ref = QuoteRef(passage_id=spanning.passage_id, sentence_ids=[spanning.sentences[0].sentence_id])
     assert f"pages {spanning.page_start}-{spanning.page_end}" in quote_data(ref)["citation"]
     assert quote_data(ref)["link"].endswith(f"#page={spanning.page_start}")
+
+
+def test_quoteref_link_uses_the_page_where_the_cited_sentence_starts() -> None:
+    from cairn.passages import load_passages
+
+    passage = next(p for p in load_passages() if p.passage_id == "M4S-2.6-01")
+    assert passage.page_start == 7
+    ref = QuoteRef(passage_id=passage.passage_id, sentence_ids=["M4S-2.6-01.s12"])
+    data = quote_data(ref)
+    assert data["page"] == 8
+    assert data["link"].endswith("#page=8")
