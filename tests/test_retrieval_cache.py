@@ -131,6 +131,12 @@ def test_retrieval_cache_replay_never_imports_the_models() -> None:
     assert out.stdout.strip() == "CLEAN []", out.stdout + out.stderr
 
 
+@pytest.fixture
+def other_platform(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The cache was written elsewhere: the tolerant cross-platform comparison applies."""
+    monkeypatch.setattr(retrieval, "build_platform", lambda: "another-platform")
+
+
 class _StubIndex:
     """Serves the cached hits back, optionally changed, so the check needs no model."""
 
@@ -147,6 +153,7 @@ class _StubIndex:
         return [retrieval.RankedHit(**h) for h in self.hits(query)]  # type: ignore[arg-type]
 
 
+@pytest.mark.usefixtures("other_platform")
 def test_retrieval_cache_check_accepts_platform_drift(
     cache: dict[str, list[dict[str, object]]],
 ) -> None:
@@ -154,21 +161,26 @@ def test_retrieval_cache_check_accepts_platform_drift(
     assert retrieval.check_cache(stub, retrieval.CACHE_PATH) == []  # type: ignore[arg-type]
 
 
+@pytest.mark.usefixtures("other_platform")
 def test_retrieval_cache_check_accepts_a_swap_and_a_changed_last_passage(
     cache: dict[str, list[dict[str, object]]],
 ) -> None:
     class Moved(_StubIndex):
         def hits(self, query: str) -> list[dict[str, object]]:
             hits = super().hits(query)
-            scores = (hits[2]["rerank_score"], hits[3]["rerank_score"])
-            hits[2], hits[3] = hits[3], hits[2]
-            hits[2]["rerank_score"], hits[3]["rerank_score"] = scores
+            gap = float(str(hits[2]["rerank_score"])) - float(str(hits[3]["rerank_score"]))
+            if gap < retrieval.PLATFORM_RERANK_TOLERANCE:  # only a near-tie can swap places
+                hits[2], hits[3] = hits[3], hits[2]
+                swapped.append(query)
             hits[4]["passage_id"] = "OTHER-01"
             return hits
 
+    swapped: list[str] = []
     assert retrieval.check_cache(Moved(cache), retrieval.CACHE_PATH) == []  # type: ignore[arg-type]
+    assert swapped
 
 
+@pytest.mark.usefixtures("other_platform")
 def test_retrieval_cache_check_accepts_a_one_rank_shift_of_a_near_tie(
     cache: dict[str, list[dict[str, object]]],
 ) -> None:
@@ -183,6 +195,7 @@ def test_retrieval_cache_check_accepts_a_one_rank_shift_of_a_near_tie(
     assert retrieval.check_cache(Shifted(cache), retrieval.CACHE_PATH) == []  # type: ignore[arg-type]
 
 
+@pytest.mark.usefixtures("other_platform")
 def test_retrieval_cache_check_reports_a_stale_cache(
     cache: dict[str, list[dict[str, object]]],
 ) -> None:
@@ -224,9 +237,143 @@ def test_retrieval_cache_same_top_tolerates_near_ties_only() -> None:
     stored = [h.model_dump() for h in _ranked({"A": 3.0, "B": 3.0 - near, "C": 2.0, "D": 1.0})]
     swapped = _ranked({"B": 3.0, "A": 3.0 - near, "C": 2.0, "D": 1.0})
     assert retrieval._same_top(stored, swapped, {h.passage_id: h for h in swapped})
-    entered = _ranked({"A": 3.0, "B": 2.9, "C": 2.0, "E": 1.0 + near})
+    entered = _ranked({"A": 3.0, "B": 2.9, "C": 2.0, "E": 1.0 + near / 3})
     assert retrieval._same_top(stored, entered, {h.passage_id: h for h in entered})
     clear = _ranked({"B": 3.0 + far, "A": 3.0, "C": 2.0, "D": 1.0})
     assert not retrieval._same_top(stored, clear, {h.passage_id: h for h in clear})
     clear_entry = _ranked({"A": 5.0, "B": 4.9, "E": 4.8, "C": 1.2})
     assert not retrieval._same_top(stored, clear_entry, {h.passage_id: h for h in clear_entry})
+
+
+def test_retrieval_cache_same_top_reports_a_lost_passage_above_the_foot() -> None:
+    # G2 case: the fresh list loses FDA-GLOSSARY-02 (rank 2, 2.67, foot 1.61) and gains a new foot
+    stored = [
+        h.model_dump()
+        for h in _ranked(
+            {"FDA-IV-02": 3.22, "FDA-GLOSSARY-02": 2.67, "FDA-IV-03": 2.46, "FDA-IV-01": 2.24,
+             "M3-6-01": 1.61}
+        )
+    ]  # fmt: skip
+    fresh = _ranked(
+        {"FDA-IV-02": 3.22, "FDA-IV-03": 2.46, "FDA-IV-01": 2.24, "M3-6-01": 1.61, "NEW-01": 1.60}
+    )
+    assert not retrieval._same_top(stored, fresh, {h.passage_id: h for h in fresh})
+
+
+def test_retrieval_cache_same_top_allows_at_most_one_passage_to_change() -> None:
+    stored = [h.model_dump() for h in _ranked({"A": 3.0, "B": 2.0, "C": 1.9, "D": 1.8, "E": 1.7})]
+    renamed = _ranked({"A": 3.0, "X": 2.0, "Y": 1.9, "Z": 1.8, "W": 1.7})
+    assert not retrieval._same_top(stored, renamed, {h.passage_id: h for h in renamed})
+    two = _ranked({"A": 3.0, "B": 2.0, "C": 1.9, "X": 1.8, "Y": 1.7})
+    assert not retrieval._same_top(stored, two, {h.passage_id: h for h in two})
+
+
+@pytest.mark.usefixtures("other_platform")
+def test_retrieval_cache_check_reports_score_differences_of_common_passages(
+    cache: dict[str, list[dict[str, object]]],
+) -> None:
+    class Moved(_StubIndex):
+        def hits(self, query: str) -> list[dict[str, object]]:
+            hits = super().hits(query)
+            hits[1]["fused_score"] = float(str(hits[1]["fused_score"])) + 1e-3
+            hits[2]["lexical_score"] = float(str(hits[2]["lexical_score"])) + 1e-3
+            hits[3]["semantic_score"] = float(str(hits[3]["semantic_score"])) + 1e-2
+            return hits
+
+    problems = retrieval.check_cache(Moved(cache), retrieval.CACHE_PATH)  # type: ignore[arg-type]
+    for name in ("fused_score", "lexical_score", "semantic_score"):
+        assert any(f"{name} differs by" in p for p in problems), name
+
+
+@pytest.mark.usefixtures("other_platform")
+def test_retrieval_cache_check_compares_common_passages_by_id(
+    cache: dict[str, list[dict[str, object]]],
+) -> None:
+    class Rotated(_StubIndex):
+        def hits(self, query: str) -> list[dict[str, object]]:
+            hits = super().hits(query)
+            # the scores keep their positions but two passages swap: by position all agree
+            scores = [h["rerank_score"] for h in hits]
+            hits[3], hits[4] = hits[4], hits[3]
+            hits[3]["rerank_score"], hits[4]["rerank_score"] = scores[3], scores[4]
+            return hits
+
+    # stored scores of positions 4 and 5 differ by more than the tolerance in some query
+    gaps = [
+        abs(float(str(h[3]["rerank_score"])) - float(str(h[4]["rerank_score"])))
+        for h in cache.values()
+    ]
+    assert max(gaps) > retrieval.PLATFORM_RERANK_TOLERANCE
+    problems = retrieval.check_cache(Rotated(cache), retrieval.CACHE_PATH)  # type: ignore[arg-type]
+    assert any("rerank_score differs by" in p for p in problems)
+
+
+def test_retrieval_cache_check_is_strict_on_the_platform_that_wrote_the_cache(
+    cache: dict[str, list[dict[str, object]]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    written_on = json.loads(retrieval.CACHE_PATH.read_text(encoding="utf-8"))["platform"]
+    monkeypatch.setattr(retrieval, "build_platform", lambda: written_on)
+    drift = retrieval.PLATFORM_RERANK_TOLERANCE / 2
+    strict = retrieval.check_cache(_StubIndex(cache, drift=drift), retrieval.CACHE_PATH)  # type: ignore[arg-type]
+    assert strict and all("rerank_score differs by" in p for p in strict)
+    assert retrieval.check_cache(_StubIndex(cache), retrieval.CACHE_PATH) == []  # type: ignore[arg-type]
+
+    class Swapped(_StubIndex):
+        def hits(self, query: str) -> list[dict[str, object]]:
+            hits = super().hits(query)
+            hits[1]["passage_id"], hits[2]["passage_id"] = (
+                hits[2]["passage_id"],
+                hits[1]["passage_id"],
+            )
+            return hits
+
+    swapped = retrieval.check_cache(Swapped(cache), retrieval.CACHE_PATH)  # type: ignore[arg-type]
+    assert swapped and all("ranked passages differ" in p for p in swapped)
+
+    class Ranked(_StubIndex):
+        def hits(self, query: str) -> list[dict[str, object]]:
+            hits = super().hits(query)
+            hits[1]["fused_rank"] = int(str(hits[1]["fused_rank"])) + 1
+            hits[1]["semantic_score"] = float(str(hits[1]["semantic_score"])) + 1e-3
+            return hits
+
+    ranks = retrieval.check_cache(Ranked(cache), retrieval.CACHE_PATH)  # type: ignore[arg-type]
+    assert any("fused_rank" in p for p in ranks) and any("semantic_score" in p for p in ranks)
+
+
+def test_retrieval_cache_check_reports_another_reranker_model(
+    cache: dict[str, list[dict[str, object]]], tmp_path: Path
+) -> None:
+    data = json.loads(retrieval.CACHE_PATH.read_text(encoding="utf-8"))
+    data["model"] = "some/other-reranker"
+    other = tmp_path / "cache.json"
+    other.write_text(json.dumps(data), encoding="utf-8")
+    problems = retrieval.check_cache(_StubIndex(cache), other)  # type: ignore[arg-type]
+    assert any("some/other-reranker" in p and "reranker" in p for p in problems)
+
+
+@pytest.mark.usefixtures("other_platform")
+def test_retrieval_cache_check_reports_short_or_empty_lists_without_crashing(
+    cache: dict[str, list[dict[str, object]]], tmp_path: Path
+) -> None:
+    class Short(_StubIndex):
+        def rerank(self, query: str) -> list[retrieval.RankedHit]:
+            return super().rerank(query)[:3]
+
+    short = retrieval.check_cache(Short(cache), retrieval.CACHE_PATH)  # type: ignore[arg-type]
+    assert short and all("expected 5 ranked passages" in p for p in short)
+
+    class Empty(_StubIndex):
+        def rerank(self, query: str) -> list[retrieval.RankedHit]:
+            return []
+
+    empty = retrieval.check_cache(Empty(cache), retrieval.CACHE_PATH)  # type: ignore[arg-type]
+    assert empty and all("expected 5 ranked passages" in p for p in empty)
+
+    data = json.loads(retrieval.CACHE_PATH.read_text(encoding="utf-8"))
+    first = sorted(data["queries"])[0]
+    data["queries"][first] = data["queries"][first][:2]
+    stored_short = tmp_path / "cache.json"
+    stored_short.write_text(json.dumps(data), encoding="utf-8")
+    problems = retrieval.check_cache(_StubIndex(cache), stored_short)  # type: ignore[arg-type]
+    assert any(p.startswith(first) and "expected 5 ranked passages" in p for p in problems)

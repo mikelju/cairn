@@ -24,10 +24,10 @@ RRF_K = 60
 # Depth of each ranking that enters the fusion, and size of the fused list returned.
 DEPTH = 50
 CANDIDATES = 20
-# Scores of the same query agree to this absolute tolerance across runs and platforms.
+# Scores of the same query agree to this absolute tolerance across runs on the same platform.
 # BM25 is float64 arithmetic over the same tokens and agrees to rounding; the int8 ONNX embeddings
-# may differ in the last digits between Windows and Linux (cosine scores are in [-1, 1]).
-# Ranks and fused scores are compared exactly except where two scores lie within this tolerance.
+# are deterministic on one machine (cosine scores are in [-1, 1]). Across platforms the looser
+# PLATFORM_* tolerances below apply (D113, D114).
 SCORE_TOLERANCE = 1e-4
 
 # The reranker (bge-reranker-v2-m3, int8) rescores the RRF top `CANDIDATES`; `TOP` are returned.
@@ -39,7 +39,8 @@ TOP = 5
 RERANK_BATCH = 1
 RERANK_THREADS = 4
 # Reranker logits span about -10..10; the same query agrees to this absolute tolerance across runs
-# and platforms. The abstention margin (half the gap between the calibration ranges) is far larger.
+# on the same platform (across platforms see PLATFORM_RERANK_TOLERANCE). The abstention margin
+# (half the gap between the calibration ranges) is far larger.
 RERANK_TOLERANCE = 1e-2
 CALIBRATION_PATH = GUIDANCE_DIR / "calibration.json"
 CALIBRATION_SETS = ("in_library", "out_of_library")
@@ -328,7 +329,10 @@ PLATFORM_FUSED_TOLERANCE = 5e-4
 def _same_top(
     stored: list[dict[str, Any]], fresh: list[RankedHit], found: dict[str, RankedHit]
 ) -> bool:
-    """Whether two top-5 lists agree up to near-ties (scores within the platform tolerance)."""
+    """Whether two top-5 lists agree up to near-ties (scores within the platform tolerance).
+
+    At most one passage may be lost and one gained (D112: at most one of five differs).
+    """
     # each list may be off by the tolerance from the other platform's value, so a tie spans twice
     tolerance = 2 * PLATFORM_RERANK_TOLERANCE
     best = stored[0]["passage_id"]
@@ -340,27 +344,79 @@ def _same_top(
     kept = {h.passage_id for h in fresh}
     lost = [h for h in stored if h["passage_id"] not in kept]
     gained = [h for h in fresh if h.passage_id not in {s["passage_id"] for s in stored}]
-    return all(foot_old - h["rerank_score"] <= tolerance for h in lost) and all(
-        h.rerank_score - foot_new <= tolerance for h in gained
+    if len(lost) > 1 or len(gained) > 1:
+        return False
+    # a passage only in one list sits near the foot of its own list; and as it is missing from the
+    # other list, its score there is at most that list's foot plus one platform tolerance, so a lost
+    # passage that scored well above the new foot is a real change, not a near-tie at the cut
+    return (
+        all(h["rerank_score"] - foot_old <= tolerance for h in lost)
+        and all(h.rerank_score - foot_new <= tolerance for h in gained)
+        and all(h["rerank_score"] - foot_new <= PLATFORM_RERANK_TOLERANCE for h in lost)
+        and all(h.rerank_score - foot_old <= PLATFORM_RERANK_TOLERANCE for h in gained)
     )
+
+
+def _strict_differences(
+    query: str, stored: list[dict[str, Any]], fresh: list[RankedHit]
+) -> list[str]:
+    """Same-platform comparison (D113): same ordered passages, scores within the run tolerances."""
+    old_ids = [h["passage_id"] for h in stored]
+    new_ids = [h.passage_id for h in fresh]
+    if old_ids != new_ids:
+        return [f"{query}: ranked passages differ: {old_ids} vs {new_ids}"]
+    problems: list[str] = []
+    for old, new in zip(stored, fresh, strict=True):
+        for name, tolerance in (
+            ("rerank_score", RERANK_TOLERANCE),
+            ("fused_score", SCORE_TOLERANCE),
+            ("lexical_score", SCORE_TOLERANCE),
+            ("semantic_score", SCORE_TOLERANCE),
+        ):
+            delta = abs(old[name] - getattr(new, name))
+            if delta > tolerance:
+                problems.append(f"{query}: {new.passage_id} {name} differs by {delta:.6f}")
+        for name in ("rerank_rank", "fused_rank", "lexical_rank", "semantic_rank"):
+            was, now = old[name], getattr(new, name)
+            if was != now:
+                problems.append(f"{query}: {new.passage_id} {name} {was} vs {now}")
+    return problems
 
 
 def check_cache(index: Index, path: Path = CACHE_PATH) -> list[str]:
     """Differences between the committed cache and a fresh retrieval of every cached query.
 
-    Built for the image build, which may run on another platform than the one that wrote the cache.
-    Per query: the best passage is the same, or the other list's best scores within twice
-    `PLATFORM_RERANK_TOLERANCE` of it (a near-tie that the platforms order differently); a passage
-    in only one of the two top 5 lists scores within twice that tolerance of the foot of its list
-    (a near-tie at the cut, E138); the reranker score at every position agrees within
-    `PLATFORM_RERANK_TOLERANCE`; for passages in both lists, lexical and fused scores agree within
+    On the platform that wrote the cache (`build_platform()`) the comparison is strict: the same
+    ordered passages and ranks, reranker scores within `RERANK_TOLERANCE`, the other scores within
+    `SCORE_TOLERANCE`. Elsewhere (the image build may run on another platform) near-ties are
+    tolerated: the best passage is the same, or the other list's best scores within twice
+    `PLATFORM_RERANK_TOLERANCE` of it; at most one passage is in only one of the two top 5 lists,
+    and it scores within twice that tolerance of the foot of its list (a near-tie at the cut, E138);
+    the reranker score agrees within `PLATFORM_RERANK_TOLERANCE` at every position and for every
+    passage in both lists; for passages in both lists, lexical scores agree within
     `SCORE_TOLERANCE`, fused scores within `PLATFORM_FUSED_TOLERANCE`, semantic scores within
-    `PLATFORM_SEMANTIC_TOLERANCE`; the lexical rank is equal and the semantic and fused ranks differ
-    by at most `PLATFORM_RANK_SHIFT`. An empty list means the cache is current.
+    `PLATFORM_SEMANTIC_TOLERANCE`; the lexical rank is equal and the semantic and fused ranks
+    differ by at most `PLATFORM_RANK_SHIFT`. A cache written by another reranker, or a list with
+    fewer than `TOP` passages, is a problem. An empty list means the cache is current.
     """
+    data = _read(path)
     problems: list[str] = []
-    for query, stored in sorted(_read(path)["queries"].items()):
+    if data.get("model") != weights.RERANKER:
+        problems.append(
+            f"cache model {data.get('model')!r} is not the reranker {weights.RERANKER!r}"
+        )
+    strict = data.get("platform") == build_platform()
+    for query, stored in sorted(data["queries"].items()):
         fresh = index.rerank(query)
+        if len(stored) < TOP or len(fresh) < TOP:
+            problems.append(
+                f"{query}: expected {TOP} ranked passages, the cache has {len(stored)} "
+                f"and a fresh retrieval {len(fresh)}"
+            )
+            continue
+        if strict:
+            problems.extend(_strict_differences(query, stored, fresh))
+            continue
         old_ids = [h["passage_id"] for h in stored]
         new_ids = [h.passage_id for h in fresh]
         found = {h.passage_id: h for h in fresh}
@@ -378,6 +434,9 @@ def check_cache(index: Index, path: Path = CACHE_PATH) -> list[str]:
                 problems.append(f"{query}: position {position} rerank_score differs by {delta:.4f}")
         for old in common:
             new = found[old["passage_id"]]
+            delta = abs(old["rerank_score"] - new.rerank_score)
+            if delta > PLATFORM_RERANK_TOLERANCE:
+                problems.append(f"{query}: {new.passage_id} rerank_score differs by {delta:.4f}")
             for name, tolerance in (
                 ("fused_score", PLATFORM_FUSED_TOLERANCE),
                 ("lexical_score", SCORE_TOLERANCE),

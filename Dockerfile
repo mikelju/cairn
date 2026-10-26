@@ -27,8 +27,8 @@ COPY data/guidance ./data/guidance
 RUN uv sync --frozen --no-dev
 # The DuckDB file is built here, from the vendored XPT snapshot: no network at runtime.
 RUN .venv/bin/python -m cairn.ingest
-# Guidance check: a fresh retrieval of every cached query must match the committed cache (same ranked
-# passages, scores within tolerance); the build fails otherwise. Only the build loads the reranker.
+# Guidance check: a fresh retrieval of every cached query must match the committed cache (at most one
+# near-tied passage differs, scores within the cross-platform tolerances); the build fails otherwise. Only the build loads the reranker.
 COPY --from=weights /models /models
 RUN CAIRN_MODELS=/models .venv/bin/cairn guidance check
 
