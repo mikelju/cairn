@@ -26,10 +26,11 @@ demo-offline-check: build
 
 # Deploys the image to one Lightsail container service (created on first run), waits up to 5 minutes
 # (30 tries, 10 s apart) for RUNNING, and prints its state and URL.
+# SKIP_BUILD=1 deploys the image already loaded as $(IMAGE) (for example one built in GitHub Actions) without rebuilding.
 # Needs the AWS CLI with Lightsail permissions and the lightsailctl plugin on PATH.
 # MSYS_NO_PATHCONV stops Git Bash from rewriting /healthz into a Windows path; exported by make so cmd runs it too.
 deploy: export MSYS_NO_PATHCONV := 1
-deploy: build
+deploy: $(if $(SKIP_BUILD),,build)
 	aws lightsail get-container-services --service-name $(SERVICE) --region $(REGION) > /dev/null 2>&1 \
 		|| aws lightsail create-container-service --service-name $(SERVICE) --power $(POWER) --scale 1 --region $(REGION)
 	aws lightsail push-container-image --service-name $(SERVICE) --label app --image $(IMAGE) --region $(REGION)
