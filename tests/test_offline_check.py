@@ -1,4 +1,4 @@
-"""The offline smoke check (`cairn.offline_check`) runs against the app the way the container runs it."""
+"""The offline smoke check (`cairn.offline_check`) runs against the app as the container does."""
 
 from __future__ import annotations
 
