@@ -180,6 +180,20 @@ def record_command(
         raise typer.Exit(1)
 
 
+@app.command("record-draft")
+def record_draft_command(model: str = DEFAULT_MODEL, recordings: Path = RECORDINGS_DIR) -> None:
+    """Record the nonclinical draft against Bedrock (laptop only): one call, 2 USD ceiling."""
+    _known_model(model)
+    ceiling = live.call_ceiling(model)
+    typer.echo(f"ceiling: {ceiling:.2f} USD of {live.DRAFT_BUDGET_USD:.2f}")
+    try:
+        path = live.record_draft(recordings, model)
+    except Exception as error:  # SDK errors and a failing draft end as a plain message
+        typer.echo(f"error: {type(error).__name__}: {error}", err=True)
+        raise typer.Exit(1) from error
+    typer.echo(f"saved {path}")
+
+
 @app.command("smoke")
 def smoke_command(output: Path = live.SMOKE_PATH) -> None:
     """Send question, draft and judge prompts to each profile (laptop only)."""
