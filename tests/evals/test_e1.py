@@ -5,6 +5,10 @@ from typing import Any
 
 import pytest
 
+from cairn.body_weight import body_weight_change
+from cairn.content import ObservationLedger
+from cairn.decisions import apply_decisions, enumerate_slots, example_decisions
+from cairn.incidence import incidence
 from cairn.tools import call_tool
 
 
@@ -136,3 +140,20 @@ def test_e1_tk_ratio_and_quarantined_animal() -> None:
     assert [(r["usubjid"], r["value"]) for r in tk()["quarantined_rows"]] == [
         ("PDS2014-0032", -23450.0)
     ]
+
+
+# The example decision set: females 20 and males 200 mg/kg/day, the male flags need confirmation.
+def test_e1_example_decisions_give_the_noael_per_sex() -> None:
+    ledger = ObservationLedger()
+    ledger.add(incidence())
+    ledger.add(body_weight_change(sex="F"))
+    ledger.add(body_weight_change(sex="M"))
+    decisions = example_decisions(enumerate_slots(ledger), "R. Reviewer", "2026-10-27T10:00:00Z")
+    noaels = apply_decisions(ledger, decisions)
+    assert (noaels["F"].dose, noaels["M"].dose) == (20.0, 200.0)
+    assert noaels["F"].flags == []
+    assert [flag.split(" was ")[0] for flag in noaels["M"].flags] == [
+        "KIDNEY Necrosis",
+        "PANCREAS Inflammation",
+    ]
+    assert ledger.slots["NOAEL-M"] is None  # nothing is placed until a person confirms

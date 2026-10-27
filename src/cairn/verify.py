@@ -1,5 +1,8 @@
 """The verifier: rules 1-8 applied in order to a drafted answer before anyone reads it.
 
+A DecisionRef places text a person decided, so like a quotation it is masked in the model text and
+in the final text that rules 3, 6 and 7 read; an unknown or empty slot fails rule 2, which is also
+how rule 6 lets a NOAEL through only when it is placed by a confirmed NOAEL slot.
 Rule 8 is quote provenance: a QuoteRef must point to a passage that `search_guidance` returned in
 this run, and the quotation the code renders must equal the text retrieved.
 The text a quotation places is guideline wording copied by code, so rules 3, 6 and 7 look at the
@@ -16,6 +19,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from cairn.content import (
+    DecisionRef,
     ObservationLedger,
     QuoteRef,
     Sentence,
@@ -265,10 +269,14 @@ def _quotes(sentence: Sentence) -> list[QuoteRef]:
     return [part for part in sentence.parts if isinstance(part, QuoteRef)]
 
 
+def _decisions(sentence: Sentence) -> list[DecisionRef]:
+    return [part for part in sentence.parts if isinstance(part, DecisionRef)]
+
+
 def _model_text(sentence: Sentence) -> str:
     """What the model wrote, joined as the renderer joins it, with a mark where a value or a
     quotation goes."""
-    return render_parts(sentence, lambda ref: REF_MARK, lambda quote: REF_MARK)
+    return render_parts(sentence, lambda ref: REF_MARK, lambda q: REF_MARK, lambda d: REF_MARK)
 
 
 def _quote_problem(quote: QuoteRef, ledger: ObservationLedger) -> str | None:
@@ -370,12 +378,16 @@ def verify(sentences: list[Sentence], ledger: ObservationLedger) -> Verdict:
         try:
             for quote in _quotes(sentence):
                 quote_data(quote)  # rule 2: an unknown passage or sentence does not resolve
-            rendered.append(render_sentence(sentence, ledger, lambda quote: REF_MARK))
+            for decision in _decisions(sentence):
+                ledger.place_slot(decision, strict=True)  # rule 2: an unknown or empty slot
+            rendered.append(
+                render_sentence(sentence, ledger, lambda q: REF_MARK, lambda d: REF_MARK)
+            )
         except UnresolvedRef as error:
             rendered.append(written[index].replace(REF_MARK, ""))
             errors[index] = str(error)
     for index, sentence in enumerate(sentences):  # rule 1, on the model text and the final text
-        if not _refs(sentence) and not _quotes(sentence):
+        if not (_refs(sentence) or _quotes(sentence) or _decisions(sentence)):
             fail(1, index)
         elif _ends_a_sentence(written[index]) or (
             index not in errors and _ends_a_sentence(rendered[index])
