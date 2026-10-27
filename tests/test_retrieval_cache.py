@@ -160,6 +160,21 @@ def test_retrieval_cache_check_accepts_platform_drift(
     assert retrieval.check_cache(stub, retrieval.CACHE_PATH) == []  # type: ignore[arg-type]
 
 
+def _score(hit: dict[str, object]) -> float:
+    return float(str(hit["rerank_score"]))
+
+
+def _swap_neighbours(hits: list[dict[str, object]], first: float, second: float) -> None:
+    """Positions 3 and 4 trade places; the fresh list stays sorted by score, as the reranker's is.
+
+    The passage that moves up scores `first` and the one that moves down `second`; each keeps its
+    own other scores and takes the rank of its new position.
+    """
+    hits[2], hits[3] = hits[3], hits[2]
+    hits[2]["rerank_score"], hits[3]["rerank_score"] = first, second
+    hits[2]["rerank_rank"], hits[3]["rerank_rank"] = 3, 4
+
+
 @pytest.mark.usefixtures("other_platform")
 def test_retrieval_cache_check_accepts_a_swap_and_a_changed_last_passage(
     cache: dict[str, list[dict[str, object]]],
@@ -167,16 +182,47 @@ def test_retrieval_cache_check_accepts_a_swap_and_a_changed_last_passage(
     class Moved(_StubIndex):
         def hits(self, query: str) -> list[dict[str, object]]:
             hits = super().hits(query)
-            gap = float(str(hits[2]["rerank_score"])) - float(str(hits[3]["rerank_score"]))
-            if gap < retrieval.PLATFORM_RERANK_TOLERANCE:  # only a near-tie can swap places
-                hits[2], hits[3] = hits[3], hits[2]
+            old3, old4 = _score(hits[2]), _score(hits[3])
+            if old3 - old4 < retrieval.PLATFORM_RERANK_TOLERANCE:  # only a near-tie can swap
+                middle = (old3 + old4) / 2  # each score drifts by half the gap, within tolerance
+                _swap_neighbours(hits, middle + 1e-3, middle - 1e-3)
                 swapped.append(query)
+                drifts.extend([abs(old4 - middle), abs(old3 - middle)])
             hits[4]["passage_id"] = "OTHER-01"
             return hits
 
     swapped: list[str] = []
+    drifts: list[float] = []
     assert retrieval.check_cache(Moved(cache), retrieval.CACHE_PATH) == []  # type: ignore[arg-type]
-    assert swapped
+    assert swapped and max(drifts) > 0
+    assert max(drifts) < retrieval.PLATFORM_RERANK_TOLERANCE
+
+
+@pytest.mark.usefixtures("other_platform")
+def test_retrieval_cache_check_reports_one_passage_drifting_beyond_the_tolerance_in_a_swap(
+    cache: dict[str, list[dict[str, object]]],
+) -> None:
+    tolerance = retrieval.PLATFORM_RERANK_TOLERANCE
+
+    class Drifted(_StubIndex):
+        def hits(self, query: str) -> list[dict[str, object]]:
+            hits = super().hits(query)
+            old3, old4 = _score(hits[2]), _score(hits[3])
+            gap = old3 - old4
+            if 0.05 < gap < tolerance:  # the lower passage jumps above the higher one
+                moved_up = old4 + tolerance + 0.05  # its own score moves by more than the tolerance
+                _swap_neighbours(hits, moved_up, old3)
+                # by position both scores still agree within the tolerance
+                assert abs(moved_up - old3) <= tolerance and abs(old3 - old4) <= tolerance
+                drifted.append(query)
+            return hits
+
+    drifted: list[str] = []
+    problems = retrieval.check_cache(Drifted(cache), retrieval.CACHE_PATH)  # type: ignore[arg-type]
+    assert drifted, "no cached query has a near-tie at positions 3 and 4 to model"
+    assert not any("position" in p for p in problems)
+    assert len(problems) == len(drifted)
+    assert all("rerank_score differs by" in p for p in problems)
 
 
 @pytest.mark.usefixtures("other_platform")
