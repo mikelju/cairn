@@ -12,7 +12,7 @@
 <button type="submit" name="actor" value="A. Author">Approve as A. Author</button>
 <button type="submit" name="actor" value="R. Reviewer">Approve as R. Reviewer</button></form>
 {% endif %}
-<p class="prod">In production → an editor with tracked changes.</p>
+{{ a.in_production("an editor with tracked changes.") }}
 </div>
 <div class="col-right card">
 <h2>Checks</h2>
