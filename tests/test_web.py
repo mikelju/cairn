@@ -401,6 +401,26 @@ def test_step3_quote_link_and_nav_follow_the_cited_sentence_page() -> None:
     assert 'aria-current="step"' not in entry
 
 
+def test_step3_quote_cite_and_links_use_the_cited_sentence_page(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from cairn import web
+    from cairn.passages import stored_passages
+
+    real = stored_passages()
+    passage = real["M4S-2.6-01"]
+    later = next(s for s in passage.sentences if s.sentence_id == "M4S-2.6-01.s12")
+    moved = passage.model_copy(update={"sentences": [later, *passage.sentences]})
+    assert passage.page_start == 7
+    monkeypatch.setattr(web, "stored_passages", lambda: {**real, passage.passage_id: moved})
+    quote = next(q for q in web._step3_context()["quotes"] if q["text"] == later.text)
+    assert quote["cite"].endswith(" 8") and quote["link"].endswith("#page=8")
+    assert quote["highlight"] == "/highlight/M4S-2.6-01.s12"
+    with TestClient(create_app()) as client:
+        page = client.get("/step/3").text
+    assert "#page=8" in page
+
+
 def test_web_parses_passages_and_highlights_once_per_process(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
