@@ -15,7 +15,7 @@ from cairn.content import (
     ValueRef,
 )
 from cairn.incidence import incidence
-from cairn.passages import Passage
+from cairn.passages import Passage, stored_passages
 from cairn.render import format_value, quotations, quote_data, render
 from cairn.tk_summary import tk_summary
 from cairn.tools import study_design
@@ -216,3 +216,20 @@ def test_quoteref_link_uses_the_page_where_the_cited_sentence_starts() -> None:
     data = quote_data(ref)
     assert data["page"] == 8
     assert data["link"].endswith("#page=8")
+
+
+def test_cited_page_falls_back_to_the_passage_start_only_without_a_highlight_entry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from cairn import highlight
+
+    passage = stored_passages()["M4S-2.6-01"]
+    assert (passage.page_start, passage.page_end) == (7, 8)
+    ref = QuoteRef(passage_id=passage.passage_id, sentence_ids=["M4S-2.6-01.s12"])
+    monkeypatch.setattr(highlight, "highlights_by_sentence", lambda: {})
+    assert highlight.cited_page(passage, "M4S-2.6-01.s12") == passage.page_start
+    assert quote_data(ref)["page"] == passage.page_start
+    entries = {"M4S-2.6-01.s12": [{"page": 8}]}
+    monkeypatch.setattr(highlight, "highlights_by_sentence", lambda: entries)
+    assert highlight.cited_page(passage, "M4S-2.6-01.s12") == 8
+    assert quote_data(ref)["page"] == 8 and quote_data(ref)["link"].endswith("#page=8")
