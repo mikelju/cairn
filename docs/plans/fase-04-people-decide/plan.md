@@ -37,6 +37,8 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | E160 | ejecutor (Sonnet) | Increment 2 without Bedrock: workflow module, draft schema and prompt, hand-written fixture, tests, `record-draft` target | done | 68f00bf; 22 workflow and recording tests rerun offline by the supervisor, green |
 | E161 | ejecutor (Sonnet) | Increment 2 closing: one real draft recording with `make record-draft`, ceiling 2 USD | done | 183e731; opus-4-6, 1 attempt, 0.054 USD of 2; 24 tests rerun offline by the supervisor, green |
 | E162 | ejecutor (Sonnet) | Increment 3: API for decisions, confirm and approve, 403, 409, idempotent resume, E6 | done | 3dd8517; E6 rerun offline by the supervisor, green; threads in `:memory:` unless `CAIRN_THREADS_DB` is set |
+| E163 | ejecutor (Sonnet) | Increment 4: steps 4 and 5 to the 02c mockups, HTMX, word cap, offline check | partial | 06a827d; steps 4 and 5 work end to end offline, 24 targeted tests green; screenshots, full `npm run check` and `make demo-offline-check` pending (browser pane refused localhost; slow machine) |
+| E164 | ejecutor (Sonnet) | Increment 4 closing: screenshots at 1440x900, full `npm run check`, `make demo-offline-check` | in progress | |
 
 ## User decisions
 Questions the supervisor raises to the user. Statuses: open, answered, deferred; closed with the literal answer.
