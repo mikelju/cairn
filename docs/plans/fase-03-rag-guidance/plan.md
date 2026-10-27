@@ -139,7 +139,7 @@ Phase 03 brief IDs start at E101 and review rounds at R101, so they never collid
 | E148 | ejecutor (Sonnet) | Copy the handoff file to `.claude/relevo/` | done | copied |
 | E149 | ejecutor (Sonnet) | R101 items 1-4: `_same_top` sign and cap with a cross-check against the other list's foot, `check_cache` by id/model/strict same-platform/short lists, 422 for uncached replay query, offline check test imports the module | done | commits 68a25f7..84a890b |
 | E150 | ejecutor (Sonnet) | R101 items 5-10: cited sentence page via `highlight.cited_page`, per-run 5 USD record ceiling and `BUDGET_USD` 10, dead `load_reranker` removed, `verify_dir` before parsing PDFs, shared cached loaders, Explore not marked step 3 | done | commits 15aedb9, 35a74c7, ecf3187, 640f297 |
-| E151 | ejecutor (Sonnet) | R101 last batch: README, master plan and records, full `npm run check`, push and CI | in progress | PENDING |
+| E151 | ejecutor (Sonnet) | R101 last batch: README, master plan and records, full `npm run check`, push and CI | done | commit 13a194d (records and docs); `npm run check` 495 passed, coverage 97.44 %; CI green on 13a194d: ci https://github.com/mikelju/cairn/actions/runs/40331423783, image https://github.com/mikelju/cairn/actions/runs/40331423716 |
 
 ## User decisions
 Questions the supervisor raises with the user. Statuses: open, answered, deferred; each closes with the user's literal answer.
