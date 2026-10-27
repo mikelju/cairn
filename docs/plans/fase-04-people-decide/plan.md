@@ -1,7 +1,7 @@
 # Phase 04 - People decide: plan and results
 
-Status: draft
-Spec: `spec.md` (draft)
+Status: in progress
+Spec: `spec.md` (approved, frozen)
 Base: branch `claude/fase-04-people-decide-0d45bc` from `main` at 047f764 (phase 03 merged, PR #11)
 
 ## Records
@@ -34,7 +34,7 @@ Questions the supervisor raises to the user. Statuses: open, answered, deferred;
 
 | ID | Question | Options and recommendation | Status | User answer |
 |---|---|---|---|---|
-| U1 | Spec open decisions O1-O4 and approval of the spec | See `spec.md`, Open decisions; recommended A for all four | open | |
+| U1 | Spec open decisions O1-O4 and approval of the spec | See `spec.md`, Open decisions; recommended A for all four | answered | "Apruebo la spec de la fase 04 con A en O1, O2, O3 y O4, incluido un gasto máximo de 2 USD en Bedrock con el perfil default para la grabación del borrador." |
 
 ## Deviations
 | ID | Summary | Affects criteria | Status |

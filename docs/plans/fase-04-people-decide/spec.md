@@ -1,7 +1,7 @@
 # Phase 04 - People decide: specification
 
-Status: draft
-Approved by the user: -
+Status: approved (frozen)
+Approved by the user: 2026-10-27 (A in O1-O4, Bedrock ceiling 2 USD with the `default` profile)
 Master plan: `../0_plan_maestro.md`
 Definitions of phases 02a, 02b and 03 (Observation, ValueRef, QuoteRef, rules 1-8, renderer, gateway, recordings, E1-E4, step 3 fixed queries) apply unchanged unless this spec extends them.
 
@@ -52,7 +52,7 @@ Frozen on approval. Changing them requires a deviation approved by the user.
 - The 02c mockups name step 4 "Analyse" and step 5 "Draft", while the PRD puts the draft in step 4 and approval in step 5 (decision O2).
 
 ## Open decisions
-To be resolved by the user before approval.
+Resolved by the user on 2026-10-27: A in all four (literal answer in `plan.md`, U1).
 
 | ID | Question | Options | Recommendation |
 |---|---|---|---|
