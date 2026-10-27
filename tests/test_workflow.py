@@ -1,6 +1,7 @@
 """Workflow tests: pauses, resume and the draft replay against fixture and real recording."""
 
 import asyncio
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -130,3 +131,46 @@ def test_record_draft_saves_a_verified_recording(
     assert (
         path.name == "draft.json" and saved["source"] == "bedrock" and saved["calls"][0]["cost_usd"]
     )
+
+
+PROMPT_SHA256 = "2e9f9a6734308df57a2ed1d6c5ae0ff6c5ddd9aaaa4ee205b85a16438fdede2a"
+
+
+def test_draft_prompt_is_pinned_to_its_version() -> None:
+    from cairn import workflow
+
+    raw = (Path(workflow.__file__).parent / "prompts" / "draft.md").read_bytes()
+    digest = hashlib.sha256(raw.replace(b"\r\n", b"\n")).hexdigest()
+    assert (workflow.DRAFT_PROMPT_VERSION, digest) == ("draft-1", PROMPT_SHA256), (
+        "draft prompt changed: bump DRAFT_PROMPT_VERSION and re-record"
+    )
+
+
+def test_record_draft_command_fails_when_the_cost_passes_the_ceiling(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from typer.testing import CliRunner
+
+    from cairn import live
+    from cairn.cli import app
+
+    reply = json.loads((FIXTURES / "draft.json").read_text(encoding="utf-8"))["calls"][0][
+        "response"
+    ]
+
+    def client(tokens: int) -> Any:
+        class Fake:
+            class messages:
+                @staticmethod
+                def create(**kwargs: Any) -> dict[str, Any]:
+                    return {**reply, "usage": {"input_tokens": tokens, "output_tokens": tokens}}
+
+        return Fake
+
+    args = ["record-draft", "--recordings", str(tmp_path)]
+    monkeypatch.setattr(live, "make_client", lambda mode: client(1000))
+    cheap = CliRunner().invoke(app, args)
+    assert cheap.exit_code == 0 and "cost: 0." in cheap.output, cheap.output
+    monkeypatch.setattr(live, "make_client", lambda mode: client(10**8))
+    dear = CliRunner().invoke(app, args)
+    assert dear.exit_code == 1 and "passes the ceiling" in dear.output

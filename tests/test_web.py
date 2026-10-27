@@ -464,3 +464,36 @@ def test_steps_4_and_5_people_decide_and_the_author_cannot_approve() -> None:
         assert "403 · Authors cannot approve their own draft. Enforced by the API" in refused.text
         done = client.post("/step/5/approve", data={"thread": id_, "actor": "R. Reviewer"})
         assert "Approved by R. Reviewer" in done.text
+
+
+def _filled_thread(client: TestClient) -> str:
+    step4 = client.get("/step/4", follow_redirects=True).text
+    match = re.search(r'name="thread" value="([0-9a-f]+)"', step4)
+    assert match
+    client.post("/step/4/example", data={"thread": match.group(1)})
+    return match.group(1)
+
+
+def test_step_pages_redirect_on_409_and_reject_bad_input() -> None:
+    with TestClient(create_app(), follow_redirects=False) as client:
+        id_ = _filled_thread(client)
+        client.post("/step/4/confirm", data={"thread": id_, "actor": "R. Reviewer"})
+        again = client.post("/step/4/example", data={"thread": id_})  # back button, Fill example
+        assert again.status_code == 303 and "/step/5?thread=" + id_ in again.headers["location"]
+        twice = client.post("/step/5/approve", data={"thread": id_, "actor": "R. Reviewer"})
+        assert twice.status_code == 200
+        second = client.post("/step/5/approve", data={"thread": id_, "actor": "R. Reviewer"})
+        assert second.status_code == 303 and "/step/5?thread=" in second.headers["location"]
+        for reply in (
+            client.get(f"/step/5?thread={id_}&actor=Mallory"),
+            client.post("/step/5/approve", data={"thread": id_, "actor": "Mallory"}),
+            client.post("/step/4/confirm", data={"thread": id_, "actor": "Mallory"}),
+            client.post("/step/4/decide", data={}),
+        ):
+            assert reply.status_code == 422
+        fresh = _filled_thread(client)
+        slot = client.get(f"/api/threads/{fresh}").json()["slots"][0]["slot"]
+        bad = client.post(
+            "/step/4/decide", data={"thread": fresh, "t_" + slot: "x", "a_" + slot: "x"}
+        )
+        assert bad.status_code == 422

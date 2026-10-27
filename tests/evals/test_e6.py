@@ -1,6 +1,8 @@
 """E6: people decide through the API, offline: pauses, 403, 409, idempotent resume, forms."""
 
+import json
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -211,3 +213,59 @@ def test_api_form_combinations_use_the_noael_rule_with_no_model_call(
     if females is None:
         assert "NOAEL, females: not established" in body["final"]["text"]
     assert model_calls == [1]  # the draft at start, nothing after
+
+
+def _twice(client: TestClient, path: str, body: dict[str, Any]) -> list[int]:
+    with ThreadPoolExecutor(2) as pool:
+        return sorted(pool.map(lambda _: client.post(path, json=body).status_code, range(2)))
+
+
+def test_api_concurrent_confirm_and_approve_succeed_once(client: TestClient) -> None:
+    thread = start(client)
+    path = f"/api/threads/{thread['thread_id']}"
+    client.post(f"{path}/decisions", json={"actor": AUTHOR, "decisions": form(thread, example)})
+    assert _twice(client, f"{path}/confirm", {"actor": REVIEWER, "confirmed": ["F", "M"]}) == [
+        200,
+        409,
+    ]
+    assert _twice(client, f"{path}/approve", {"actor": REVIEWER}) == [200, 409]
+
+
+def test_api_author_is_always_the_author(client: TestClient) -> None:
+    reply = client.post("/api/threads", json={"author": REVIEWER})
+    thread = reply.json()
+    assert thread["author"] == AUTHOR
+    path = f"/api/threads/{thread['thread_id']}"
+    client.post(f"{path}/decisions", json={"actor": AUTHOR, "decisions": form(thread, example)})
+    mine = client.post(f"{path}/confirm", json={"actor": AUTHOR, "confirmed": ["F", "M"]})
+    assert mine.status_code == 403
+    theirs = client.post(f"{path}/confirm", json={"actor": REVIEWER, "confirmed": ["F", "M"]})
+    assert theirs.status_code == 200
+    assert approve(client, thread, AUTHOR).status_code == 403
+
+
+@pytest.mark.parametrize(
+    "dose", [1e9, -20.0, float("nan"), 30.0], ids=["huge", "negative", "nan", "not-a-dose"]
+)
+def test_api_422_for_a_dose_the_slot_does_not_have(client: TestClient, dose: float) -> None:
+    thread = start(client)
+    path = f"/api/threads/{thread['thread_id']}"
+    for field in ("adverse_from", "treatment_related_from"):
+        bad = form(thread, example)
+        bad[0][field] = dose
+        body = json.dumps({"actor": AUTHOR, "decisions": bad}, allow_nan=True)
+        reply = client.post(
+            f"{path}/decisions", content=body, headers={"content-type": "application/json"}
+        )
+        assert reply.status_code == 422
+    assert client.get(path).status_code == 200
+
+
+def test_api_422_when_treatment_related_comes_after_adverse(client: TestClient) -> None:
+    thread = start(client)
+    path = f"/api/threads/{thread['thread_id']}"
+    bad = form(thread, example)
+    doses = sorted(d for d in thread["slots"][0]["doses"] if d > 0)
+    bad[0].update(treatment_related_from=doses[-1], adverse_from=doses[0])
+    reply = client.post(f"{path}/decisions", json={"actor": AUTHOR, "decisions": bad})
+    assert reply.status_code == 422

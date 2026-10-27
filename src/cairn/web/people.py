@@ -17,6 +17,7 @@ from cairn.web import templates
 from cairn.web.threads import (
     AUTHOR,
     REVIEWER,
+    Actor,
     Approve,
     Confirm,
     DecisionIn,
@@ -39,7 +40,23 @@ def _choice(dose: float | None) -> str:
 
 
 def _dose(value: str) -> float | None:
-    return None if value == "none" else float(value)
+    if value == "none":
+        return None
+    try:
+        return float(value)
+    except ValueError:
+        raise HTTPException(status_code=422, detail=f"bad dose {value!r}") from None
+
+
+def _actor(actor: str) -> Actor:
+    if actor not in (AUTHOR, REVIEWER):
+        raise HTTPException(status_code=422, detail="unknown actor")
+    return actor
+
+
+def _current(thread: str, actor: str) -> RedirectResponse:
+    """After a 409: the page for the state the thread is really in, not the raw JSON."""
+    return RedirectResponse(f"/step/5?thread={thread}&actor={actor}", status_code=303)
 
 
 async def _draft(request: Request, thread: str) -> Markup:
@@ -50,6 +67,17 @@ async def _draft(request: Request, thread: str) -> Markup:
     apply_decisions(ledger, decisions, frozenset(state.get("confirmed", [])))
     text = str(escape(render(sections_of(state), ledger)))
     return Markup(EMPTY_SLOT.sub(r'<span class="slot">\1</span>', text))
+
+
+def _select(name: str, label: str, doses: list[str], chosen: str) -> Markup:
+    options = [("", "choose"), ("none", "none"), *[(d, d) for d in doses]]
+    body = "".join(
+        Markup('<option value="{}"{}>{}</option>').format(
+            v, Markup(" selected" if v == chosen else ""), t
+        )
+        for v, t in options
+    )
+    return Markup('<select name="{}" aria-label="{}">{}</select>').format(name, label, Markup(body))
 
 
 async def _fragment(request: Request, view: dict[str, Any]) -> dict[str, Any]:
@@ -64,9 +92,25 @@ async def _fragment(request: Request, view: dict[str, Any]) -> dict[str, Any]:
         }
         for s in view["slots"]
     ]
+    table = [
+        [
+            r["finding"],
+            r["sex"],
+            _select(
+                "t_" + r["slot"],
+                f"Treatment-related from {r['finding']} {r['sex']}",
+                r["doses"],
+                r["t"],
+            ),
+            _select(
+                "a_" + r["slot"], f"Adverse from {r['finding']} {r['sex']}", r["doses"], r["a"]
+            ),
+        ]
+        for r in rows
+    ]
     return {
         "thread": view["thread_id"],
-        "rows": rows,
+        "rows": table,
         "noael": view["noael"],
         "complete": len(given) == len(view["slots"]),
         "draft": await _draft(request, view["thread_id"]),
@@ -85,6 +129,8 @@ async def step4(request: Request, thread: str | None = None) -> Response:
 @people.post("/step/4/decide", response_class=HTMLResponse)
 async def step4_decide(request: Request) -> HTMLResponse:
     form = await request.form()
+    if "thread" not in form:
+        raise HTTPException(status_code=422, detail="thread is required")
     thread = str(form["thread"])
     items = []
     for slot in (await get_thread(request, thread))["slots"]:
@@ -95,7 +141,14 @@ async def step4_decide(request: Request) -> HTMLResponse:
                     dec_id=slot["slot"], treatment_related_from=_dose(t), adverse_from=_dose(a)
                 )
             )
-    view = await record_decisions(request, thread, Record(actor=AUTHOR, decisions=items))
+    try:
+        view = await record_decisions(request, thread, Record(actor=AUTHOR, decisions=items))
+    except HTTPException as refusal:
+        if refusal.status_code != 409:
+            raise
+        return HTMLResponse(
+            status_code=204, headers={"HX-Redirect": _current(thread, AUTHOR).headers["location"]}
+        )
     return templates.TemplateResponse(request, "step4_result.html", await _fragment(request, view))
 
 
@@ -110,7 +163,12 @@ async def step4_example(request: Request, thread: Annotated[str, Form()]) -> Red
         )
         for s in slots
     ]
-    await record_decisions(request, thread, Record(actor=AUTHOR, decisions=items))
+    try:
+        await record_decisions(request, thread, Record(actor=AUTHOR, decisions=items))
+    except HTTPException as refusal:
+        if refusal.status_code != 409:
+            raise
+        return _current(thread, AUTHOR)
     return RedirectResponse(f"/step/4?thread={thread}", status_code=303)
 
 
@@ -118,7 +176,13 @@ async def step4_example(request: Request, thread: Annotated[str, Form()]) -> Red
 async def step4_confirm(
     request: Request, thread: Annotated[str, Form()], actor: Annotated[str, Form()]
 ) -> RedirectResponse:
-    await confirm(request, thread, Confirm(actor=actor, confirmed=["F", "M"]))  # type: ignore[arg-type]
+    who = _actor(actor)
+    try:
+        await confirm(request, thread, Confirm(actor=who, confirmed=["F", "M"]))
+    except HTTPException as refusal:
+        if refusal.status_code != 409:
+            raise
+        return _current(thread, who)
     return RedirectResponse(f"/step/5?thread={thread}&actor={actor}", status_code=303)
 
 
@@ -155,18 +219,21 @@ async def _step5(request: Request, thread: str, actor: str, error: str = "") -> 
 async def step5(request: Request, thread: str | None = None, actor: str = REVIEWER) -> Response:
     if thread is None:
         return RedirectResponse("/step/4", status_code=303)
-    return await _step5(request, thread, actor)
+    return await _step5(request, thread, _actor(actor))
 
 
 @people.post("/step/5/approve", response_class=HTMLResponse)
 async def step5_approve(
     request: Request, thread: Annotated[str, Form()], actor: Annotated[str, Form()]
 ) -> Response:
+    who = _actor(actor)
     error = ""
     try:
-        await approve(request, thread, Approve(actor=actor))  # type: ignore[arg-type]
+        await approve(request, thread, Approve(actor=who))
     except HTTPException as refusal:
+        if refusal.status_code == 409:
+            return _current(thread, who)
         if refusal.status_code != 403:
             raise
         error = f"403 · {refusal.detail} Enforced by the API, not the UI"
-    return await _step5(request, thread, actor, error)
+    return await _step5(request, thread, who, error)

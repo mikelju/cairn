@@ -11,7 +11,7 @@ from pydantic import ValidationError
 from cairn import highlight, live, passages, retrieval, weights
 from cairn.canonical import canonical_json
 from cairn.gateway import DEFAULT_MODEL, MODEL_PROFILES, GatewayError
-from cairn.recording import RECORDINGS_DIR, StaleRecording, recorded_model
+from cairn.recording import RECORDINGS_DIR, StaleRecording, recorded_model, total_cost
 from cairn.tools import argument_problems, result_sha256
 from cairn.tools import call_tool as registry_call
 
@@ -192,6 +192,11 @@ def record_draft_command(model: str = DEFAULT_MODEL, recordings: Path = RECORDIN
         typer.echo(f"error: {type(error).__name__}: {error}", err=True)
         raise typer.Exit(1) from error
     typer.echo(f"saved {path}")
+    spent = total_cost(json.loads(path.read_text(encoding="utf-8"))) or 0.0
+    typer.echo(f"cost: {spent:.2f} USD")
+    if spent > ceiling:
+        typer.echo(f"error: cost passes the ceiling of {ceiling:.2f} USD", err=True)
+        raise typer.Exit(1)
 
 
 @app.command("smoke")

@@ -4,6 +4,7 @@ The actor comes in each request (two simulated demo users); the API, not the pag
 self-approval. Recording decisions only updates the checkpoint and recomputes: no model call.
 """
 
+import asyncio
 import uuid
 from datetime import UTC, datetime
 from typing import Any, Literal
@@ -23,8 +24,12 @@ REVIEWER: Actor = "R. Reviewer"
 threads = APIRouter(prefix="/api/threads")
 
 
-class Start(BaseModel):
-    author: Actor = AUTHOR
+_locks: dict[str, asyncio.Lock] = {}
+
+
+def _lock(thread_id: str) -> asyncio.Lock:
+    """One lock per thread: the check of the pause and the write or resume happen together."""
+    return _locks.setdefault(thread_id, asyncio.Lock())
 
 
 class DecisionIn(BaseModel):
@@ -98,10 +103,10 @@ def _at(waiting: str, expected: str) -> None:
 
 
 @threads.post("", status_code=201)
-async def start(request: Request, body: Start | None = None) -> dict[str, Any]:
+async def start(request: Request) -> dict[str, Any]:
     thread_id = uuid.uuid4().hex
     graph = _graph(request)
-    await graph.ainvoke({"author": (body or Start()).author}, _config(thread_id))
+    await graph.ainvoke({"author": AUTHOR}, _config(thread_id))
     _, _, state, waiting = await _load(request, thread_id)
     return _view(thread_id, state, waiting)
 
@@ -115,6 +120,11 @@ async def get_thread(request: Request, thread_id: str) -> dict[str, Any]:
 @threads.post("/{thread_id}/decisions")
 async def record_decisions(request: Request, thread_id: str, body: Record) -> dict[str, Any]:
     """Store the decisions in the checkpoint; the NOAEL and the verdict are recomputed, no model."""
+    async with _lock(thread_id):
+        return await _record(request, thread_id, body)
+
+
+async def _record(request: Request, thread_id: str, body: Record) -> dict[str, Any]:
     graph, config, state, waiting = await _load(request, thread_id)
     _at(waiting, "await_decisions")
     slots = {s.slot: s for s in enumerate_slots(build_ledger(state))}
@@ -124,6 +134,11 @@ async def record_decisions(request: Request, thread_id: str, body: Record) -> di
         if item.dec_id not in slots:
             raise HTTPException(status_code=422, detail=f"unknown slot {item.dec_id}")
         slot = slots[item.dec_id]
+        given = (item.treatment_related_from, item.adverse_from)
+        if any(d is not None and d not in slot.doses for d in given):
+            raise HTTPException(status_code=422, detail=f"dose not in {list(slot.doses)}")
+        if None not in given and item.treatment_related_from > item.adverse_from:  # type: ignore[operator]
+            raise HTTPException(status_code=422, detail="treatment-related after adverse")
         records.append(
             Decision(
                 dec_id=slot.slot,
@@ -143,9 +158,14 @@ async def record_decisions(request: Request, thread_id: str, body: Record) -> di
 @threads.post("/{thread_id}/confirm")
 async def confirm(request: Request, thread_id: str, body: Confirm) -> dict[str, Any]:
     """A reviewer confirms the NOAEL of each listed sex; resumes only if the text then verifies."""
+    async with _lock(thread_id):
+        return await _confirm(request, thread_id, body)
+
+
+async def _confirm(request: Request, thread_id: str, body: Confirm) -> dict[str, Any]:
     graph, config, state, waiting = await _load(request, thread_id)
     _at(waiting, "await_decisions")
-    if body.actor != REVIEWER:
+    if body.actor != REVIEWER or body.actor == state.get("author"):
         raise HTTPException(status_code=403, detail="Only the reviewer confirms a NOAEL.")
     state = {**state, "confirmed": list(body.confirmed)}
     if not verify_final(state).ok:
@@ -158,6 +178,11 @@ async def confirm(request: Request, thread_id: str, body: Confirm) -> dict[str, 
 
 @threads.post("/{thread_id}/approve")
 async def approve(request: Request, thread_id: str, body: Approve) -> dict[str, Any]:
+    async with _lock(thread_id):
+        return await _approve(request, thread_id, body)
+
+
+async def _approve(request: Request, thread_id: str, body: Approve) -> dict[str, Any]:
     graph, config, state, waiting = await _load(request, thread_id)
     _at(waiting, "await_approval")
     if body.actor == state.get("author"):
