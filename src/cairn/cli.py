@@ -155,7 +155,7 @@ def record_command(
     model: str = DEFAULT_MODEL,
     recordings: Path = RECORDINGS_DIR,
 ) -> None:
-    """Record questions against Bedrock (laptop only); stops before 5 USD in one run."""
+    """Record questions against Bedrock (laptop only); stops before 5 USD in all, counting what is recorded."""
     _known_model(model)
     ids = [live.question_text(q)[0] for q in questions]
     if not all(ids):
@@ -163,17 +163,17 @@ def record_command(
         raise typer.Exit(2)
     before = live.recorded_spend(recordings)
     typer.echo(
-        f"ceiling: {live.record_ceiling(model, len(ids)):.2f} USD this run, "
-        f"limit {live.RECORD_BUDGET_USD:.2f} per run; {before:.2f} already recorded (information)"
+        f"ceiling: {live.record_ceiling(model, len(ids)):.2f} USD more, "
+        f"{before:.2f} already recorded, of {live.RECORD_BUDGET_USD:.2f}"
     )
-    report = live.record_questions(ids, recordings, model)
+    report = live.record_questions(ids, recordings, model, spent=before)
     for question_id, outcome in report.outcomes.items():
         typer.echo(f"{question_id}: {outcome}")
     for path in report.saved:
         typer.echo(f"saved {path}")
     for question_id in report.unsaved:
         typer.echo(f"not saved: {question_id} (the file is left as it was)")
-    typer.echo(f"spent: {report.spent:.4f} USD")
+    typer.echo(f"spent: {report.spent - before:.4f} USD")
     if report.stopped:
         typer.echo(report.stopped, err=report.stopped.startswith("error:"))
     if report.stopped or report.unsaved:

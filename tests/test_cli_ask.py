@@ -96,9 +96,7 @@ def test_record_rejects_free_text_and_stops_at_budget(
     assert live.record_ceiling("opus-4-6", 2) < live.BUDGET_USD
 
 
-def test_record_limit_is_per_run_and_recorded_spend_is_only_information(
-    fake: Script, tmp_path: Path
-) -> None:
+def test_record_ceiling_counts_what_is_already_recorded(fake: Script, tmp_path: Path) -> None:
     assert live.BUDGET_USD == 10.0 and live.RECORD_BUDGET_USD == 5.0
     (tmp_path / "q1.json").write_text(json.dumps({"calls": [{"cost_usd": 4.99}]}), encoding="utf-8")
     (tmp_path / "q9.json").write_text(json.dumps({"calls": [{"cost_usd": None}]}), encoding="utf-8")
@@ -106,9 +104,9 @@ def test_record_limit_is_per_run_and_recorded_spend_is_only_information(
     assert live.recorded_spend(tmp_path) == pytest.approx(4.99)
     assert live.recorded_spend(tmp_path / "missing") == 0.0
     done = runner.invoke(app, ["record", "Q2", "--recordings", str(tmp_path)])
-    assert "stopped before Q2" not in done.output
-    assert "4.99 already recorded (information)" in done.output
-    assert "limit 5.00 per run" in done.output
+    assert done.exit_code == 1 and "stopped before Q2" in done.output
+    assert "4.99 already recorded, of 5.00" in done.output
+    assert not (tmp_path / "q2.json").exists()
 
 
 def test_record_questions_stops_when_one_run_would_pass_five_usd(tmp_path: Path) -> None:

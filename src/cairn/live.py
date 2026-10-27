@@ -26,7 +26,7 @@ from cairn.questions import QUESTIONS
 from cairn.recording import RecordingClient, RecordingKey, ReplayClient, total_cost
 
 BUDGET_USD = 10.0  # smoke
-RECORD_BUDGET_USD = 5.0  # one `make record` run (phase decision O5)
+RECORD_BUDGET_USD = 5.0  # phase ceiling (O5, D107): counts what is already recorded
 # Ceiling for one model call: a generous prompt size and the largest reply the gateway allows.
 CEILING_INPUT_TOKENS = 20_000
 CEILING_OUTPUT_TOKENS = MAX_TOKENS
@@ -118,7 +118,7 @@ def record_questions(
     budget: float = RECORD_BUDGET_USD,
     spent: float = 0.0,
 ) -> RecordReport:
-    """Record each question; stop before the next one could pass the budget."""
+    """Record each question; stop before the next one could pass the budget (`spent` counts already)."""
     report = RecordReport(spent=spent)
     ids = list(dict.fromkeys(ids))
     step = MAX_CALLS * call_ceiling(model)
