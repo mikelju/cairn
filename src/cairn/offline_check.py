@@ -8,13 +8,17 @@ import subprocess
 import sys
 import time
 import urllib.request as http
+from urllib.error import HTTPError
 
 BASE = "http://127.0.0.1:8000"
 
 
 def get(path: str) -> tuple[int, bytes]:
-    with http.urlopen(BASE + path) as response:
-        return response.status, response.read()
+    try:
+        with http.urlopen(BASE + path) as response:
+            return response.status, response.read()
+    except HTTPError as error:  # urllib raises on 4xx/5xx; the check reports it as a failure
+        return error.code, error.read()
 
 
 def main() -> int:
@@ -24,8 +28,14 @@ def main() -> int:
             if socket.socket().connect_ex(("127.0.0.1", 8000)) == 0:
                 break
             time.sleep(1)
+        failed = False
         for path in ("/", "/step/1", "/step/2", "/step/3", "/explore", "/healthz"):
-            print(path, get(path)[0])
+            status = get(path)[0]
+            print(path, status)
+            failed = failed or status != 200
+        if failed:
+            print("a route did not answer 200")
+            return 1
         _, step3 = get("/step/3")
         link = re.search(rb'href="(/highlight/[^"]+)"', step3)
         if link is None:

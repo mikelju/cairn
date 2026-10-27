@@ -4,14 +4,22 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
+from email.message import Message
+from io import BytesIO
 from types import SimpleNamespace
 from typing import Any
+from urllib.error import HTTPError
 
 import pytest
 from fastapi.testclient import TestClient
 
 from cairn import offline_check
 from cairn.app import create_app
+
+
+def _http_error(path: str, status: int, body: bytes) -> HTTPError:
+    """What `urllib.request.urlopen` raises for a 4xx or 5xx answer."""
+    return HTTPError(offline_check.BASE + path, status, "error", Message(), BytesIO(body))
 
 
 class _Server:
@@ -35,6 +43,8 @@ def run_check(monkeypatch: pytest.MonkeyPatch) -> Iterator[Callable[..., int]]:
                     path = target.full_url.removeprefix(offline_check.BASE)
                     data = target.data
                 forced = override(path)
+                if forced is not None and forced[0] >= 400:  # urllib raises on 4xx and 5xx
+                    raise _http_error(path, forced[0], forced[1])
                 if forced is not None:
                     yield SimpleNamespace(status=forced[0], read=lambda: forced[1])
                     return
@@ -47,6 +57,8 @@ def run_check(monkeypatch: pytest.MonkeyPatch) -> Iterator[Callable[..., int]]:
                         headers={"content-type": "application/x-www-form-urlencoded"},
                     )
                 )
+                if response.status_code >= 400:
+                    raise _http_error(path, response.status_code, response.content)
                 yield SimpleNamespace(status=response.status_code, read=lambda: response.content)
 
             monkeypatch.setattr(
@@ -109,3 +121,11 @@ def test_offline_check_fails_when_step_2_is_not_recorded(run_check: Callable[...
         return (200, b"no marker") if path == "/step/2/run" else None
 
     assert run_check(override) == 1
+
+
+@pytest.mark.parametrize("route", ["/healthz", "/explore", "/step/1"])
+def test_offline_check_fails_when_a_route_does_not_answer_200(
+    run_check: Callable[..., int], capsys: pytest.CaptureFixture[str], route: str
+) -> None:
+    assert run_check(lambda path: (500, b"boom") if path == route else None) == 1
+    assert f"{route} 500" in capsys.readouterr().out
