@@ -32,6 +32,7 @@ from cairn.recording import (
 )
 from cairn.render import quotations
 from cairn.validate import RULE_AUC, RULE_CONC, validate_study
+from cairn.web.threads import threads
 
 HERE = Path(__file__).parent
 templates = Jinja2Templates(directory=HERE / "templates")
@@ -390,3 +391,4 @@ def mount_web(app: FastAPI) -> None:
     app.state.snapshot = load_study()[2]
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
     app.include_router(router)
+    app.include_router(threads)
