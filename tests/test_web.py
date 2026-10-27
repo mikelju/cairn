@@ -20,7 +20,7 @@ def test_healthz_and_landing_page() -> None:
     assert "Public sample data · fictional compound · not GxP-validated" in page
     assert "Role: Study toxicologist (simulated)" in page
     assert re.search(r"v0\.1\.0 · commit \S+ · snapshot [0-9a-f]{12}", page)
-    assert page.count('class="locked"') == 4
+    assert page.count('class="locked"') == 2
     assert 'href="/step/2"' in page and 'href="/step/3"' in page
     assert "/static/vendor/htmx.min.js" in page
 
@@ -338,7 +338,7 @@ def test_navigation_unlocks_step_3_and_keeps_the_rest_locked() -> None:
     with TestClient(create_app()) as client:
         page = client.get("/step/3").text
     assert '<a href="/step/3" aria-current="step">3 Explore</a>' in page
-    assert page.count('class="locked"') == 4
+    assert page.count('class="locked"') == 2
 
 
 def test_highlight_route_serves_only_committed_pngs() -> None:
@@ -448,3 +448,19 @@ def test_web_parses_passages_and_highlights_once_per_process(
     assert calls == {"passages": 1, "highlights": 1}
     passages.stored_passages.cache_clear()
     highlight.highlights_by_sentence.cache_clear()
+
+
+def test_steps_4_and_5_people_decide_and_the_author_cannot_approve() -> None:
+    with TestClient(create_app()) as client:
+        step4 = client.get("/step/4").text  # starts a thread and follows the redirect
+        thread = re.search(r'name="thread" value="([0-9a-f]+)"', step4)
+        assert thread and "Acting as: A. Author" in step4 and "disabled" in step4
+        id_ = thread.group(1)
+        assert "Draft with empty slots" in step4 and "no decision yet" in step4
+        client.post("/step/4/example", data={"thread": id_})
+        confirmed = client.post("/step/4/confirm", data={"thread": id_, "actor": "R. Reviewer"})
+        assert "Acting as: R. Reviewer" in confirmed.text and "Final text" in confirmed.text
+        refused = client.post("/step/5/approve", data={"thread": id_, "actor": "A. Author"})
+        assert "403 · Authors cannot approve their own draft. Enforced by the API" in refused.text
+        done = client.post("/step/5/approve", data={"thread": id_, "actor": "R. Reviewer"})
+        assert "Approved by R. Reviewer" in done.text

@@ -167,3 +167,9 @@ async def approve(request: Request, thread_id: str, body: Approve) -> dict[str, 
     await graph.ainvoke(Command(resume={"approved_by": body.actor}), config)
     _, _, state, waiting = await _load(request, thread_id)
     return _view(thread_id, state, waiting)
+
+
+async def load_view(request: Request, thread_id: str) -> tuple[State, str, dict[str, Any]]:
+    """State, the step it waits at, and the JSON view: for server-rendered pages."""
+    _, _, state, waiting = await _load(request, thread_id)
+    return state, waiting, _view(thread_id, state, waiting)

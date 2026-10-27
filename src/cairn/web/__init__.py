@@ -387,8 +387,11 @@ def explore_run(request: Request, question: Annotated[str, Form()]) -> HTMLRespo
 
 
 def mount_web(app: FastAPI) -> None:
+    from cairn.web.people import people  # imports this module's helpers, so it loads late
+
     app.state.commit = _commit()
     app.state.snapshot = load_study()[2]
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
     app.include_router(router)
+    app.include_router(people)
     app.include_router(threads)

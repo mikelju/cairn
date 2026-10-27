@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% import "_components.html" as a with context %}
+{% block main %}
+{% call a.step(4, "Analyse", "REAL", "People decide treatment relatedness and the dose level; the model does not.", "two-col") %}
+<div class="col-left">
+<p class="meta">TK note: inherited from step 1.</p>
+<form method="post" action="/step/4/example"><input type="hidden" name="thread" value="{{ thread }}"><button type="submit">Fill example decisions (example)</button></form>
+<div id="recompute">{% include "step4_result.html" %}</div>
+<p class="prod">In production → named reviewers and signed records.</p>
+</div>
+<div class="col-right card">
+<form hx-post="/step/4/decide" hx-trigger="change" hx-target="#recompute">
+<input type="hidden" name="thread" value="{{ thread }}">
+<table>
+  <thead><tr><th>Finding</th><th>Sex</th><th>Treatment-related from</th><th>Adverse from</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr><td>{{ r.finding }}</td><td>{{ r.sex }}</td>
+  <td><select name="t_{{ r.slot }}" aria-label="Treatment-related from {{ r.finding }} {{ r.sex }}"><option value="">choose</option><option value="none"{% if r.t == "none" %} selected{% endif %}>none</option>{% for d in r.doses %}<option value="{{ d }}"{% if r.t == d|string %} selected{% endif %}>{{ d }}</option>{% endfor %}</select></td><td><select name="a_{{ r.slot }}" aria-label="Adverse from {{ r.finding }} {{ r.sex }}"><option value="">choose</option><option value="none"{% if r.a == "none" %} selected{% endif %}>none</option>{% for d in r.doses %}<option value="{{ d }}"{% if r.a == d|string %} selected{% endif %}>{{ d }}</option>{% endfor %}</select></td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</form>
+</div>
+{% endcall %}
+{% endblock %}

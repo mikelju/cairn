@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% import "_components.html" as a with context %}
+{% block main %}
+{% call a.step(5, "Draft", "RECORDED", "The model drafts the summary; code places every value and every quotation.", "two-col") %}
+<div class="col-left">
+{{ a.badge_meta("RECORDED", meta) }}
+{% call a.disclosure("Final text") %}<div class="card answer"><p>{{ text }}</p></div>{% endcall %}
+{% if error %}{% call a.callout("blocked") %}<p>{{ error }}</p>{% endcall %}{% endif %}
+{% if approved_by %}{% call a.callout("rules") %}<p>Approved by {{ approved_by }}.</p>{% endcall %}
+{% else %}
+<form method="post" action="/step/5/approve" class="controls"><input type="hidden" name="thread" value="{{ thread }}">
+<button type="submit" name="actor" value="A. Author">Approve as A. Author</button>
+<button type="submit" name="actor" value="R. Reviewer">Approve as R. Reviewer</button></form>
+{% endif %}
+<p class="prod">In production → an editor with tracked changes.</p>
+</div>
+<div class="col-right card">
+<h2>Checks</h2>
+{{ a.data_table(["Check", "Result"], checks) }}
+</div>
+{% endcall %}
+{% endblock %}

@@ -126,6 +126,8 @@ def _rendered_state(name: str) -> str:
             return client.get("/").text
         if name == "step3":
             return client.get("/step/3").text
+        if name.startswith(("step4", "step5")):
+            return _people_state(client, name)
         if name.startswith("step2_"):
             page = client.get("/step/2").text
             if name == "step2_before":
@@ -141,6 +143,22 @@ def _rendered_state(name: str) -> str:
             return page
         data = {"inject": "on"} if name == "step1_injected" else None
         return with_result(page, client.post("/step/1/run", data=data).text)
+
+
+def _people_state(client: TestClient, name: str) -> str:
+    """Steps 4 and 5 as a visitor sees them: empty, with the example filled, and after the 403."""
+    thread = client.post("/api/threads").json()["thread_id"]
+    if name == "step4_empty":
+        return client.get(f"/step/4?thread={thread}").text
+    client.post("/step/4/example", data={"thread": thread})
+    if name == "step4_filled":
+        return client.get(f"/step/4?thread={thread}").text
+    client.post("/step/4/confirm", data={"thread": thread, "actor": "R. Reviewer"})
+    if name == "step5":
+        return client.get(f"/step/5?thread={thread}").text
+    refused = client.post("/step/5/approve", data={"thread": thread, "actor": "A. Author"})
+    assert "Authors cannot approve their own draft" in refused.text
+    return refused.text
 
 
 def _page(body: str, lede: str = "One short sentence.") -> str:
@@ -200,6 +218,10 @@ def test_result_fragment_lands_inside_the_result_element() -> None:
         "step2_q2_open",
         "step2_q6",
         "step3",
+        "step4_empty",
+        "step4_filled",
+        "step5",
+        "step5_refused",
     ],
 )
 def test_word_cap_rendered(state: str) -> None:
