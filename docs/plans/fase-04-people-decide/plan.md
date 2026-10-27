@@ -36,7 +36,7 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | E159 | ejecutor (Sonnet) | Increment 2: LangGraph workflow, draft prompt, one Bedrock recording under 2 USD | partial | ff6d4c0: dependencies only (sqlite-vec skipped on Windows ARM64 by a uv override); context budget ran out; 0 USD spent |
 | E160 | ejecutor (Sonnet) | Increment 2 without Bedrock: workflow module, draft schema and prompt, hand-written fixture, tests, `record-draft` target | done | 68f00bf; 22 workflow and recording tests rerun offline by the supervisor, green |
 | E161 | ejecutor (Sonnet) | Increment 2 closing: one real draft recording with `make record-draft`, ceiling 2 USD | done | 183e731; opus-4-6, 1 attempt, 0.054 USD of 2; 24 tests rerun offline by the supervisor, green |
-| E162 | ejecutor (Sonnet) | Increment 3: API for decisions, confirm and approve, 403, 409, idempotent resume, E6 | in progress | |
+| E162 | ejecutor (Sonnet) | Increment 3: API for decisions, confirm and approve, 403, 409, idempotent resume, E6 | done | 3dd8517; E6 rerun offline by the supervisor, green; threads in `:memory:` unless `CAIRN_THREADS_DB` is set |
 
 ## User decisions
 Questions the supervisor raises to the user. Statuses: open, answered, deferred; closed with the literal answer.
