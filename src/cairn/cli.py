@@ -155,7 +155,7 @@ def record_command(
     model: str = DEFAULT_MODEL,
     recordings: Path = RECORDINGS_DIR,
 ) -> None:
-    """Record questions against Bedrock (laptop only); stops before 5 USD in all, counting what is recorded."""
+    """Record questions against Bedrock (laptop only); stops before 5 USD in all."""
     _known_model(model)
     ids = [live.question_text(q)[0] for q in questions]
     if not all(ids):

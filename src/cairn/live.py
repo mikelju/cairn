@@ -118,7 +118,7 @@ def record_questions(
     budget: float = RECORD_BUDGET_USD,
     spent: float = 0.0,
 ) -> RecordReport:
-    """Record each question; stop before the next one could pass the budget (`spent` counts already)."""
+    """Record each question; stop before the next could pass the budget, `spent` included."""""
     report = RecordReport(spent=spent)
     ids = list(dict.fromkeys(ids))
     step = MAX_CALLS * call_ceiling(model)
