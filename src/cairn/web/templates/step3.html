@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% import "_components.html" as a with context %}
+{% block main %}
+{% call a.step(3, "Explore", "COMPUTED AT BUILD", "Guidance is retrieved and ranked at build, then quoted by page.", "two-col") %}
+<div class="col-left">
+{% set headers = ["Guideline", "Section", "Page", "Lex", "Sem", "Fused"] %}
+{% for q in r.queries %}
+<p class="meta"><strong>{{ q.id }}</strong> {{ q.query }}</p>
+{{ a.data_table(headers, q.rows) }}
+{% if q.folded %}{% call a.disclosure("Lower ranks") %}{{ a.data_table(headers, q.folded) }}{% endcall %}{% endif %}
+{% endfor %}
+<p class="meta"><a href="/explore">Ask the recorded questions</a></p>
+<div class="col-prod">{{ a.in_production("live questions behind an access code.") }}</div>
+</div>
+<div class="col-right card">
+<h2>Quotations</h2>
+<p class="meta">Quotes: {{ r.quotes|length }} · verbatim on the cited page: {{ r.verbatim }}/{{ r.quotes|length }}</p>
+{% call a.disclosure("Quoted sentences") %}
+{% for q in r.quotes %}<blockquote class="quote"><p>{{ q.text }}</p><p class="meta">{{ q.id }} · {{ q.cite }}{% if q.highlight %} · <a href="{{ q.highlight }}">highlighted page</a>{% endif %} · <a href="{{ q.link }}">official page</a></p></blockquote>{% endfor %}
+{% endcall %}
+</div>
+{% endcall %}
+{% endblock %}

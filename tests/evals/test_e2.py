@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from cairn.content import Sentence, Text, ValueRef
+from cairn.content import QuoteRef, Sentence, Text, ValueRef
 from cairn.observation import build_observation
 from cairn.verify import data_quality_note, verify
 from conftest import World
@@ -113,12 +113,17 @@ FIXTURES = [
             say("Animal ", w.ref(w.tk, "quarantined_rows.0.usubjid"), " had a minor issue."),
         ],
     ),
+    Fixture(
+        "citation to a passage not retrieved",
+        8,
+        lambda w: [Sentence(parts=[QuoteRef(passage_id="M3-6-01", sentence_ids=["M3-6-01.s1"])])],
+    ),
 ]
 
 
-def test_e2_has_fifteen_fixtures() -> None:
-    assert len(FIXTURES) == 15
-    assert {f.rule for f in FIXTURES} == {1, 2, 3, 4, 5, 6, 7}
+def test_e2_has_sixteen_fixtures() -> None:
+    assert len(FIXTURES) == 16
+    assert {f.rule for f in FIXTURES} == {1, 2, 3, 4, 5, 6, 7, 8}
 
 
 @pytest.mark.parametrize("fixture", FIXTURES, ids=[f.name for f in FIXTURES])

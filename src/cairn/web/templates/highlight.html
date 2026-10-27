@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% import "_components.html" as a with context %}
+{% block main %}
+{% call a.step(3, "Explore", "COMPUTED AT BUILD", "The quoted sentence is highlighted on its page of the guideline.") %}
+<blockquote class="quote"><p>{{ sentence }}</p></blockquote>
+<div class="page-images">
+{% for e in pages %}
+<figure>
+<p class="meta">Page {{ e.page }} · <a href="{{ e.link }}">official page</a> · <a href="/step/3">back to step 3</a></p>
+<a href="/{{ e.image }}"><img class="page-image" src="/{{ e.image }}" alt="Guideline page {{ e.page }} with the quoted sentence highlighted"></a>
+</figure>
+{% endfor %}
+</div>
+{% endcall %}
+{% endblock %}

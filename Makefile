@@ -8,7 +8,7 @@ SERVICE ?= cairn
 REGION ?= eu-west-1
 POWER ?= medium
 
-.PHONY: build demo demo-offline-check deploy
+.PHONY: build demo demo-offline-check deploy guidance guidance-check weights
 
 build:
 	docker build --platform $(PLATFORM) --build-arg COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo unknown) -t $(IMAGE) .
@@ -19,17 +19,18 @@ demo: build
 	docker run --rm --platform $(PLATFORM) -p 127.0.0.1:$(PORT):8000 $(IMAGE)
 
 # Docker cannot publish ports with --network none, so this target proves the offline claim
-# from inside a container that has no network: it fetches the landing page, steps 1 and 2 and /healthz,
-# then posts question Q2 to step 2 and requires a 200 whose page carries the RECORDED badge.
+# from inside a container that has no network: it fetches the landing page, steps 1 to 3, /explore and /healthz,
+# one highlighted page from step 3 with its PNG, then posts question Q2 to step 2 and requires a 200 carrying the RECORDED badge.
 demo-offline-check: build
-	docker run --rm --platform $(PLATFORM) --network none $(IMAGE) python -c "import urllib.request as u, socket, subprocess, sys, time; p = subprocess.Popen(['uvicorn', 'cairn.app:create_app', '--factory', '--port', '8000']); [time.sleep(1) for _ in range(120) if socket.socket().connect_ex(('127.0.0.1', 8000))]; [print(x, u.urlopen('http://127.0.0.1:8000' + x).status) for x in ('/', '/step/1', '/step/2', '/healthz')]; r = u.urlopen('http://127.0.0.1:8000/step/2/run', data=b'question=Q2'); b = r.read(); ok = r.status == 200 and b'RECORDED' in b; print('POST /step/2/run', r.status, 'RECORDED' if ok else 'missing RECORDED'); p.terminate(); sys.exit(0 if ok else 1)"
+	docker run --rm --platform $(PLATFORM) --network none $(IMAGE) python -m cairn.offline_check
 
 # Deploys the image to one Lightsail container service (created on first run), waits up to 5 minutes
 # (30 tries, 10 s apart) for RUNNING, and prints its state and URL.
+# SKIP_BUILD=1 deploys the image already loaded as $(IMAGE) (for example one built in GitHub Actions) without rebuilding.
 # Needs the AWS CLI with Lightsail permissions and the lightsailctl plugin on PATH.
 # MSYS_NO_PATHCONV stops Git Bash from rewriting /healthz into a Windows path; exported by make so cmd runs it too.
 deploy: export MSYS_NO_PATHCONV := 1
-deploy: build
+deploy: $(if $(SKIP_BUILD),,build)
 	aws lightsail get-container-services --service-name $(SERVICE) --region $(REGION) > /dev/null 2>&1 \
 		|| aws lightsail create-container-service --service-name $(SERVICE) --power $(POWER) --scale 1 --region $(REGION)
 	aws lightsail push-container-image --service-name $(SERVICE) --label app --image $(IMAGE) --region $(REGION)
@@ -65,3 +66,15 @@ live:
 smoke:
 	$(if $(AWS_PROFILE),,$(error set AWS_PROFILE=<profile>))
 	uv run cairn smoke
+
+# Rebuilds the generated guidance files from the pinned guideline PDFs (never edit them by hand).
+guidance:
+	uv run cairn guidance build
+
+# Downloads the pinned model weights into CAIRN_MODELS (default ~/.cache/cairn/models) and verifies every SHA-256.
+weights:
+	uv run cairn guidance weights
+
+# Compares the committed retrieval cache with a fresh retrieval (the image build runs the same check).
+guidance-check:
+	uv run cairn guidance check

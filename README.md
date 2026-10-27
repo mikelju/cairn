@@ -8,7 +8,8 @@ Public sample data · fictitious compound · not GxP-validated.
 
 ## Status
 
-Steps 1 and 2 of the web demo work, and the question loop runs against recorded Bedrock answers.
+Steps 1, 2 and 3 of the web demo and Explore work, and the question loop runs against recorded Bedrock answers.
+Step 3 searches four public guidelines (hybrid index with a reranker) and quotes them verbatim with a highlighted page.
 The master plan is in [docs/plans/0_plan_maestro.md](docs/plans/0_plan_maestro.md).
 
 ## Step 2 and the laptop commands
@@ -20,6 +21,13 @@ Three commands reach Bedrock and run on a laptop only:
 - `make smoke AWS_PROFILE=<profile>` checks the model profiles and writes the smoke evidence.
 
 All three need `AWS_PROFILE`, spend money, and print their estimated spending ceiling before the first call.
+
+## Guidance retrieval commands
+
+A clean clone needs the model weights before `npm run check` (the retrieval tests fail with "weights missing" otherwise):
+- `make weights` downloads the pinned weights into `CAIRN_MODELS` and verifies every SHA-256.
+- `make guidance` rebuilds the generated guidance files from the pinned guideline PDFs.
+- `make guidance-check` compares the committed retrieval cache with a fresh retrieval.
 
 ## How we work
 

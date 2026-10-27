@@ -20,8 +20,8 @@ def test_healthz_and_landing_page() -> None:
     assert "Public sample data · fictional compound · not GxP-validated" in page
     assert "Role: Study toxicologist (simulated)" in page
     assert re.search(r"v0\.1\.0 · commit \S+ · snapshot [0-9a-f]{12}", page)
-    assert page.count('class="locked"') == 5
-    assert 'href="/step/2"' in page
+    assert page.count('class="locked"') == 4
+    assert 'href="/step/2"' in page and 'href="/step/3"' in page
     assert "/static/vendor/htmx.min.js" in page
 
 
@@ -89,13 +89,22 @@ def test_step2_page_lists_the_questions_with_the_recorded_badge() -> None:
     assert 'value="Q2"' in page and 'value="Q6"' in page
 
 
-REAL = Path(__file__).parent.parent / "recordings"
+REAL = Path(__file__).parent / "fixtures" / "recordings_real_shape"
+
+
+def _as_bedrock(folder: Path, target: Path) -> Path:
+    """A copy of the real-shape fixtures that claims to be recorded, to test the recorded badge."""
+    for source in folder.glob("*.json"):
+        data = json.loads(source.read_text(encoding="utf-8"))
+        data["source"] = "bedrock"
+        (target / source.name).write_text(json.dumps(data), encoding="utf-8")
+    return target
 
 
 def test_q2_replay(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Offline replay of the real Opus 4.6 recording: 9-row screen, honest denominators."""
+    """Offline replay of the real-shape Opus 4.6 fixture: 9-row screen, honest denominators."""
     result = _ask("Q2", monkeypatch, REAL)
-    assert 'class="badge recorded"' in result
+    assert 'class="badge fixture"' in result
     assert "Rules fired: none" in result
     assert result.count("<tr><td>") == 9
     assert "not examined" in result and "0/1" in result
@@ -197,8 +206,12 @@ def test_q2_sentence_and_evidence_state_the_same_examined_count(
     assert evidence.group(3) == "affected"
 
 
-def test_step2_header_badge_follows_the_recordings_served(monkeypatch: pytest.MonkeyPatch) -> None:
-    for folder, shown, hidden in ((FIXTURES, "fixture", "recorded"), (REAL, "recorded", "fixture")):
+def test_step2_header_badge_follows_the_recordings_served(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    recorded = _as_bedrock(REAL, tmp_path)
+    cases = ((FIXTURES, "fixture", "recorded"), (recorded, "recorded", "fixture"))
+    for folder, shown, hidden in cases:
         monkeypatch.setenv("CAIRN_RECORDINGS", str(folder))
         with TestClient(create_app()) as client:
             page = client.get("/step/2").text
@@ -255,3 +268,183 @@ def test_q2_prose_counts_the_screened_findings_by_reference(
     assert rows == incidence().values["n_findings"]
     toggle = re.search(r"<details>.*?</details>", result, flags=re.S)
     assert toggle and "[n_findings]" in toggle.group(0) and not re.search(r"\d", toggle.group(0))
+
+
+def _explore(question: str) -> str:
+    with TestClient(create_app()) as client:
+        return client.post("/explore/run", data={"question": question}).text
+
+
+def test_explore_page_has_a_button_for_every_question() -> None:
+    from cairn.questions import QUESTIONS
+
+    with TestClient(create_app()) as client:
+        page = client.get("/explore").text
+    for question_id in QUESTIONS:
+        assert f'"question": "{question_id}"' in page
+    assert len(QUESTIONS) == 11
+    assert "In production" in page and 'class="badge recorded"' in page
+
+
+@pytest.mark.parametrize("question", ["Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8"])
+def test_explore_study_questions_replay_offline(question: str) -> None:
+    result = _explore(question)
+    assert 'class="badge recorded"' in result
+    assert "Rules fired:" in result
+
+
+@pytest.mark.parametrize("question", ["G1", "G2", "G3"])
+def test_explore_guideline_questions_render_quotes_from_quoteref(question: str) -> None:
+    result = _explore(question)
+    assert 'class="badge recorded"' in result
+    assert "<blockquote" in result
+    assert "official page" in result and "#page=" in result
+    assert "Rules fired: none" in result
+
+
+def test_explore_rejects_an_unknown_question() -> None:
+    with TestClient(create_app()) as client:
+        assert client.post("/explore/run", data={"question": "Q99"}).status_code == 422
+
+
+def test_step3_shows_the_two_fixed_queries_with_ranks_and_the_build_badge() -> None:
+    from cairn import retrieval
+
+    with TestClient(create_app()) as client:
+        page = client.get("/step/3").text
+    fixed = [q for q in retrieval.load_fixed_queries() if q["used_by"] == "nonclinical-summary"]
+    assert len(fixed) == 2
+    for query in fixed:
+        assert query["query"] in page
+        top = retrieval.cached_guidance(query["query"]).hits[0]
+        assert f"<td>{top.fused_rank}</td>" in page
+    assert page.count("<tr>") >= 2 * (1 + 3)  # a header row and three passages per query
+    assert 'class="badge computed-at-build"' in page and "COMPUTED AT BUILD" in page
+    assert "Lower ranks" in page and "In production" in page
+    assert "<th>Lex</th>" in page and "<th>Sem</th>" in page and "<th>Fused</th>" in page
+
+
+def test_step3_counts_quotes_verbatim_on_the_cited_page() -> None:
+    with TestClient(create_app()) as client:
+        page = client.get("/step/3").text
+    match = re.search(r"Quotes: (\d+) · verbatim on the cited page: (\d+)/(\d+)", page)
+    assert match, "no quotes line"
+    total, verbatim, of = map(int, match.groups())
+    assert total == of == 6
+    assert verbatim == total
+
+
+def test_navigation_unlocks_step_3_and_keeps_the_rest_locked() -> None:
+    with TestClient(create_app()) as client:
+        page = client.get("/step/3").text
+    assert '<a href="/step/3" aria-current="step">3 Explore</a>' in page
+    assert page.count('class="locked"') == 4
+
+
+def test_highlight_route_serves_only_committed_pngs() -> None:
+    from cairn.highlight import load_highlights
+
+    entry = load_highlights()[0]
+    name = Path(entry["image"]).name
+    with TestClient(create_app()) as client:
+        ok = client.get(f"/highlights/{name}")
+        assert ok.status_code == 200 and ok.headers["content-type"] == "image/png"
+        assert ok.content.startswith(b"\x89PNG")
+        assert client.get("/highlights/nope.png").status_code == 404
+        assert client.get("/highlights/..%2Fhighlights.json").status_code == 404
+
+
+def test_highlight_route_page_shows_the_image_and_the_official_link() -> None:
+    from cairn.highlight import load_highlights
+
+    entry = load_highlights()[0]
+    with TestClient(create_app()) as client:
+        page = client.get(f"/highlight/{entry['sentence_id']}").text
+        assert client.get("/highlight/unknown.s9").status_code == 404
+    assert f'src="/{entry["image"]}"' in page
+    assert f'href="{entry["link"]}"' in page and "#page=" in entry["link"]
+
+
+def test_highlight_route_links_every_step3_quotation() -> None:
+    with TestClient(create_app()) as client:
+        page = client.get("/step/3").text
+        links = re.findall(r'href="(/highlight/[^"]+)">highlighted page', page)
+        assert len(links) == 6
+        for link in links:
+            assert client.get(link).status_code == 200
+    assert page.count("official page") == 6 and "#page=" in page
+
+
+def test_explore_quotations_link_the_highlighted_page() -> None:
+    result = _explore("G2")
+    assert "highlighted page" in result and 'href="/highlight/' in result
+    assert "official page" in result and "#page=" in result
+
+
+def test_explore_guideline_quotations_sit_in_the_right_column() -> None:
+    result = _explore("G1")
+    right = result.split('<div class="col-right card">', 1)[1]
+    assert right.count("<blockquote") >= 1
+    assert "<blockquote" not in result.split('<div class="col-right card">', 1)[0]
+
+
+def test_step3_quote_link_and_nav_follow_the_cited_sentence_page() -> None:
+    from cairn.highlight import cited_page
+    from cairn.passages import stored_passages
+
+    passage = stored_passages()["M4S-2.6-01"]
+    assert cited_page(passage, "M4S-2.6-01.s12") == 8 != passage.page_start
+    with TestClient(create_app()) as client:
+        explore = client.get("/explore").text
+        entry = client.get("/highlight/M4S-2.6-01.s12").text
+    assert 'aria-current="step"' not in explore
+    assert 'aria-current="step"' not in entry
+
+
+def test_step3_quote_cite_and_links_use_the_cited_sentence_page(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from cairn import web
+    from cairn.passages import stored_passages
+
+    real = stored_passages()
+    passage = real["M4S-2.6-01"]
+    later = next(s for s in passage.sentences if s.sentence_id == "M4S-2.6-01.s12")
+    moved = passage.model_copy(update={"sentences": [later, *passage.sentences]})
+    assert passage.page_start == 7
+    monkeypatch.setattr(web, "stored_passages", lambda: {**real, passage.passage_id: moved})
+    quote = next(q for q in web._step3_context()["quotes"] if q["text"] == later.text)
+    assert quote["cite"].endswith(" 8") and quote["link"].endswith("#page=8")
+    assert quote["highlight"] == "/highlight/M4S-2.6-01.s12"
+    with TestClient(create_app()) as client:
+        page = client.get("/step/3").text
+    assert "#page=8" in page
+
+
+def test_web_parses_passages_and_highlights_once_per_process(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from cairn import highlight, passages
+
+    calls = {"passages": 0, "highlights": 0}
+    real_p, real_h = passages.load_passages, highlight.load_highlights
+
+    def count_p(*args: object) -> object:
+        calls["passages"] += 1
+        return real_p(*args)  # type: ignore[arg-type]
+
+    def count_h(*args: object) -> object:
+        calls["highlights"] += 1
+        return real_h(*args)  # type: ignore[arg-type]
+
+    passages.stored_passages.cache_clear()
+    highlight.highlights_by_sentence.cache_clear()
+    monkeypatch.setattr(passages, "load_passages", count_p)
+    monkeypatch.setattr(highlight, "load_highlights", count_h)
+    with TestClient(create_app()) as client:
+        for _ in range(3):
+            assert client.get("/step/3").status_code == 200
+            assert client.get("/highlight/M4S-2.6-01.s12").status_code == 200
+    assert calls == {"passages": 1, "highlights": 1}
+    passages.stored_passages.cache_clear()
+    highlight.highlights_by_sentence.cache_clear()

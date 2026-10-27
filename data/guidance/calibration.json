@@ -1,0 +1,90 @@
+{
+  "in_library": [
+    {
+      "best_score": 7.4717,
+      "question": "How long should repeat-dose toxicity studies in rodents and non-rodents last to support a clinical trial of a given duration?"
+    },
+    {
+      "best_score": 1.039,
+      "question": "How should toxicokinetic data be presented in the written toxicology summary of the Common Technical Document?"
+    },
+    {
+      "best_score": 2.1087,
+      "question": "Which animal species are expected for general toxicity testing of anticancer pharmaceuticals?"
+    },
+    {
+      "best_score": 3.837,
+      "question": "How is the maximum recommended starting dose for a first clinical trial derived from animal studies?"
+    },
+    {
+      "best_score": 4.4081,
+      "question": "How are doses scaled between animal species and humans using body surface area?"
+    },
+    {
+      "best_score": 3.3098,
+      "question": "When are embryo-fetal development studies needed for women of childbearing potential in clinical trials?"
+    },
+    {
+      "best_score": 2.4912,
+      "question": "Which safety pharmacology studies are recommended before the first administration to humans?"
+    },
+    {
+      "best_score": 1.5428,
+      "question": "Which genotoxicity tests should be completed before the first human exposure?"
+    },
+    {
+      "best_score": 4.2667,
+      "question": "How are nonclinical study summaries organised in the Common Technical Document?"
+    },
+    {
+      "best_score": 3.6167,
+      "question": "Do toxicity studies of anticancer drugs need a recovery period?"
+    }
+  ],
+  "method": "threshold = midpoint between the lowest in-library and the highest out-of-library best reranker score (decision O4); abstain when the best score is below it",
+  "model": "BAAI/bge-reranker-v2-m3-int8",
+  "out_of_library": [
+    {
+      "best_score": -9.8963,
+      "question": "What is the capital of Australia?"
+    },
+    {
+      "best_score": -10.5323,
+      "question": "How do I configure a PostgreSQL replica with automatic failover?"
+    },
+    {
+      "best_score": -10.6726,
+      "question": "Give me a recipe for a sourdough bread starter."
+    },
+    {
+      "best_score": -3.9847,
+      "question": "What is the recommended paracetamol dose for an adult with a fever?"
+    },
+    {
+      "best_score": -4.924,
+      "question": "Who won the football world cup in 2014?"
+    },
+    {
+      "best_score": -10.8932,
+      "question": "How do I renew a passport that expires next month?"
+    },
+    {
+      "best_score": -7.9204,
+      "question": "What is the difference between TCP and UDP?"
+    },
+    {
+      "best_score": -10.2783,
+      "question": "How does a fixed rate mortgage differ from a variable rate mortgage?"
+    },
+    {
+      "best_score": -4.6577,
+      "question": "How should an HPLC assay for a drug substance be validated for linearity and precision?"
+    },
+    {
+      "best_score": -4.1437,
+      "question": "How many participants does a phase 3 hypertension trial need to show a blood pressure difference?"
+    }
+  ],
+  "platform": "windows-arm64",
+  "threshold": -1.4729
+}

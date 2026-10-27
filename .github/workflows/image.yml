@@ -1,0 +1,21 @@
+name: image
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  amd64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4.2.2
+      # Native linux/amd64 build: the Dockerfile runs `cairn guidance check` inside it.
+      - run: make build
+      - run: docker save cairn | gzip > cairn-amd64.tar.gz
+      - uses: actions/upload-artifact@v4.6.2
+        with:
+          name: cairn-amd64
+          path: cairn-amd64.tar.gz
+          retention-days: 3

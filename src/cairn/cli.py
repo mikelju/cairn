@@ -8,7 +8,7 @@ import typer
 import uvicorn
 from pydantic import ValidationError
 
-from cairn import live
+from cairn import highlight, live, passages, retrieval, weights
 from cairn.canonical import canonical_json
 from cairn.gateway import DEFAULT_MODEL, MODEL_PROFILES, GatewayError
 from cairn.recording import RECORDINGS_DIR, StaleRecording, recorded_model
@@ -16,6 +16,8 @@ from cairn.tools import argument_problems, result_sha256
 from cairn.tools import call_tool as registry_call
 
 app = typer.Typer(help="Cairn: traceable agentic demo for drug safety science.")
+guidance_app = typer.Typer(help="Guideline passages for guidance retrieval.")
+app.add_typer(guidance_app, name="guidance")
 
 
 def call_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
@@ -82,6 +84,20 @@ def tk_summary_command(
     _emit(call_tool("tk_summary", {"sex": sex, "dose": dose, "day": day}), hash_only)
 
 
+@app.command("search-guidance")
+def search_guidance_command(
+    query: str,
+    hash_only: Annotated[bool, typer.Option("--hash", help="Print only the result hash")] = False,
+) -> None:
+    """Search the guideline library and print the passages or the abstention as canonical JSON."""
+    try:
+        result = call_tool("search_guidance", {"query": query})
+    except retrieval.StaleRetrievalCache as error:
+        typer.echo(f"error: {error}", err=True)
+        raise typer.Exit(1) from error
+    _emit(result, hash_only)
+
+
 def _known_model(model: str) -> str:
     """Return the model or end the command before any ceiling is computed."""
     if model not in MODEL_PROFILES:
@@ -92,7 +108,9 @@ def _known_model(model: str) -> str:
 
 @app.command("ask")
 def ask_command(
-    question: Annotated[str, typer.Argument(help="Question ID (Q2, Q6) or free text with --live")],
+    question: Annotated[
+        str, typer.Argument(help="Question ID (Q1-Q8, G1-G3) or free text with --live")
+    ],
     live_mode: Annotated[bool, typer.Option("--live", help="Call Bedrock")] = False,
     model: Annotated[
         str | None, typer.Option(help="Model key; replay reads it from the file")
@@ -112,7 +130,7 @@ def ask_command(
             chosen = model or recorded_model(recordings, question_id, DEFAULT_MODEL)
             result = live.ask_replay(question_id, recordings, chosen)
         else:
-            typer.echo("error: replay needs a question ID (Q2, Q6); use --live", err=True)
+            typer.echo("error: replay needs a question ID (Q1-Q8, G1-G3); use --live", err=True)
             raise typer.Exit(2)
     except typer.Exit:
         raise
@@ -137,21 +155,25 @@ def record_command(
     model: str = DEFAULT_MODEL,
     recordings: Path = RECORDINGS_DIR,
 ) -> None:
-    """Record questions against Bedrock (laptop only); stops before 10 USD."""
+    """Record questions against Bedrock (laptop only); stops before 5 USD in all."""
     _known_model(model)
     ids = [live.question_text(q)[0] for q in questions]
     if not all(ids):
-        typer.echo("error: record takes question IDs (Q2, Q6)", err=True)
+        typer.echo("error: record takes question IDs (Q1-Q8, G1-G3)", err=True)
         raise typer.Exit(2)
-    typer.echo(f"ceiling: {live.record_ceiling(model, len(ids)):.2f} USD of {live.BUDGET_USD:.2f}")
-    report = live.record_questions(ids, recordings, model)
+    before = live.recorded_spend(recordings)
+    typer.echo(
+        f"ceiling: {live.record_ceiling(model, len(ids)):.2f} USD more, "
+        f"{before:.2f} already recorded, of {live.RECORD_BUDGET_USD:.2f}"
+    )
+    report = live.record_questions(ids, recordings, model, spent=before)
     for question_id, outcome in report.outcomes.items():
         typer.echo(f"{question_id}: {outcome}")
     for path in report.saved:
         typer.echo(f"saved {path}")
     for question_id in report.unsaved:
         typer.echo(f"not saved: {question_id} (the file is left as it was)")
-    typer.echo(f"spent: {report.spent:.4f} USD")
+    typer.echo(f"spent: {report.spent - before:.4f} USD")
     if report.stopped:
         typer.echo(report.stopped, err=report.stopped.startswith("error:"))
     if report.stopped or report.unsaved:
@@ -164,6 +186,61 @@ def smoke_command(output: Path = live.SMOKE_PATH) -> None:
     typer.echo(f"ceiling: {live.smoke_ceiling():.2f} USD of {live.BUDGET_USD:.2f}")
     evidence = live.smoke(output)
     typer.echo(f"wrote {output}; spent {evidence['total_cost_usd']:.4f} USD")
+
+
+@guidance_app.command("build")
+def guidance_build_command(
+    output: Path = passages.PASSAGES_PATH,
+    calibration: Path = retrieval.CALIBRATION_PATH,
+    cache: Path = retrieval.CACHE_PATH,
+    passages_only: bool = False,
+    highlights_only: bool = False,
+) -> None:
+    """Rebuild the generated guidance files: passages, calibration, retrieval cache, highlights.
+
+    The calibration and cache steps embed and rerank (needs the weights: run
+    `cairn guidance weights` once). `--highlights-only` redraws the highlighted pages from the
+    committed cache without loading any model.
+    """
+    if highlights_only:
+        typer.echo(f"wrote {highlight.HIGHLIGHTS_PATH}: {highlight.write_highlights()} highlights")
+        return
+    count = passages.write_passages(output)
+    typer.echo(f"wrote {output}: {count} passages")
+    if passages_only:
+        return
+    index = retrieval.build_index(output)
+    calibration.write_text(retrieval.calibrate(index, calibration), encoding="utf-8", newline="\n")
+    typer.echo(f"wrote {calibration}: threshold {retrieval.load_threshold(calibration):.4f}")
+    cache.write_text(retrieval.build_cache(index), encoding="utf-8", newline="\n")
+    cached = json.loads(cache.read_text(encoding="utf-8"))["queries"]
+    typer.echo(f"wrote {cache}: {len(cached)} queries")
+    typer.echo(f"wrote {highlight.HIGHLIGHTS_PATH}: {highlight.write_highlights(cache)} highlights")
+
+
+@guidance_app.command("check")
+def guidance_check_command(cache: Path = retrieval.CACHE_PATH) -> None:  # pragma: no cover
+    """Compare the committed retrieval cache with a fresh retrieval (needs the weights)."""
+    problems = retrieval.check_cache(retrieval.build_index(), cache)
+    for problem in problems:
+        typer.echo(problem, err=True)
+    if problems:
+        raise typer.Exit(1)
+    typer.echo(f"guidance cache matches a fresh retrieval: {cache}")
+
+
+@guidance_app.command("weights")
+def guidance_weights_command() -> None:  # pragma: no cover
+    """Download the pinned model weights into CAIRN_MODELS and verify every SHA-256."""
+    models = weights.models_dir()
+    try:
+        done = weights.download_weights(models)
+    except weights.WeightsError as error:
+        typer.echo(str(error), err=True)
+        raise typer.Exit(1) from error
+    for name, relative, size in done:
+        typer.echo(f"{name} {relative} {size} bytes ok")
+    typer.echo(f"weights verified in {models}")
 
 
 @app.command()

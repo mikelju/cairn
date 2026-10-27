@@ -1,6 +1,6 @@
 # 002 - Step 2 Q2 prose answers the question
 
-Status: ready locally
+Status: integrated
 
 ## Contract
 Goal and reason: the Q2 prose says "The screening table examined a total of 80 animals and is shown above."

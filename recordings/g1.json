@@ -1,0 +1,178 @@
+{
+  "calls": [
+    {
+      "cost_usd": 0.016385,
+      "input_tokens": 2997,
+      "latency_s": 3.047,
+      "output_tokens": 56,
+      "response": {
+        "container": null,
+        "content": [
+          {
+            "caller": null,
+            "id": "toolu_bdrk_01NsTmP5kjpgeU2BAaqp75Ms",
+            "input": {
+              "kind": "validate_study"
+            },
+            "name": "run_job",
+            "toolset_name": null,
+            "type": "tool_use"
+          }
+        ],
+        "diagnostics": null,
+        "id": "msg_bdrk_011CgJjXznkwHzDwRMgKQ8Fk",
+        "model": "claude-opus-4-6",
+        "role": "assistant",
+        "stop_details": null,
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "type": "message",
+        "usage": {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "inference_geo": null,
+          "input_tokens": 2997,
+          "output_tokens": 56,
+          "output_tokens_details": null,
+          "server_tool_use": null,
+          "service_tier": null,
+          "speed": null
+        }
+      }
+    },
+    {
+      "cost_usd": 0.016895,
+      "input_tokens": 3079,
+      "latency_s": 1.86,
+      "output_tokens": 60,
+      "response": {
+        "container": null,
+        "content": [
+          {
+            "caller": null,
+            "id": "toolu_bdrk_01MNwt8VeXfxBckxDBCwJuzY",
+            "input": {
+              "query": "repeat-dose toxicity written summary contents"
+            },
+            "name": "search_guidance",
+            "toolset_name": null,
+            "type": "tool_use"
+          }
+        ],
+        "diagnostics": null,
+        "id": "msg_bdrk_011CgJjY9Nh6gYdLNa46GV5A",
+        "model": "claude-opus-4-6",
+        "role": "assistant",
+        "stop_details": null,
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "type": "message",
+        "usage": {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "inference_geo": null,
+          "input_tokens": 3079,
+          "output_tokens": 60,
+          "output_tokens_details": null,
+          "server_tool_use": null,
+          "service_tier": null,
+          "speed": null
+        }
+      }
+    },
+    {
+      "cost_usd": 0.031335,
+      "input_tokens": 5012,
+      "latency_s": 3.532,
+      "output_tokens": 251,
+      "response": {
+        "container": null,
+        "content": [
+          {
+            "caller": null,
+            "id": "toolu_bdrk_01GSWjbjbZhZUbLfV8amV8GV",
+            "input": {
+              "sentences": [
+                {
+                  "parts": [
+                    {
+                      "text": "The guidance says: ",
+                      "type": "text"
+                    },
+                    {
+                      "passage_id": "M4S-2.6.6.3-01",
+                      "sentence_ids": [
+                        "M4S-2.6.6.3-01.s1",
+                        "M4S-2.6.6.3-01.s2"
+                      ],
+                      "type": "quote"
+                    }
+                  ]
+                },
+                {
+                  "parts": [
+                    {
+                      "text": "It also says: ",
+                      "type": "text"
+                    },
+                    {
+                      "passage_id": "M4S-2.6.6.1-01",
+                      "sentence_ids": [
+                        "M4S-2.6.6.1-01.s1",
+                        "M4S-2.6.6.1-01.s3",
+                        "M4S-2.6.6.1-01.s4"
+                      ],
+                      "type": "quote"
+                    }
+                  ]
+                }
+              ]
+            },
+            "name": "write_answer",
+            "toolset_name": null,
+            "type": "tool_use"
+          }
+        ],
+        "diagnostics": null,
+        "id": "msg_bdrk_011CgJjZpHYCJDzwrK6oRkRp",
+        "model": "claude-opus-4-6",
+        "role": "assistant",
+        "stop_details": null,
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "type": "message",
+        "usage": {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "inference_geo": null,
+          "input_tokens": 5012,
+          "output_tokens": 251,
+          "output_tokens_details": null,
+          "server_tool_use": null,
+          "service_tier": null,
+          "speed": null
+        }
+      }
+    }
+  ],
+  "date": "2026-10-23",
+  "model": "opus-4-6",
+  "model_profile": "eu.anthropic.claude-opus-4-6-v1",
+  "prompt_version": "question-7",
+  "question_id": "G1",
+  "region": "eu-west-1",
+  "source": "bedrock",
+  "tool_schema_sha256": "25276c34f9375fc85b9f4b6a4d798b5fe9974dbd21456c69d1a192f21dea167b"
+}

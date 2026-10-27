@@ -1,15 +1,18 @@
 """The tool registry: one list of typed functions served over MCP, REST and the CLI."""
 
 from collections.abc import Callable
+from functools import lru_cache
 from typing import Any
 
 from pydantic import BaseModel, ValidationError, validate_call
 
 from cairn.body_weight import body_weight_change
 from cairn.canonical import canonical_sha256
+from cairn.gateway import Mode, mode_from_env
 from cairn.incidence import incidence
 from cairn.jobs import execute, inputs_hash
 from cairn.observation import Observation, build_observation, query
+from cairn.passages import stored_passages
 from cairn.tk_summary import tk_summary
 
 
@@ -56,12 +59,48 @@ def study_design() -> Observation:
     )
 
 
+@lru_cache(maxsize=1)
+def _live_index() -> Any:  # pragma: no cover - needs the weights; record and live modes only
+    from cairn import retrieval
+
+    return retrieval.build_index()
+
+
+def search_guidance(query: str) -> dict[str, Any]:
+    """Search the guideline library; returns the top 5 passages or an explicit abstention.
+
+    Each hit carries the reranker score and the lexical, semantic and fused ranks. When the best
+    reranker score is below the stored threshold there is no passage and `abstained` is true.
+    Replay mode reads the precomputed cache; record and live modes compute the search.
+    """
+    from cairn import retrieval
+
+    if mode_from_env() is Mode.REPLAY:
+        guidance = retrieval.cached_guidance(query)
+    else:  # pragma: no cover - needs the weights
+        guidance = retrieval.search_guidance(_live_index(), query)
+    result = guidance.model_dump(mode="json")
+    passages = stored_passages()
+    for hit in result["hits"]:
+        passage = passages[hit["passage_id"]]
+        hit.update(
+            doc=passage.doc,
+            section=passage.section,
+            page_start=passage.page_start,
+            page_end=passage.page_end,
+            text=passage.text,
+            sentences=[s.model_dump() for s in passage.sentences],
+        )
+    return result
+
+
 REGISTRY: dict[str, Callable[..., Any]] = {
     "run_job": run_job,
     "study_design": study_design,
     "incidence": incidence,
     "body_weight_change": body_weight_change,
     "tk_summary": tk_summary,
+    "search_guidance": search_guidance,
 }
 
 

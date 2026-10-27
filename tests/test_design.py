@@ -3,6 +3,7 @@
 import hashlib
 import json
 import re
+from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin
 
@@ -14,7 +15,7 @@ from cairn.web import HERE, templates
 from test_word_cap import rendered_lede, rendered_problems, rendered_words
 
 STATIC = HERE / "static"
-REAL_RECORDINGS = HERE.parents[2] / "recordings"
+REAL_RECORDINGS = Path(__file__).parent / "fixtures" / "recordings_real_shape"
 CSS_PATH = STATIC / "cairn.css"
 TEMPLATES = sorted((HERE / "templates").glob("*.html"))
 
@@ -286,10 +287,16 @@ def test_badge_css_failing_sample() -> None:
 
 
 def test_badge_recorded_keeps_its_metadata_and_simulated_its_production_line(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    monkeypatch.setenv("CAIRN_RECORDINGS", str(REAL_RECORDINGS))
-    recorded = json.loads((REAL_RECORDINGS / "q2.json").read_text(encoding="utf-8"))
+    served = tmp_path / "served"
+    served.mkdir()
+    for source in REAL_RECORDINGS.glob("*.json"):
+        data = json.loads(source.read_text(encoding="utf-8"))
+        data["source"] = "bedrock"
+        (served / source.name).write_text(json.dumps(data), encoding="utf-8")
+    monkeypatch.setenv("CAIRN_RECORDINGS", str(served))
+    recorded = json.loads((served / "q2.json").read_text(encoding="utf-8"))
     with TestClient(create_app()) as client:
         result = client.post("/step/2/run", data={"question": "Q2"}).text
         step1 = client.get("/step/1").text

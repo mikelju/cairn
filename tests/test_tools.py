@@ -16,12 +16,16 @@ from cairn.app import create_app
 from cairn.cli import app as cli_app
 from cairn.tools import REGISTRY, call_tool, result_sha256
 
+GUIDANCE_QUERY = (
+    "How does the FDA 2005 guidance define the no observed adverse effect level (NOAEL)?"
+)
 CASES: list[tuple[str, dict[str, Any]]] = [
     ("run_job", {"kind": "validate_study", "params": {}}),
     ("study_design", {}),
     ("incidence", {"screen": True}),
     ("body_weight_change", {"sex": "F", "population": "main_and_recovery"}),
     ("tk_summary", {"sex": "M", "dose": 20.0, "day": 1.0}),
+    ("search_guidance", {"query": GUIDANCE_QUERY}),
 ]
 
 
@@ -70,6 +74,8 @@ def cli_hash(name: str, arguments: dict[str, Any]) -> str:
         args = ["body-weight-change", "--sex", "F", "--hash"]
     elif name == "tk_summary":
         args = ["tk-summary", "--sex", "M", "--dose", "20", "--day", "1", "--hash"]
+    elif name == "search_guidance":
+        args = ["search-guidance", arguments["query"], "--hash"]
     else:
         args = ["study-design", "--hash"]
     result = CliRunner().invoke(cli_app, args)
@@ -92,6 +98,7 @@ def test_registry_has_exactly_the_registered_tools() -> None:
         "body_weight_change",
         "incidence",
         "run_job",
+        "search_guidance",
         "study_design",
         "tk_summary",
     ]
@@ -178,3 +185,34 @@ def test_rest_tool_endpoint_runs_off_the_event_loop() -> None:
 
     route = next(r for r in create_app().routes if getattr(r, "path", "") == "/api/tools/{name}")
     assert not inspect.iscoroutinefunction(route.endpoint)  # type: ignore[attr-defined]
+
+
+def test_registry_same_hash_search_guidance(server_url: str) -> None:
+    """The guidance search gives one result hash over MCP, REST and the CLI (replay, cached)."""
+    name, arguments = "search_guidance", {"query": CASES[-1][1]["query"]}
+    direct = result_sha256(call_tool(name, arguments))
+    assert result_sha256(anyio.run(mcp_call, server_url, name, arguments)) == direct
+    assert result_sha256(rest_call(server_url, name, arguments)) == direct
+    assert cli_hash(name, arguments) == direct
+
+
+def test_uncached_guidance_query_is_a_422_over_rest_and_a_tool_error_over_mcp(
+    server_url: str,
+) -> None:
+    import httpx
+
+    arguments = {"query": "a question nobody cached"}
+    response = httpx.post(f"{server_url}/api/tools/search_guidance", json=arguments, timeout=60)
+    assert response.status_code == 422
+    assert "query not in the replay cache" in response.json()["detail"]
+
+    async def failed() -> str:
+        async with Client(f"{server_url}/mcp") as client:
+            try:
+                result = await client.call_tool("search_guidance", arguments)
+            except Exception as error:
+                return str(error)
+        assert result.is_error
+        return str(result.content)
+
+    assert "stale retrieval cache" in anyio.run(failed)

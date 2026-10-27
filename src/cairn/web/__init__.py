@@ -8,17 +8,20 @@ from typing import Annotated, Any
 
 import pandas as pd
 from fastapi import APIRouter, FastAPI, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from cairn import __version__
-from cairn.content import Text
+from cairn import __version__, retrieval
+from cairn.content import Text, ValueRef
 from cairn.gateway import DEFAULT_MODEL, LLMGateway, Mode
+from cairn.guidelines import load_manifest
+from cairn.highlight import IMAGES_DIR, cited_page, highlights_by_sentence
 from cairn.ingest import build_report, load_study
 from cairn.jobs import JobRunner
 from cairn.loop import PROMPT_VERSION, STUDY_TOOLS, LoopResult, LoopStatus, ask, schema_hash
-from cairn.questions import QUESTIONS
+from cairn.passages import normalize_whitespace, stored_passages
+from cairn.questions import QUESTIONS, STEP2_QUESTIONS
 from cairn.recording import (
     RECORDINGS_DIR,
     RecordingKey,
@@ -27,6 +30,7 @@ from cairn.recording import (
     recorded_model,
     total_cost,
 )
+from cairn.render import quotations
 from cairn.validate import RULE_AUC, RULE_CONC, validate_study
 
 HERE = Path(__file__).parent
@@ -157,7 +161,12 @@ def _marker(field: str) -> str:
 
 def _written(result: LoopResult) -> str:
     return " ".join(
-        "".join(part.text if isinstance(part, Text) else _marker(part.field) for part in s.parts)
+        "".join(
+            part.text
+            if isinstance(part, Text)
+            else _marker(part.field if isinstance(part, ValueRef) else "quote")
+            for part in s.parts
+        )
         for s in result.sentences
     )
 
@@ -202,6 +211,20 @@ def _evidence(result: LoopResult) -> list[dict[str, str]]:
     return evidence
 
 
+def _highlighted(sentence_id: str) -> list[dict[str, Any]]:
+    return highlights_by_sentence().get(sentence_id, [])
+
+
+def _all_highlights() -> list[dict[str, Any]]:
+    return [e for entries in highlights_by_sentence().values() for e in entries]
+
+
+def _with_highlight(quote: dict[str, Any]) -> dict[str, Any]:
+    """Add the viewer link when the build highlighted the first quoted sentence."""
+    first = quote["sentence_ids"][0]
+    return {**quote, "highlight": f"/highlight/{first}" if _highlighted(first) else ""}
+
+
 def _step2_context(question_id: str, directory: Path) -> dict[str, Any]:
     model = recorded_model(directory, question_id, DEFAULT_MODEL)
     key = RecordingKey(question_id, PROMPT_VERSION, schema_hash(), model)
@@ -235,17 +258,124 @@ def _step2_context(question_id: str, directory: Path) -> dict[str, Any]:
             "",
         ),
         "evidence": _evidence(result),
+        "quotes": [_with_highlight(q) for q in quotations(result.sentences)]
+        if result.rendered
+        else [],
     }
 
 
 @router.get("/step/2", response_class=HTMLResponse)
 async def step2(request: Request) -> HTMLResponse:
     badge = _step2_badge(_recordings_dir())
-    return _page(request, "step2.html", current=2, questions=QUESTIONS, page_badge=badge)
+    return _page(request, "step2.html", current=2, questions=STEP2_QUESTIONS, page_badge=badge)
 
 
 @router.post("/step/2/run", response_class=HTMLResponse)
 def step2_run(request: Request, question: Annotated[str, Form()]) -> HTMLResponse:
+    if question not in QUESTIONS:
+        raise HTTPException(status_code=422, detail="unknown question")
+    try:
+        context = _step2_context(question, _recordings_dir())
+    except StaleRecording as error:
+        return templates.TemplateResponse(request, "step2_result.html", {"stale": str(error)})
+    return templates.TemplateResponse(request, "step2_result.html", {"r": context})
+
+
+SHOWN_HITS = 3
+NS_QUERIES = "nonclinical-summary"
+
+
+def _rank(value: int | None) -> str:
+    return "-" if value is None else str(value)
+
+
+def _step3_context() -> dict[str, Any]:
+    """The two fixed workflow queries from the build-time cache, with the quotation check.
+
+    A quotation is the first stored sentence of a shown passage; it counts as verbatim on the cited
+    page when the build located exactly that text on a page of the passage.
+    """
+    guidelines = load_manifest()["guidelines"]
+    passages = stored_passages()
+    queries, quotes, verbatim = [], [], 0
+    for fixed in retrieval.load_fixed_queries():
+        if fixed["used_by"] != NS_QUERIES:
+            continue
+        rows: list[list[str]] = []
+        folded: list[list[str]] = []
+        for number, hit in enumerate(retrieval.cached_guidance(fixed["query"]).hits, start=1):
+            passage = passages[hit.passage_id]
+            title = guidelines[passage.doc]["title"]
+            row = [
+                " ".join(title.split()[:2]),
+                passage.section,
+                str(passage.page_start),
+                _rank(hit.lexical_rank),
+                _rank(hit.semantic_rank),
+                _rank(hit.fused_rank),
+            ]
+            (rows if number <= SHOWN_HITS else folded).append(row)
+            if number > SHOWN_HITS:
+                continue
+            sentence = passage.sentences[0]
+            page = cited_page(passage, sentence.sentence_id)
+            base = guidelines[passage.doc]["page_link_base"]
+            marks = _highlighted(sentence.sentence_id)
+            if any(
+                normalize_whitespace(m["text"]) == normalize_whitespace(sentence.text)
+                and passage.page_start <= m["page"] <= passage.page_end
+                for m in marks
+            ):
+                verbatim += 1
+            quotes.append(
+                {
+                    "id": fixed["id"],
+                    "text": sentence.text,
+                    "cite": " ".join([*row[:2], str(page)]),
+                    "highlight": f"/highlight/{sentence.sentence_id}" if marks else "",
+                    "link": f"{base}#page={page}",
+                }
+            )
+        queries.append({"id": fixed["id"], "query": fixed["query"], "rows": rows, "folded": folded})
+    return {"queries": queries, "quotes": quotes, "verbatim": verbatim}
+
+
+@router.get("/step/3", response_class=HTMLResponse)
+async def step3(request: Request) -> HTMLResponse:
+    return _page(request, "step3.html", current=3, r=_step3_context())
+
+
+@router.get("/highlight/{sentence_id}", response_class=HTMLResponse)
+async def highlight_view(request: Request, sentence_id: str) -> HTMLResponse:
+    entries = _highlighted(sentence_id)
+    if not entries:
+        raise HTTPException(status_code=404, detail="no highlighted page for this sentence")
+    passage = stored_passages()[entries[0]["passage_id"]]
+    return _page(
+        request,
+        "highlight.html",
+        current=0,
+        pages=entries,
+        sentence=next(s.text for s in passage.sentences if s.sentence_id == sentence_id),
+    )
+
+
+@router.get("/highlights/{name}")
+async def highlight_image(name: str) -> FileResponse:
+    known = {Path(str(e["image"])).name for e in _all_highlights()}
+    if name not in known:
+        raise HTTPException(status_code=404, detail="unknown highlight")
+    return FileResponse(IMAGES_DIR / name, media_type="image/png")
+
+
+@router.get("/explore", response_class=HTMLResponse)
+async def explore(request: Request) -> HTMLResponse:
+    badge = _step2_badge(_recordings_dir())
+    return _page(request, "explore.html", current=0, questions=QUESTIONS, page_badge=badge)
+
+
+@router.post("/explore/run", response_class=HTMLResponse)
+def explore_run(request: Request, question: Annotated[str, Form()]) -> HTMLResponse:
     if question not in QUESTIONS:
         raise HTTPException(status_code=422, detail="unknown question")
     try:

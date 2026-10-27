@@ -1,5 +1,5 @@
 {# Shared components: every page builds on these macros; step templates hold wording only. #}
-{% macro badge(kind) %}<span class="badge {{ kind|lower }}">{{ kind }}</span>{% endmacro %}
+{% macro badge(kind) %}<span class="badge {{ kind|lower|replace(' ', '-') }}">{{ kind }}</span>{% endmacro %}
 
 {% macro badge_meta(kind, meta) %}<p class="meta">{{ badge(kind) }} {{ meta }}</p>{% endmacro %}
 
@@ -9,7 +9,7 @@
   <nav class="steps" aria-label="Steps">
     {% for name in steps %}
       {% set n = loop.index %}
-      {% if n <= 2 %}
+      {% if n <= 3 %}
         <a href="/step/{{ n }}"{% if current == n %} aria-current="step"{% endif %}>{{ n }} {{ name }}</a>
       {% else %}
         <span class="locked" aria-disabled="true">{{ n }} {{ name }}</span>

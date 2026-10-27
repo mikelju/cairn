@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from cairn.app import create_app
 
 STEP_WORD_CAP = 93
-REAL_RECORDINGS = Path(__file__).resolve().parents[1] / "recordings"
+REAL_RECORDINGS = Path(__file__).resolve().parent / "fixtures" / "recordings_real_shape"
 STALE_NOTICE = "stale recording"
 SENTENCE_WORD_CAP = 25
 
@@ -108,7 +108,7 @@ def open_toggle(html: str) -> str:
 
 
 def rendered_state(name: str) -> str:
-    # Step 2 states always replay the real recordings, whatever the cwd or the environment say.
+    # Step 2 states always replay the real-shape fixtures, whatever the cwd or the environment say.
     saved = os.environ.get("CAIRN_RECORDINGS")
     os.environ["CAIRN_RECORDINGS"] = str(REAL_RECORDINGS)
     try:
@@ -124,6 +124,8 @@ def _rendered_state(name: str) -> str:
     with TestClient(create_app()) as client:
         if name == "landing":
             return client.get("/").text
+        if name == "step3":
+            return client.get("/step/3").text
         if name.startswith("step2_"):
             page = client.get("/step/2").text
             if name == "step2_before":
@@ -197,6 +199,7 @@ def test_result_fragment_lands_inside_the_result_element() -> None:
         "step2_q2",
         "step2_q2_open",
         "step2_q6",
+        "step3",
     ],
 )
 def test_word_cap_rendered(state: str) -> None:

@@ -3,7 +3,17 @@
 from collections.abc import Callable
 from typing import Any
 
-from cairn.content import ObservationLedger, Sentence, Text, UnresolvedRef, ValueRef
+from cairn.content import (
+    ObservationLedger,
+    QuoteRef,
+    Sentence,
+    Text,
+    UnresolvedRef,
+    ValueRef,
+)
+from cairn.guidelines import load_manifest
+from cairn.highlight import cited_page
+from cairn.passages import stored_passages
 
 THOUSAND = 1000
 
@@ -25,22 +35,82 @@ def format_value(value: Any) -> str:
     raise UnresolvedRef(f"value of type {type(value).__name__} cannot be formatted")
 
 
-def render_parts(sentence: Sentence, place: Callable[[ValueRef], str]) -> str:
+def quote_data(ref: QuoteRef) -> dict[str, Any]:
+    """The quotation of a QuoteRef as data: the stored sentences copied verbatim, with source.
+
+    `link` is the official document link with `#page=N`, for the UI; nothing here is model text.
+    """
+    passage = stored_passages().get(ref.passage_id)
+    if passage is None:
+        raise UnresolvedRef(f"unknown passage {ref.passage_id}")
+    stored = {sentence.sentence_id: sentence.text for sentence in passage.sentences}
+    if not ref.sentence_ids:
+        raise UnresolvedRef(f"quotation of {ref.passage_id} names no sentence")
+    missing = [sid for sid in ref.sentence_ids if sid not in stored]
+    if missing:
+        raise UnresolvedRef(f"unknown sentence {missing[0]} in {ref.passage_id}")
+    guideline = load_manifest()["guidelines"][passage.doc]
+    pages = (
+        f"page {passage.page_start}"
+        if passage.page_start == passage.page_end
+        else f"pages {passage.page_start}-{passage.page_end}"
+    )
+    page = cited_page(passage, ref.sentence_ids[0])
+    return {
+        "passage_id": ref.passage_id,
+        "sentence_ids": list(ref.sentence_ids),
+        "text": " ".join(stored[sid] for sid in ref.sentence_ids),
+        "guideline": guideline["title"],
+        "section": passage.section,
+        "page": page,
+        "citation": f"{guideline['title']}, section {passage.section}, {pages}",
+        "link": f"{guideline['page_link_base']}#page={page}",
+    }
+
+
+def render_quote(ref: QuoteRef) -> str:
+    """The stored sentence text followed by guideline, section and page, all placed by code."""
+    data = quote_data(ref)
+    return f"{data['text']} ({data['citation']})"
+
+
+def quotations(sentences: list[Sentence]) -> list[dict[str, Any]]:
+    """Every quotation in the sentences, as data. Model text never counts, whatever it says."""
+    return [quote_data(p) for s in sentences for p in s.parts if isinstance(p, QuoteRef)]
+
+
+def render_parts(
+    sentence: Sentence,
+    place: Callable[[ValueRef], str],
+    place_quote: Callable[[QuoteRef], str] = render_quote,
+) -> str:
     """Join the parts in order, adding a space between text and a value only where words fuse."""
     out = ""
-    previous: Text | ValueRef | None = None
+    previous: Text | ValueRef | QuoteRef | None = None
     for part in sentence.parts:
-        piece = part.text if isinstance(part, Text) else place(part)
+        if isinstance(part, Text):
+            piece = part.text
+        elif isinstance(part, QuoteRef):
+            piece = place_quote(part)
+        else:
+            piece = place(part)
         mixed = isinstance(part, Text) != isinstance(previous, Text)
-        if previous is not None and mixed and out[-1:].isalnum() and piece[:1].isalnum():
+        quoted = isinstance(part, QuoteRef) or isinstance(previous, QuoteRef)
+        fused_words = mixed and out[-1:].isalnum() and piece[:1].isalnum()
+        bare = not (out[-1:].isspace() or piece[:1].isspace() or piece[:1] in ".,;:")
+        if previous is not None and (fused_words or (quoted and out and bare)):
             out += " "
         out += piece
         previous = part
     return out
 
 
-def render_sentence(sentence: Sentence, ledger: ObservationLedger) -> str:
-    return render_parts(sentence, lambda ref: format_value(ledger.resolve(ref)))
+def render_sentence(
+    sentence: Sentence,
+    ledger: ObservationLedger,
+    place_quote: Callable[[QuoteRef], str] = render_quote,
+) -> str:
+    return render_parts(sentence, lambda ref: format_value(ledger.resolve(ref)), place_quote)
 
 
 def render(sentences: list[Sentence], ledger: ObservationLedger) -> str:

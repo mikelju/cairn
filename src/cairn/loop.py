@@ -1,7 +1,7 @@
 """The question loop: the model picks tools and drafts, the code places every number.
 
 At most MAX_CALLS model calls per question. The model sees tool results by ID (O1, O2...)
-and ends by calling write_answer with a list of Sentence made of Text and ValueRef parts.
+and ends by calling write_answer with a list of Sentence made of Text, ValueRef and QuoteRef parts.
 Text with a digit is rejected before rendering; the rest is rendered and verified.
 """
 
@@ -23,9 +23,16 @@ from cairn.verify import Verdict, verify
 MAX_CALLS = 6
 FIRST_TOOL = "run_job"
 ANSWER_TOOL = "write_answer"
-STUDY_TOOLS = ("run_job", "study_design", "incidence", "body_weight_change", "tk_summary")
+STUDY_TOOLS = (
+    "run_job",
+    "study_design",
+    "incidence",
+    "body_weight_change",
+    "tk_summary",
+    "search_guidance",
+)
 PROMPT = (Path(__file__).parent / "prompts" / "question.md").read_text(encoding="utf-8")
-PROMPT_VERSION = "question-5"
+PROMPT_VERSION = "question-7"
 SENTENCES = TypeAdapter(list[Sentence])
 
 
@@ -109,7 +116,7 @@ def tool_definitions() -> list[dict[str, Any]]:
     definitions = sentences.pop("$defs", {})  # references resolve from the schema root
     answer = {
         "name": ANSWER_TOOL,
-        "description": "Give the final answer as a list of sentences made of text and ref parts.",
+        "description": "Give the final answer as sentences of text, ref and quote parts.",
         "strict": True,
         "input_schema": strictify(
             {"type": "object", "properties": {"sentences": sentences}, "$defs": definitions}
@@ -137,6 +144,23 @@ def _shown(obs_id: str, observation: Observation) -> str:
     )
 
 
+def _shown_guidance(output: dict[str, Any]) -> str:
+    """What the model sees of a search: the hits it may quote, or the abstention."""
+    hits = [
+        {
+            "passage_id": hit["passage_id"],
+            "doc": hit["doc"],
+            "section": hit["section"],
+            "rerank_score": hit["rerank_score"],
+            "sentences": hit["sentences"],
+        }
+        for hit in output.get("hits", [])
+        if hit["rerank_score"] >= output["threshold"]
+    ]
+    abstained = bool(output.get("abstained"))
+    return json.dumps({"abstained": abstained, "hits": hits}, default=str)
+
+
 def _has_digit(sentences: list[Sentence]) -> bool:
     return any(
         char.isdigit()
@@ -161,6 +185,9 @@ def _run_tool(name: str, arguments: dict[str, Any], result: LoopResult) -> tuple
     if isinstance(output, Observation):
         step.obs_id = result.ledger.add(output)
         return _shown(step.obs_id, output), step, False
+    if name == "search_guidance":
+        result.ledger.add_guidance(output)
+        return _shown_guidance(output), step, False
     return json.dumps({"kind": output["kind"], "status": output["status"]}), step, False
 
 

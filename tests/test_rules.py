@@ -1,7 +1,10 @@
 """Verifier rules 1-7: each has a passing and a failing fixture (C9)."""
 
-from cairn.content import Sentence, Text, ValueRef
+from typing import Any
+
+from cairn.content import ObservationLedger, Part, QuoteRef, Sentence, Text, ValueRef
 from cairn.observation import build_observation
+from cairn.tools import call_tool
 from cairn.verify import RULE_REASONS, Verdict, data_quality_note, verify
 from conftest import World
 
@@ -150,6 +153,33 @@ def test_rule_5_quarantined_data_without_the_note_fails(world: World) -> None:
     only(verify(far_away, world.ledger), 5)
 
 
+def _note_with_field(world: World, field: str) -> Sentence:
+    return Sentence(
+        parts=[
+            text("Data quality note: the value of animal "),
+            world.ref(world.tk, field),
+            text(
+                " was quarantined by validation as not physically possible; "
+                "the mean is shown with and without it."
+            ),
+        ]
+    )
+
+
+def test_rule_5_note_accepts_the_animal_field_with_or_without_the_values_prefix(
+    world: World,
+) -> None:
+    mean = passing(world)[1]
+    for field in ("quarantined_rows.0.usubjid", "values.quarantined_rows.0.usubjid"):
+        assert verify([mean, _note_with_field(world, field)], world.ledger).ok
+
+
+def test_rule_5_note_with_another_animal_field_fails(world: World) -> None:
+    mean = passing(world)[1]
+    other = _note_with_field(world, "values.quarantined_rows.1.usubjid")
+    assert 5 in {failure.rule for failure in verify([mean, other], world.ledger).failures}
+
+
 def test_rule_6_neutral_wording_passes(world: World) -> None:
     sentence = Sentence(parts=[text("The screen listed "), world.ref(world.incidence, "screen")])
     assert verify([sentence], world.ledger).ok
@@ -189,7 +219,7 @@ def test_rules_apply_in_order_and_report_every_failure(world: World) -> None:
     assert [f.rule for f in verdict.failures] == sorted(f.rule for f in verdict.failures)
 
 
-def rule_of(world: World, parts: list[Text | ValueRef], rule: int) -> None:
+def rule_of(world: World, parts: list[Part], rule: int) -> None:
     only(verify([Sentence(parts=parts)], world.ledger), rule)
 
 
@@ -205,7 +235,7 @@ def test_f1_expressions_are_checked_on_the_final_rendered_text(world: World) -> 
 
 def test_f1_a_value_placed_between_words_does_not_make_an_expression(world: World) -> None:
     sex = world.ref(world.weight, "sex")
-    parts: list[Text | ValueRef] = [text("The NOA"), sex, text("EL here, "), sex]
+    parts: list[Part] = [text("The NOA"), sex, text("EL here, "), sex]
     assert verify([Sentence(parts=parts)], world.ledger).ok
 
 
@@ -273,12 +303,12 @@ def test_f6_ledger_text_values_cannot_be_written_by_hand(world: World) -> None:
     ):
         rule_of(world, [text(written), sex], 7)
     finding = world.ref(world.incidence, "findings.0.finding")
-    parts: list[Text | ValueRef] = [text("Finding: "), finding, text(" in F and M.")]
+    parts: list[Part] = [text("Finding: "), finding, text(" in F and M.")]
     assert verify([Sentence(parts=parts)], world.ledger).ok
 
 
 def test_f7_the_denominator_must_be_the_examined_of_the_same_group(world: World) -> None:
-    parts: list[Text | ValueRef] = [
+    parts: list[Part] = [
         world.ref(world.incidence, "findings.0.groups.3.affected"),
         text(" of "),
         world.ref(world.incidence, "n_examined"),
@@ -321,7 +351,7 @@ def test_g1_rules_6_and_7_apply_to_the_text_joined_across_sentences(world: World
 def test_g2_units_are_not_study_terms_and_the_canonical_phrase_passes(world: World) -> None:
     pct = world.ref(world.weight, "groups.3.percent_lower_than_control")
     dose = world.ref(world.weight, "groups.3.dose")
-    parts: list[Text | ValueRef] = [
+    parts: list[Part] = [
         text("Mean body weight was "),
         pct,
         text(" percent lower than control at "),
@@ -363,7 +393,7 @@ def test_g3_digits_in_cited_text_are_blocked_but_structural_fields_pass(world: W
 
 def test_g4_sentence_ends_without_a_space_or_with_other_marks(world: World) -> None:
     sex = world.ref(world.weight, "sex")
-    ends: list[list[Text | ValueRef]]
+    ends: list[list[Part]]
     ends = [
         [sex, text("... All animals looked abnormal")],
         [sex, text("\u2026 All animals looked abnormal")],
@@ -376,7 +406,7 @@ def test_g4_sentence_ends_without_a_space_or_with_other_marks(world: World) -> N
     ]
     for written in ends:
         rule_of(world, written, 1)
-    fine: list[list[Text | ValueRef]]
+    fine: list[list[Part]]
     fine = [
         [text("Seen e.g. in "), sex, text(".")],
         [text("Lower vs. control in "), sex, text(".")],
@@ -448,3 +478,72 @@ def test_h3_rule_1_judges_sentence_ends_inside_placed_values(world: World) -> No
     rule_of(world, [text("Seen in "), _cited(world, "note", "Control."), text(" All were bad")], 1)
     ref = _cited(world, "note", "mean of animals")
     assert verify([Sentence(parts=[text("Seen in "), ref, text(".")])], world.ledger).ok
+
+
+G2 = "How does the FDA 2005 guidance define the no observed adverse effect level (NOAEL)?"
+
+
+def retrieve(world: World) -> dict[str, Any]:
+    """Run the cached G2 search and record its passages in the ledger, as the loop does."""
+    result = call_tool("search_guidance", {"query": G2})
+    world.ledger.add_guidance(result)
+    return result
+
+
+def quote(passage_id: str, sentence_id: str) -> QuoteRef:
+    return QuoteRef(passage_id=passage_id, sentence_ids=[sentence_id])
+
+
+def test_rule_8_quotation_of_a_retrieved_passage_passes(world: World) -> None:
+    retrieve(world)
+    sentence = Sentence(parts=[text("The guidance says: "), quote("FDA-IV-01", "FDA-IV-01.s1")])
+    verdict = verify([sentence], world.ledger)
+    assert verdict.ok
+    assert verdict.text is not None
+    assert "(FDA" in verdict.text or "Guidance" in verdict.text
+
+
+def test_rule_8_quotation_of_a_passage_not_retrieved_fails(world: World) -> None:
+    retrieve(world)
+    sentence = Sentence(parts=[quote("M4S-2.6.6.3-01", "M4S-2.6.6.3-01.s1")])
+    only(verify([sentence], world.ledger), 8)
+
+
+def test_rule_8_quotation_with_nothing_retrieved_fails(world: World) -> None:
+    only(verify([Sentence(parts=[quote("FDA-IV-01", "FDA-IV-01.s1")])], world.ledger), 8)
+
+
+def test_rule_8_text_that_differs_from_the_retrieved_text_fails(world: World) -> None:
+    result = retrieve(world)
+    hit = next(h for h in result["hits"] if h["passage_id"] == "FDA-IV-01")
+    altered = {
+        **result,
+        "hits": [{**hit, "sentences": [{**hit["sentences"][0], "text": "Changed."}]}],
+    }
+    fresh = ObservationLedger()
+    fresh.add_guidance(altered)
+    verdict = verify([Sentence(parts=[quote("FDA-IV-01", "FDA-IV-01.s1")])], fresh)
+    only(verdict, 8)
+    assert "differs" in verdict.failures[0].reason
+
+
+def test_rule_8_abstention_and_hits_below_the_threshold_retrieve_nothing(world: World) -> None:
+    result = call_tool("search_guidance", {"query": G2})
+    world.ledger.add_guidance({**result, "abstained": True, "hits": []})
+    assert world.ledger.retrieved == {}
+    world.ledger.add_guidance({**result, "threshold": 100.0})
+    assert world.ledger.retrieved == {}
+
+
+def test_rule_8_unknown_passage_fails_rule_2_not_rule_8(world: World) -> None:
+    verdict = verify([Sentence(parts=[quote("NOPE-01", "NOPE-01.s1")])], world.ledger)
+    only(verdict, 2)
+
+
+def test_rule_8_quotation_text_is_not_judged_as_model_text(world: World) -> None:
+    """The NOAEL definition holds digits-free guideline wording the safety list would flag."""
+    retrieve(world)
+    sentence = Sentence(parts=[quote("FDA-IV-01", "FDA-IV-01.s1")])
+    assert verify([sentence], world.ledger).ok
+    shouty = Sentence(parts=[text("It is safe: "), quote("FDA-IV-01", "FDA-IV-01.s1")])
+    assert verify([shouty], world.ledger).rules == [6]

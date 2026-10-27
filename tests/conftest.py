@@ -1,5 +1,6 @@
 """Shared fixtures: the app's DuckDB file is built once when it is missing."""
 
+import socket
 from dataclasses import dataclass
 
 import pytest
@@ -42,3 +43,15 @@ def world() -> World:
         weight=ledger.add(body_weight_change()),
         tk=ledger.add(tk_summary()),
     )
+
+
+@pytest.fixture
+def block_sockets(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Any attempt to open a network connection fails, so retrieval can never download."""
+
+    def refuse(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("network blocked in this test")
+
+    monkeypatch.setattr(socket.socket, "connect", refuse)
+    monkeypatch.setattr(socket.socket, "connect_ex", refuse)
+    monkeypatch.setattr(socket, "getaddrinfo", refuse)
