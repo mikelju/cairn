@@ -240,6 +240,39 @@ def test_retrieval_cache_check_accepts_a_one_rank_shift_of_a_near_tie(
     assert retrieval.check_cache(Shifted(cache), retrieval.CACHE_PATH) == []  # type: ignore[arg-type]
 
 
+AMD64_QUERY = "nonclinical data to support first-in-human clinical trial anticancer drug"
+
+
+@pytest.mark.usefixtures("other_platform")
+def test_retrieval_cache_check_accepts_two_near_ties_swapped_at_the_cut_on_amd64(
+    cache: dict[str, list[dict[str, object]]],
+) -> None:
+    """D116: observed on a GitHub amd64 runner, two passages lost and two gained at the cut."""
+    stored = cache[AMD64_QUERY]
+    assert [h["passage_id"] for h in stored] == [
+        "S9-1.2-01", "S9-1.3-01", "S9-1.1-01", "S9-3.3-01", "S9-3.6-01",
+    ]  # fmt: skip
+    by_id = {str(h["passage_id"]): h for h in stored}
+    observed = [
+        ("S9-1.3-01", 3.378), ("S9-1.2-01", 3.295), ("S9-3.4-01", 2.325),
+        ("M3-6-01", 2.305), ("S9-1.1-01", 2.237),
+    ]  # fmt: skip
+
+    class Amd64(_StubIndex):
+        def hits(self, query: str) -> list[dict[str, object]]:
+            hits = super().hits(query)
+            if query != AMD64_QUERY:
+                return hits
+            fresh = []
+            for rank, (pid, score) in enumerate(observed, start=1):
+                hit = dict(by_id.get(pid, stored[-1]))  # a new passage borrows the foot's scores
+                hit.update(passage_id=pid, rerank_score=score, rerank_rank=rank)
+                fresh.append(hit)
+            return fresh
+
+    assert retrieval.check_cache(Amd64(cache), retrieval.CACHE_PATH) == []  # type: ignore[arg-type]
+
+
 @pytest.mark.usefixtures("other_platform")
 def test_retrieval_cache_check_reports_a_stale_cache(
     cache: dict[str, list[dict[str, object]]],
@@ -305,12 +338,16 @@ def test_retrieval_cache_same_top_reports_a_lost_passage_above_the_foot() -> Non
     assert not retrieval._same_top(stored, fresh, {h.passage_id: h for h in fresh})
 
 
-def test_retrieval_cache_same_top_allows_at_most_one_passage_to_change() -> None:
+def test_retrieval_cache_same_top_reports_renamed_passages_well_above_the_other_foot() -> None:
     stored = [h.model_dump() for h in _ranked({"A": 3.0, "B": 2.0, "C": 1.9, "D": 1.8, "E": 1.7})]
-    renamed = _ranked({"A": 3.0, "X": 2.0, "Y": 1.9, "Z": 1.8, "W": 1.7})
+    renamed = _ranked({"A": 3.0, "X": 1.0, "Y": 0.9, "Z": 0.8, "W": 0.7})
     assert not retrieval._same_top(stored, renamed, {h.passage_id: h for h in renamed})
-    two = _ranked({"A": 3.0, "B": 2.0, "C": 1.9, "X": 1.8, "Y": 1.7})
+    two = _ranked({"A": 3.0, "B": 2.0, "C": 1.9, "X": 0.8, "Y": 0.7})
     assert not retrieval._same_top(stored, two, {h.passage_id: h for h in two})
+    # two near-ties at the cut may change places: each is within the tolerance of the other foot
+    tied = [h.model_dump() for h in _ranked({"A": 3.0, "B": 2.5, "C": 2.4, "D": 2.3, "E": 2.2})]
+    cut = _ranked({"A": 3.0, "B": 2.5, "X": 2.35, "Y": 2.3, "C": 2.25})
+    assert retrieval._same_top(tied, cut, {h.passage_id: h for h in cut})
 
 
 @pytest.mark.usefixtures("other_platform")

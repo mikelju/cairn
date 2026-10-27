@@ -338,7 +338,7 @@ def _same_top(
 ) -> bool:
     """Whether two top-5 lists agree up to near-ties (scores within the platform tolerance).
 
-    At most one passage may be lost and one gained (D112: at most one of five differs).
+    Any number of passages may be in only one list (D116), but each must be a near-tie at the cut.
     """
     # each list may be off by the tolerance from the other platform's value, so a tie spans twice
     tolerance = 2 * PLATFORM_RERANK_TOLERANCE
@@ -351,8 +351,6 @@ def _same_top(
     kept = {h.passage_id for h in fresh}
     lost = [h for h in stored if h["passage_id"] not in kept]
     gained = [h for h in fresh if h.passage_id not in {s["passage_id"] for s in stored}]
-    if len(lost) > 1 or len(gained) > 1:
-        return False
     # a passage only in one list sits near the foot of its own list; and as it is missing from the
     # other list, its score there is at most that list's foot plus one platform tolerance, so a lost
     # passage that scored well above the new foot is a real change, not a near-tie at the cut
@@ -402,8 +400,9 @@ def check_cache(
     ordered passages and ranks, reranker scores within `RERANK_TOLERANCE`, the other scores within
     `SCORE_TOLERANCE`. Elsewhere (the image build may run on another platform) near-ties are
     tolerated: the best passage is the same, or the other list's best scores within twice
-    `PLATFORM_RERANK_TOLERANCE` of it; at most one passage is in only one of the two top 5 lists,
-    and it scores within twice that tolerance of the foot of its list (a near-tie at the cut, E138);
+    `PLATFORM_RERANK_TOLERANCE` of it; every passage in only one of the two top 5 lists scores
+    within twice that tolerance of the foot of its own list and within that tolerance of the foot
+    of the other (a near-tie at the cut, E138, D116);
     the reranker score agrees within `PLATFORM_RERANK_TOLERANCE` at every position and for every
     passage in both lists; for passages in both lists, lexical scores agree within
     `SCORE_TOLERANCE`, fused scores within `PLATFORM_FUSED_TOLERANCE`, semantic scores within
