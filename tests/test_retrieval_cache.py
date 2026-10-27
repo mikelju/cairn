@@ -43,8 +43,7 @@ def test_retrieval_cache_fixed_queries_file() -> None:
 def test_retrieval_cache_covers_fixed_and_recorded_queries(
     cache: dict[str, list[dict[str, object]]],
 ) -> None:
-    wanted = {q["query"] for q in retrieval.load_fixed_queries()}
-    wanted |= set(retrieval.recorded_queries(Path("recordings")))
+    wanted = set(retrieval.required_queries(recordings=Path("recordings")))
     assert wanted <= set(cache)
     assert set(cache) == wanted, "the cache holds only the fixed and the recorded queries"
 
@@ -377,3 +376,37 @@ def test_retrieval_cache_check_reports_short_or_empty_lists_without_crashing(
     stored_short.write_text(json.dumps(data), encoding="utf-8")
     problems = retrieval.check_cache(_StubIndex(cache), stored_short)  # type: ignore[arg-type]
     assert any(p.startswith(first) and "expected 5 ranked passages" in p for p in problems)
+
+
+@pytest.mark.usefixtures("other_platform")
+def test_retrieval_cache_check_reports_lists_longer_than_top(
+    cache: dict[str, list[dict[str, object]]], tmp_path: Path
+) -> None:
+    class Long(_StubIndex):
+        def rerank(self, query: str) -> list[retrieval.RankedHit]:
+            hits = super().rerank(query)
+            return [*hits, hits[-1].model_copy(update={"passage_id": "EXTRA-01"})]
+
+    fresh_long = retrieval.check_cache(Long(cache), retrieval.CACHE_PATH)  # type: ignore[arg-type]
+    assert fresh_long and all("expected 5 ranked passages" in p for p in fresh_long)
+
+    data = json.loads(retrieval.CACHE_PATH.read_text(encoding="utf-8"))
+    first = sorted(data["queries"])[0]
+    data["queries"][first] = [*data["queries"][first], dict(data["queries"][first][-1])]
+    stored_long = tmp_path / "cache.json"
+    stored_long.write_text(json.dumps(data), encoding="utf-8")
+    problems = retrieval.check_cache(_StubIndex(cache), stored_long)  # type: ignore[arg-type]
+    assert any(p.startswith(first) and "expected 5 ranked passages" in p for p in problems)
+
+
+def test_retrieval_cache_check_reports_a_required_query_missing_from_the_cache(
+    cache: dict[str, list[dict[str, object]]], tmp_path: Path
+) -> None:
+    g2 = next(q["query"] for q in retrieval.load_fixed_queries() if q["id"] == "G2")
+    data = json.loads(retrieval.CACHE_PATH.read_text(encoding="utf-8"))
+    del data["queries"][g2]
+    lacking = tmp_path / "cache.json"
+    lacking.write_text(json.dumps(data), encoding="utf-8")
+    problems = retrieval.check_cache(_StubIndex(cache), lacking)  # type: ignore[arg-type]
+    assert any(p.startswith(g2) and "missing from the cache" in p for p in problems)
+    assert retrieval.check_cache(_StubIndex(cache), retrieval.CACHE_PATH) == []  # type: ignore[arg-type]

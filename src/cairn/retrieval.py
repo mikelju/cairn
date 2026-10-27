@@ -284,13 +284,20 @@ def recorded_queries(directory: Path = RECORDINGS_DIR) -> list[str]:
     return sorted(found)
 
 
+def required_queries(
+    fixed: Path = FIXED_QUERIES_PATH, recordings: Path = RECORDINGS_DIR
+) -> list[str]:
+    """The queries the cache must hold: every fixed one and every recorded one, sorted."""
+    return sorted(
+        {q["query"] for q in load_fixed_queries(fixed)} | set(recorded_queries(recordings))
+    )
+
+
 def build_cache(
     index: Index, fixed: Path = FIXED_QUERIES_PATH, recordings: Path = RECORDINGS_DIR
 ) -> str:
     """The cache as JSON text: the reranked top hits of every fixed and recorded query."""
-    queries = sorted(
-        {q["query"] for q in load_fixed_queries(fixed)} | set(recorded_queries(recordings))
-    )
+    queries = required_queries(fixed, recordings)
     results = {
         query: [
             {k: round(v, 6) if isinstance(v, float) else v for k, v in hit.model_dump().items()}
@@ -383,7 +390,12 @@ def _strict_differences(
     return problems
 
 
-def check_cache(index: Index, path: Path = CACHE_PATH) -> list[str]:
+def check_cache(
+    index: Index,
+    path: Path = CACHE_PATH,
+    fixed: Path = FIXED_QUERIES_PATH,
+    recordings: Path = RECORDINGS_DIR,
+) -> list[str]:
     """Differences between the committed cache and a fresh retrieval of every cached query.
 
     On the platform that wrote the cache (`build_platform()`) the comparison is strict: the same
@@ -396,8 +408,9 @@ def check_cache(index: Index, path: Path = CACHE_PATH) -> list[str]:
     passage in both lists; for passages in both lists, lexical scores agree within
     `SCORE_TOLERANCE`, fused scores within `PLATFORM_FUSED_TOLERANCE`, semantic scores within
     `PLATFORM_SEMANTIC_TOLERANCE`; the lexical rank is equal and the semantic and fused ranks
-    differ by at most `PLATFORM_RANK_SHIFT`. A cache written by another reranker, or a list with
-    fewer than `TOP` passages, is a problem. An empty list means the cache is current.
+    differ by at most `PLATFORM_RANK_SHIFT`. A cache written by another reranker, a fixed or
+    recorded query missing from it, or a list (stored or fresh) without exactly `TOP` passages is a
+    problem. An empty list means the cache is current.
     """
     data = _read(path)
     problems: list[str] = []
@@ -405,10 +418,15 @@ def check_cache(index: Index, path: Path = CACHE_PATH) -> list[str]:
         problems.append(
             f"cache model {data.get('model')!r} is not the reranker {weights.RERANKER!r}"
         )
+    problems.extend(
+        f"{query}: required query missing from the cache"
+        for query in required_queries(fixed, recordings)
+        if query not in data["queries"]
+    )
     strict = data.get("platform") == build_platform()
     for query, stored in sorted(data["queries"].items()):
         fresh = index.rerank(query)
-        if len(stored) < TOP or len(fresh) < TOP:
+        if len(stored) != TOP or len(fresh) != TOP:
             problems.append(
                 f"{query}: expected {TOP} ranked passages, the cache has {len(stored)} "
                 f"and a fresh retrieval {len(fresh)}"
