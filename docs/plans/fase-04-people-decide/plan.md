@@ -32,7 +32,8 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | E157 | ejecutor (Opus) | Draft spec and plan of phase 04 (document mode) | done | fc9a814; supervisor cut the deploy out of C10 (the user deploys) |
 | E158 | ejecutor (Sonnet) | Increment 1: DecisionRef, slots, rules 1, 2 and 6, NOAEL rule, E1 example set | done | 778f72a; 48 tests of decisions and E1 rerun by the supervisor, green |
 | E159 | ejecutor (Sonnet) | Increment 2: LangGraph workflow, draft prompt, one Bedrock recording under 2 USD | partial | ff6d4c0: dependencies only (sqlite-vec skipped on Windows ARM64 by a uv override); context budget ran out; 0 USD spent |
-| E160 | ejecutor (Sonnet) | Increment 2 without Bedrock: workflow module, draft schema and prompt, hand-written fixture, tests, `record-draft` target | in progress | |
+| E160 | ejecutor (Sonnet) | Increment 2 without Bedrock: workflow module, draft schema and prompt, hand-written fixture, tests, `record-draft` target | done | 68f00bf; 22 workflow and recording tests rerun offline by the supervisor, green |
+| E161 | ejecutor (Sonnet) | Increment 2 closing: one real draft recording with `make record-draft`, ceiling 2 USD | in progress | |
 
 ## User decisions
 Questions the supervisor raises to the user. Statuses: open, answered, deferred; closed with the literal answer.
