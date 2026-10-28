@@ -168,8 +168,9 @@ def test_audit_events_follow_the_walkthrough(client: TestClient, db_path: Path) 
         (4, AUTHOR, "decisions_recorded"),
         (5, REVIEWER, "noael_confirmed"),
         (6, "system", "verify_final"),
-        (7, AUTHOR, "refused"),
-        (8, REVIEWER, "approved"),
+        (7, "sonnet-4-6", "judge_run"),
+        (8, AUTHOR, "refused"),
+        (9, REVIEWER, "approved"),
     ]
     assert "snapshot_sha256" in rows[0][5]
 
@@ -181,7 +182,7 @@ def test_api_audit_verify_full_walkthrough_and_unknown_thread(
     decide(client, thread, form(thread))
     approve(client, thread, REVIEWER)
     path = f"/api/threads/{thread['thread_id']}/audit/verify"
-    assert client.get(path).json() == {"ok": True, "count": 5, "first_broken": None}
+    assert client.get(path).json() == {"ok": True, "count": 6, "first_broken": None}
     assert client.get("/api/threads/nope/audit/verify").status_code == 404
     audit_routes = [r.path for r in threads.routes if "audit" in r.path]  # type: ignore[attr-defined]
     assert audit_routes == ["/api/threads/{thread_id}/audit/verify"]
@@ -191,7 +192,7 @@ def test_api_audit_verify_full_walkthrough_and_unknown_thread(
         conn.execute(
             "UPDATE audit SET actor = 'X' WHERE thread_id = ? AND seq = 3", (thread["thread_id"],)
         )
-    assert client.get(path).json() == {"ok": False, "count": 5, "first_broken": 3}
+    assert client.get(path).json() == {"ok": False, "count": 6, "first_broken": 3}
 
 
 def test_snapshot_mismatch_fails_gather_and_real_build_passes(tmp_path: Path) -> None:

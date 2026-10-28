@@ -48,12 +48,12 @@ MODEL_FLAG = $(if $(MODEL),--model $(MODEL))
 QUESTIONS ?= Q2 Q6
 QUESTION ?= Q2
 
-.PHONY: record record-draft live smoke
+.PHONY: record record-draft record-judge live smoke
 
 # Environment is exported by make itself (not inline VAR=value prefixes), so the recipes run the same under sh and cmd.
-record record-draft live smoke: export AWS_PROFILE := $(AWS_PROFILE)
+record record-draft record-judge live smoke: export AWS_PROFILE := $(AWS_PROFILE)
 record: export CAIRN_LLM_MODE := record
-# record-draft stays in replay mode for retrieval (the weights are absent); the gateway client is built for record directly.
+# record-draft and record-judge stay in replay mode for retrieval (the weights are absent); the gateway client is built for record directly.
 live smoke: export CAIRN_LLM_MODE := live
 
 record:
@@ -63,6 +63,11 @@ record:
 record-draft:
 	$(if $(AWS_PROFILE),,$(error set AWS_PROFILE=<profile>))
 	uv run cairn record-draft $(MODEL_FLAG)
+
+# Judge recordings (decision O1 of phase 05): E5 cases, example-decisions draft sentences and the EXAMPLE sentence.
+record-judge:
+	$(if $(AWS_PROFILE),,$(error set AWS_PROFILE=<profile>))
+	uv run cairn record-judge $(MODEL_FLAG)
 
 live:
 	$(if $(AWS_PROFILE),,$(error set AWS_PROFILE=<profile>))

@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from cairn import audit
 from cairn.decisions import Decision, apply_decisions, enumerate_slots
 from cairn.gateway import DEFAULT_MODEL, LLMGateway, Mode
+from cairn.judge import JUDGE_MODEL, summary
 from cairn.observation import current_snapshot
 from cairn.recording import RECORDINGS_DIR, ReplayClient, recorded_model, recording_path
 from cairn.workflow import State, build_graph, build_ledger, draft_key, verify_final
@@ -59,7 +60,9 @@ def _graph(request: Request) -> Any:
     directory = RECORDINGS_DIR
     model = recorded_model(directory, "DRAFT", DEFAULT_MODEL)
     client = ReplayClient.load(directory, draft_key(model))
-    return build_graph(LLMGateway(Mode.REPLAY, client=client), model, request.app.state.saver)
+    return build_graph(
+        LLMGateway(Mode.REPLAY, client=client), model, request.app.state.saver, judge_dir=directory
+    )
 
 
 def _config(thread_id: str) -> Any:
@@ -96,6 +99,7 @@ def _view(thread_id: str, state: State, waiting: str) -> dict[str, Any]:
             "text": verdict.text,
             "failures": [str(f) for f in verdict.failures],
         },
+        "judge": state.get("judge", []),
         "approved_by": state.get("approved_by"),
     }
 
@@ -220,6 +224,7 @@ async def _confirm(request: Request, thread_id: str, body: Confirm) -> dict[str,
         ok=final["ok"],
         failures=len(final["failures"]),
     )
+    await _log(request, thread_id, JUDGE_MODEL, "judge_run", **summary(state.get("judge", [])))
     return _view(thread_id, state, waiting)
 
 

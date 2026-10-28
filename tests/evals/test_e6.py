@@ -38,6 +38,11 @@ def model_calls(monkeypatch: pytest.MonkeyPatch) -> list[int]:
     return calls
 
 
+def replayed(body: dict[str, Any]) -> int:
+    """Judge verdicts served from a recording; a sentence with no recording makes no call."""
+    return sum(1 for item in body["judge"] if item["verdict"] != "not judged")
+
+
 def start(client: TestClient) -> dict[str, Any]:
     reply = client.post("/api/threads", json={"author": AUTHOR})
     assert reply.status_code == 201
@@ -110,7 +115,8 @@ def test_api_confirm_example_set_reaches_approval_green(
     assert body["final"]["ok"], body["final"]["failures"]
     assert "NOAEL, females: 20 mg/kg/day" in body["final"]["text"]
     assert "NOAEL, males: 200 mg/kg/day" in body["final"]["text"]
-    assert model_calls == [1]  # the draft at start, nothing after
+    assert body["judge"]
+    assert len(model_calls) == 1 + replayed(body)  # the draft, then one call per recorded verdict
 
 
 def test_api_confirm_is_reviewer_only(client: TestClient) -> None:
@@ -175,7 +181,7 @@ def test_resume_idempotent(client: TestClient, model_calls: list[int]) -> None:
     assert (client.get(path).json(), saver.conn.total_changes) == before
     assert approve(client, thread, REVIEWER).status_code == 200
     assert approve(client, thread, REVIEWER).status_code == 409
-    assert model_calls == [1]  # the draft at start, nothing after
+    assert len(model_calls) == 1 + replayed(first.json())  # the draft, then recorded verdicts
 
 
 def only(**adverse: float | None) -> Any:
@@ -212,7 +218,7 @@ def test_api_form_combinations_use_the_noael_rule_with_no_model_call(
     assert (body["noael"]["F"]["dose"], body["noael"]["M"]["dose"]) == (females, males)
     if females is None:
         assert "NOAEL, females: not established" in body["final"]["text"]
-    assert model_calls == [1]  # the draft at start, nothing after
+    assert len(model_calls) == 1 + replayed(body)  # the draft, then recorded verdicts
 
 
 def _twice(client: TestClient, path: str, body: dict[str, Any]) -> list[int]:

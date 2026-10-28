@@ -1,0 +1,222 @@
+{
+  "cases": [
+    {
+      "id": "E5-01",
+      "sentence": "Vacuolization (gland, adrenal) in females: 10 of 10 animals at 400 mg/kg/day, 0 of 10 in the control group.",
+      "obs": [
+        "O2"
+      ],
+      "label": "faithful",
+      "kind": "none"
+    },
+    {
+      "id": "E5-02",
+      "sentence": "Atrophy fat (gland, mammary) in females: 5 of 10 animals at 200 mg/kg/day, 0 of 10 in the control group.",
+      "obs": [
+        "O2"
+      ],
+      "label": "faithful",
+      "kind": "none"
+    },
+    {
+      "id": "E5-03",
+      "sentence": "Vacuolization (gland, adrenal) in males: 9 of 10 animals at 400 mg/kg/day, 1 of 10 in the control group.",
+      "obs": [
+        "O2"
+      ],
+      "label": "faithful",
+      "kind": "none"
+    },
+    {
+      "id": "E5-04",
+      "sentence": "Vacuolization (liver) in females: 3 of 10 animals at 400 mg/kg/day, 0 of 10 in the control group.",
+      "obs": [
+        "O2"
+      ],
+      "label": "faithful",
+      "kind": "none"
+    },
+    {
+      "id": "E5-05",
+      "sentence": "Necrosis (kidney) in males: 3 of 10 animals at 400 mg/kg/day, 0 of 10 in the control group.",
+      "obs": [
+        "O2"
+      ],
+      "label": "faithful",
+      "kind": "none"
+    },
+    {
+      "id": "E5-06",
+      "sentence": "Congestion (spleen) in females: 8 of 10 animals at 400 mg/kg/day, 5 of 10 in the control group.",
+      "obs": [
+        "O2"
+      ],
+      "label": "faithful",
+      "kind": "none"
+    },
+    {
+      "id": "E5-07",
+      "sentence": "On day 29 females at 400 mg/kg/day weighed 20.7 percent less than control.",
+      "obs": [
+        "O3"
+      ],
+      "label": "faithful",
+      "kind": "none"
+    },
+    {
+      "id": "E5-08",
+      "sentence": "On day 29 males at 20 mg/kg/day weighed 2.2 percent less than control.",
+      "obs": [
+        "O4"
+      ],
+      "label": "faithful",
+      "kind": "none"
+    },
+    {
+      "id": "E5-09",
+      "sentence": "On day 29 females at 20 mg/kg/day weighed 9.3 percent less than control.",
+      "obs": [
+        "O3"
+      ],
+      "label": "faithful",
+      "kind": "none"
+    },
+    {
+      "id": "E5-10",
+      "sentence": "In males at 20 mg/kg/day on day 1 the mean AUCTAU was 2,821 with the quarantined value and 15,956 without it.",
+      "obs": [
+        "O5"
+      ],
+      "label": "faithful",
+      "kind": "none"
+    },
+    {
+      "id": "E5-11",
+      "sentence": "The mean without the quarantined value was 5.7 times the mean with it.",
+      "obs": [
+        "O5"
+      ],
+      "label": "faithful",
+      "kind": "none"
+    },
+    {
+      "id": "E5-12",
+      "sentence": "The study PDS2014 used 124 animals of species rat, given the test article by oral gavage.",
+      "obs": [
+        "O1"
+      ],
+      "label": "faithful",
+      "kind": "none"
+    },
+    {
+      "id": "E5-13",
+      "sentence": "The test article caused vacuolization (gland, adrenal) in females, seen in 10 of 10 animals at 400 mg/kg/day, 0 of 10 in the control group.",
+      "obs": [
+        "O2"
+      ],
+      "label": "overstated",
+      "kind": "causal"
+    },
+    {
+      "id": "E5-14",
+      "sentence": "The test article reduced the body weight of females by 20.7 percent at 400 mg/kg/day.",
+      "obs": [
+        "O3"
+      ],
+      "label": "overstated",
+      "kind": "causal"
+    },
+    {
+      "id": "E5-15",
+      "sentence": "Vacuolization (gland, adrenal) in males was induced by the test article: 9 of 10 animals at 400 mg/kg/day, 1 of 10 in the control group.",
+      "obs": [
+        "O2"
+      ],
+      "label": "overstated",
+      "kind": "causal"
+    },
+    {
+      "id": "E5-16",
+      "sentence": "Males at 400 mg/kg/day lost 7.9 percent of their body weight.",
+      "obs": [
+        "O4"
+      ],
+      "label": "overstated",
+      "kind": "certainty"
+    },
+    {
+      "id": "E5-17",
+      "sentence": "It is proven that vacuolization (liver) in males occurs at 400 mg/kg/day: 3 of 10 animals at 400 mg/kg/day, 0 of 10 in the control group.",
+      "obs": [
+        "O2"
+      ],
+      "label": "overstated",
+      "kind": "certainty"
+    },
+    {
+      "id": "E5-18",
+      "sentence": "It is certain that the exposure of males at 20 mg/kg/day on day 1 is 5.7 times higher without the quarantined value, an established fact.",
+      "obs": [
+        "O5"
+      ],
+      "label": "overstated",
+      "kind": "certainty"
+    },
+    {
+      "id": "E5-19",
+      "sentence": "The dose of 20 mg/kg/day is safe for females.",
+      "obs": [
+        "O2",
+        "O3"
+      ],
+      "label": "overstated",
+      "kind": "safety"
+    },
+    {
+      "id": "E5-20",
+      "sentence": "No risk was seen in males at 20 mg/kg/day, so the dose is harmless.",
+      "obs": [
+        "O2",
+        "O4"
+      ],
+      "label": "overstated",
+      "kind": "safety"
+    },
+    {
+      "id": "E5-21",
+      "sentence": "The dose of 200 mg/kg/day was well tolerated in males: body weight was 3.6 percent lower than control.",
+      "obs": [
+        "O4"
+      ],
+      "label": "overstated",
+      "kind": "safety"
+    },
+    {
+      "id": "E5-22",
+      "sentence": "Hypertrophy hepatocellular (liver) in females was massively increased at 400 mg/kg/day: 3 of 10 animals at 400 mg/kg/day, 0 of 10 in the control group.",
+      "obs": [
+        "O2"
+      ],
+      "label": "overstated",
+      "kind": "magnitude"
+    },
+    {
+      "id": "E5-23",
+      "sentence": "Vacuolization (liver) in females was dramatically widespread: 3 of 10 animals at 400 mg/kg/day, 0 of 10 in the control group.",
+      "obs": [
+        "O2"
+      ],
+      "label": "overstated",
+      "kind": "magnitude"
+    },
+    {
+      "id": "E5-24",
+      "sentence": "Males at 20 mg/kg/day showed a severe body weight reduction of 2.2 percent compared with control.",
+      "obs": [
+        "O4"
+      ],
+      "label": "overstated",
+      "kind": "magnitude"
+    }
+  ]
+}

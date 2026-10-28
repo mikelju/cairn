@@ -1,5 +1,5 @@
 """The nonclinical summary workflow: gather -> draft -> await_decisions -> verify_final ->
-await_approval -> approve, on a LangGraph graph with a SQLite checkpointer and two pauses.
+judge -> await_approval -> approve, on a LangGraph graph with a SQLite checkpointer and two pauses.
 
 The model drafts once; code places every number, every quotation and every decision. People
 resume the graph at the two pauses: with decisions (and the sexes whose NOAEL they confirm), then
@@ -7,6 +7,7 @@ with an approval. `verify_final` is pure so the API can recompute without a mode
 """
 
 import json
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Annotated, Any, TypedDict
 
@@ -20,9 +21,11 @@ from cairn.content import DecisionRef, ObservationLedger, QuoteRef, Sentence, Te
 from cairn.decisions import Decision, apply_decisions, noael_sentence
 from cairn.gateway import LLMGateway
 from cairn.incidence import incidence
+from cairn.judge import not_judged, replay_judge
 from cairn.loop import _has_digit, _shown, strictify
 from cairn.observation import Observation, check_build
 from cairn.recording import RecordingKey, tool_schema_hash
+from cairn.render import render_sentence
 from cairn.tk_summary import tk_summary
 from cairn.tools import call_tool, study_design
 from cairn.verify import Verdict, data_quality_note, verify
@@ -47,7 +50,15 @@ class Workflow(BaseModel):
 
 NONCLINICAL_SUMMARY = Workflow(
     name="nonclinical-summary",
-    steps=["gather", "draft", "await_decisions", "verify_final", "await_approval", "approve"],
+    steps=[
+        "gather",
+        "draft",
+        "await_decisions",
+        "verify_final",
+        "judge",
+        "await_approval",
+        "approve",
+    ],
     pauses=["await_decisions", "await_approval"],
 )
 
@@ -91,6 +102,7 @@ class State(TypedDict, total=False):
     decisions: list[dict[str, Any]]
     confirmed: list[str]  # sexes whose NOAEL a person confirmed
     final: dict[str, Any]  # verdict of verify_final: ok, text, failures
+    judge: list[dict[str, str]]  # one warning-only verdict per sentence of the final text
     approved_by: str
 
 
@@ -115,6 +127,25 @@ def verify_final(state: State) -> Verdict:
     decisions = [Decision.model_validate(d) for d in state.get("decisions", [])]
     apply_decisions(ledger, decisions, frozenset(state.get("confirmed", [])))
     return verify(sections_of(state), ledger)
+
+
+def shown_facts(ledger: ObservationLedger, obs_ids: Iterable[str]) -> str:
+    """The Observations as the judge sees them, one line each."""
+    return "\n".join(_shown(obs_id, ledger.get(obs_id)) for obs_id in dict.fromkeys(obs_ids))
+
+
+def final_sentences(state: State) -> list[tuple[str, str]]:
+    """Each sentence of the final text with the facts of the Observations it cites."""
+    ledger = build_ledger(state)
+    decisions = [Decision.model_validate(d) for d in state.get("decisions", [])]
+    apply_decisions(ledger, decisions, frozenset(state.get("confirmed", [])))
+    return [
+        (
+            render_sentence(sentence, ledger),
+            shown_facts(ledger, (p.obs_id for p in sentence.parts if isinstance(p, ValueRef))),
+        )
+        for sentence in sections_of(state)
+    ]
 
 
 def gather_state() -> State:
@@ -174,8 +205,12 @@ def build_graph(
     model: str,
     checkpointer: BaseCheckpointSaver[Any],
     workflow: Workflow = NONCLINICAL_SUMMARY,
+    judge_dir: Path | None = None,
 ) -> Any:
-    """Compile the workflow; the pauses are `interrupt` calls resumed with `Command(resume=...)`."""
+    """Compile the workflow; the pauses are `interrupt` calls resumed with `Command(resume=...)`.
+
+    The judge node replays the recordings in `judge_dir` and never changes `final`.
+    """
 
     async def gather(state: State) -> State:
         return gather_state()
@@ -192,6 +227,16 @@ def build_graph(
         failures = [str(f) for f in verdict.failures]
         return {"final": {"ok": verdict.ok, "text": verdict.text, "failures": failures}}
 
+    async def judge_node(state: State) -> State:
+        if not state["final"]["ok"]:
+            return {"judge": []}
+        return {
+            "judge": [
+                replay_judge(judge_dir, text, facts) if judge_dir else not_judged(text, facts)
+                for text, facts in final_sentences(state)
+            ]
+        }
+
     async def await_approval(state: State) -> State:
         answer = interrupt({"waiting": "approval", "final": state["final"]})
         return {"approved_by": answer["approved_by"]}
@@ -204,6 +249,7 @@ def build_graph(
         "draft": draft,
         "await_decisions": await_decisions,
         "verify_final": verify_node,
+        "judge": judge_node,
         "await_approval": await_approval,
         "approve": approve,
     }
