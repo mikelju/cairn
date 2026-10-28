@@ -1,13 +1,14 @@
 # Phase 05 - Audit and judge: plan and results
 
-Status: pending
-Spec: `spec.md` (draft, not yet approved)
-Base: branch `fase-05-audit-judge` from the phase 04 delivery (PR https://github.com/mikelju/cairn/pull/12, not yet merged to `main`)
+Status: in progress
+Spec: `spec.md` (approved by the user on 2026-10-28, see U1 and U2)
+Base: branch `claude/jolly-knuth-g8jdjq` from `main` at 3a92dd4 (phase 04 merged, PR https://github.com/mikelju/cairn/pull/12)
 
 ## Records
 - User priority, literal (phase 04, still standing): "the project is getting complex. Avoid over-engineering at every step. Do the minimum that meets each criterion; no extra abstractions, configuration, layers or speculative tests; fewer and larger increments when that is simpler; reuse what phases 01-03 already built."
 - User request for this phase, literal: "arranca la spec y el plan de la 05. ya sabes, pasame un lavish bien visual para explicarme todo lo que se va a hacer y las decisiones pendientes."
 - User instruction of 2026-10-28, literal: "las tareas de ejecución las deben realizar agentes sonnet 5.5".
+- User instruction of 2026-10-28, literal: "una vez que el plan esté cerrado, pasa a ejecutar con sonnet 5.5 como hemos dicho antes. finaliza la fase 05 y dame la PR".
 
 ## Increments
 Each increment leaves the product working and covers specific criteria.
@@ -34,6 +35,8 @@ Questions the supervisor raises to the user. Statuses: open, answered, deferred;
 
 | ID | Question | Options and recommendation | Status | User answer |
 |---|---|---|---|---|
+| U1 | Spec open decisions O1-O7 and approval of the spec | See `spec.md`, Open decisions; recommended A for all seven | answered | "O1 (Modelo y gasto del juez): A: Sonnet 4.6, tope 2 USD, perfil default; O2 (Calibración del juez): A: 24 casos generados por código (12 fieles, 12 exagerados, 4 tipos), los revisas antes de grabar, kappa 0,70; O3 (Qué cubre la cadena y dónde vive): A: todos los eventos del flujo, tabla nueva en el mismo SQLite de los hilos; O4 (Cómo se enseña la manipulación): A: el botón edita una copia en memoria; solo API y botones; O5 (Juez en vivo o reproducido): A: solo reproducido; frases sin grabación salen como no juzgadas; O6 (Dónde van las 8 comprobaciones de reglas): A: pasan al paso 6; el paso 5 deja una línea 'Reglas: 8 de 8, ver paso 6'; O7 (SEC-002, huella de los datos): A: cerrarlo en esta fase; spec (Aprobación de la spec): Apruebo la spec de la fase 05 con las respuestas anteriores" |
+| U2 | Comments on the decision page (2026-10-28) | Judge card and audit chain card | answered | Judge: "esto me parece bien. es como una revisión neutra del texto en si". Audit chain: "realmente merece la pena tener esto en la demo? lo podemos indicar e incluso podemos hacer una versión minima de esto, pero no creo que sea necesaria esta implementacion completa en una demo". Supervisor reading, applied before freezing the spec: a minimal chain (append and pure verify over the events of O3 in the same SQLite, tampering of a copy shown by tests, one read-only verify endpoint, step 6 shows one status line and an "In production" note); no tamper endpoint or button and no hash trace in the UI, so O4 is reduced to tests; the user can redirect |
 
 ## Deviations
 | ID | Summary | Affects criteria | Status |
