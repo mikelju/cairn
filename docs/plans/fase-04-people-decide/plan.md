@@ -1,6 +1,6 @@
 # Phase 04 - People decide: plan and results
 
-Status: in progress
+Status: ready locally
 Spec: `spec.md` (approved, frozen)
 Base: branch `claude/fase-04-people-decide-0d45bc` from `main` at 047f764 (phase 03 merged, PR #11)
 
@@ -46,6 +46,7 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | E165 | ejecutor (Sonnet) | Round 1 review fixes F1-F6 with regressions | done | 281dca3 and f2419be; verified by R3 |
 | E166 | ejecutor (Opus) | Increment 4 closing on branch `claude/jolly-knuth-g8jdjq` | cancelled | stopped by the supervisor because the user asked for Sonnet executors; its untracked screenshots were reused by E167 |
 | E167 | ejecutor (Sonnet) | Round 2 fixes A1-A4 and increment 4 closing | done | 7bd32d0, 7da54c2, 1485f70; targeted tests 80 passed, rerun by the supervisor; `npm run check` exit 0, 556 passed, 97.17% |
+| E168 | ejecutor (Sonnet) | Delivery: merge check with the local branch, C11 grep, push, PR to `main`, checks | done | d3fd27b; nothing new on `claude/fase-04-people-decide-0d45bc`; PR https://github.com/mikelju/cairn/pull/12; `evals` on the PR head green; PRD-term grep pending for the user |
 
 ## User decisions
 Questions the supervisor raises to the user. Statuses: open, answered, deferred; closed with the literal answer.
@@ -67,6 +68,13 @@ Questions the supervisor raises to the user. Statuses: open, answered, deferred;
 ## Results
 Per criterion: command or walkthrough run, observed result and reference to the evidence.
 Pending items, limits and what could not be checked, stated plainly.
+
+- C1: `npm run check` exit 0, 556 passed, coverage 97.17% after the last code change (E167); `evals` green on the PR head (E168).
+- C2-C7: increments 1-3 and E6, refreshed after the round 1 and round 2 fixes; targeted E6, web and workflow tests 80 passed, rerun by the supervisor.
+- C8-C10: increment 4 evidence (four screenshots at 1440x900 with no overflow, HTMX recompute test, `make demo-offline-check` exit 0).
+- C11: 12-digit and GxP grep clean (E168).
+- Pending for the user: the PRD-term grep, which needs the git-ignored PRD on the user's machine.
+- Limits: `make demo-offline-check` passed in the cloud container only with an uncommitted proxy-CA build context; the per-thread lock map grows for unknown thread ids; `record-draft` saves before its per-call ceiling check.
 
 ## Candidate learnings
 Only reusable lessons with a literal quote from the session; consolidated when the phase closes.
