@@ -5,17 +5,20 @@ self-approval. Recording decisions only updates the checkpoint and recomputes: n
 """
 
 import asyncio
+import json
 import uuid
 from datetime import UTC, datetime
-from typing import Any, Literal
+from typing import Any, Literal, NoReturn
 
 from fastapi import APIRouter, HTTPException, Request
 from langgraph.types import Command
 from pydantic import BaseModel
 
+from cairn import audit
 from cairn.decisions import Decision, apply_decisions, enumerate_slots
 from cairn.gateway import DEFAULT_MODEL, LLMGateway, Mode
-from cairn.recording import RECORDINGS_DIR, ReplayClient, recorded_model
+from cairn.observation import current_snapshot
+from cairn.recording import RECORDINGS_DIR, ReplayClient, recorded_model, recording_path
 from cairn.workflow import State, build_graph, build_ledger, draft_key, verify_final
 
 Actor = Literal["A. Author", "R. Reviewer"]
@@ -97,6 +100,22 @@ def _view(thread_id: str, state: State, waiting: str) -> dict[str, Any]:
     }
 
 
+def _now() -> str:
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+async def _log(request: Request, thread_id: str, actor: str, action: str, **payload: Any) -> None:
+    await audit.append(request.app.state.saver.conn, thread_id, _now(), actor, action, payload)
+
+
+async def _refuse(
+    request: Request, thread_id: str, actor: str, step: str, status: int, detail: str
+) -> NoReturn:
+    """Chain the refusal, then answer with it."""
+    await _log(request, thread_id, actor, "refused", step=step, status=status, reason=detail)
+    raise HTTPException(status_code=status, detail=detail)
+
+
 def _at(waiting: str, expected: str) -> None:
     if waiting != expected:
         raise HTTPException(status_code=409, detail=f"thread is at {waiting}, not {expected}")
@@ -106,7 +125,18 @@ def _at(waiting: str, expected: str) -> None:
 async def start(request: Request) -> dict[str, Any]:
     thread_id = uuid.uuid4().hex
     graph = _graph(request)
-    await graph.ainvoke({"author": AUTHOR}, _config(thread_id))
+    async with _lock(thread_id):
+        await graph.ainvoke({"author": AUTHOR}, _config(thread_id))
+        draft = json.loads(recording_path(RECORDINGS_DIR, "DRAFT").read_text(encoding="utf-8"))
+        await _log(
+            request,
+            thread_id,
+            AUTHOR,
+            "thread_started",
+            snapshot_sha256=current_snapshot(),
+            draft_model=draft.get("model"),
+            draft_recorded=draft.get("date"),
+        )
     _, _, state, waiting = await _load(request, thread_id)
     return _view(thread_id, state, waiting)
 
@@ -128,7 +158,7 @@ async def _record(request: Request, thread_id: str, body: Record) -> dict[str, A
     graph, config, state, waiting = await _load(request, thread_id)
     _at(waiting, "await_decisions")
     slots = {s.slot: s for s in enumerate_slots(build_ledger(state))}
-    now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now = _now()
     records = []
     for item in body.decisions:
         if item.dec_id not in slots:
@@ -155,6 +185,7 @@ async def _record(request: Request, thread_id: str, body: Record) -> dict[str, A
             ).model_dump()
         )
     await graph.aupdate_state(config, {"decisions": records, "confirmed": []})
+    await _log(request, thread_id, body.actor, "decisions_recorded", decisions=records)
     _, _, state, waiting = await _load(request, thread_id)
     return _view(thread_id, state, waiting)
 
@@ -170,13 +201,25 @@ async def _confirm(request: Request, thread_id: str, body: Confirm) -> dict[str,
     graph, config, state, waiting = await _load(request, thread_id)
     _at(waiting, "await_decisions")
     if body.actor != REVIEWER or body.actor == state.get("author"):
-        raise HTTPException(status_code=403, detail="Only the reviewer confirms a NOAEL.")
+        await _refuse(
+            request, thread_id, body.actor, "confirm", 403, "Only the reviewer confirms a NOAEL."
+        )
     state = {**state, "confirmed": list(body.confirmed)}
     if not verify_final(state).ok:
-        raise HTTPException(status_code=409, detail="verify_final is not green")
+        await _refuse(request, thread_id, body.actor, "confirm", 409, "verify_final is not green")
     resume = {"decisions": state.get("decisions", []), "confirmed": state["confirmed"]}
     await graph.ainvoke(Command(resume=resume), config)
     _, _, state, waiting = await _load(request, thread_id)
+    await _log(request, thread_id, body.actor, "noael_confirmed", confirmed=state["confirmed"])
+    final = state["final"]
+    await _log(
+        request,
+        thread_id,
+        "system",
+        "verify_final",
+        ok=final["ok"],
+        failures=len(final["failures"]),
+    )
     return _view(thread_id, state, waiting)
 
 
@@ -190,12 +233,30 @@ async def _approve(request: Request, thread_id: str, body: Approve) -> dict[str,
     graph, config, state, waiting = await _load(request, thread_id)
     _at(waiting, "await_approval")
     if body.actor == state.get("author"):
-        raise HTTPException(status_code=403, detail="Authors cannot approve their own draft.")
+        await _refuse(
+            request,
+            thread_id,
+            body.actor,
+            "approve",
+            403,
+            "Authors cannot approve their own draft.",
+        )
     if not state.get("final", {}).get("ok"):
-        raise HTTPException(status_code=409, detail="verify_final is not green")
+        await _refuse(request, thread_id, body.actor, "approve", 409, "verify_final is not green")
     await graph.ainvoke(Command(resume={"approved_by": body.actor}), config)
+    await _log(request, thread_id, body.actor, "approved")
     _, _, state, waiting = await _load(request, thread_id)
     return _view(thread_id, state, waiting)
+
+
+@threads.get("/{thread_id}/audit/verify")
+async def verify_audit(request: Request, thread_id: str) -> dict[str, Any]:
+    """Read-only: check the thread's chain and say whether it is intact."""
+    chain = await audit.entries(request.app.state.saver.conn, thread_id)
+    if not chain:
+        raise HTTPException(status_code=404, detail="thread not found")
+    check = audit.verify_chain(chain)
+    return {"ok": check.ok, "count": check.count, "first_broken": check.first_broken}
 
 
 async def load_view(request: Request, thread_id: str) -> tuple[State, str, dict[str, Any]]:

@@ -36,7 +36,7 @@ def build_report(
     return report
 
 
-def write_database(validation: Validation, path: Path) -> None:
+def write_database(validation: Validation, path: Path, snapshot: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.unlink(missing_ok=True)
     connection = duckdb.connect(str(path))
@@ -48,6 +48,8 @@ def write_database(validation: Validation, path: Path) -> None:
         connection.register("source", validation.quarantine)
         connection.execute("CREATE TABLE quarantine AS SELECT * FROM source")
         connection.unregister("source")
+        connection.execute("CREATE TABLE build (snapshot_sha256 VARCHAR)")
+        connection.execute("INSERT INTO build VALUES (?)", [snapshot])
     finally:
         connection.close()
 
@@ -73,7 +75,7 @@ def load_study(
 def ingest(directory: Path = VENDORED_DIR, db_path: Path = DEFAULT_DB) -> dict[str, Any]:
     frames, zeros, snapshot = load_study(directory)
     validation = validate_study(frames, zeros)
-    write_database(validation, db_path)
+    write_database(validation, db_path, snapshot)
     return build_report(frames, validation, snapshot)
 
 

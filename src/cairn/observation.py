@@ -67,6 +67,24 @@ def query(
         connection.close()
 
 
+class StaleBuild(Exception):
+    """The DuckDB file was not built from the snapshot pinned in the manifest."""
+
+
+def check_build(path: Path | None = None) -> None:
+    """Fail unless the DuckDB build in use records the manifest's snapshot (SEC-002)."""
+    try:
+        rows = query("SELECT snapshot_sha256 FROM build", path=path)
+    except duckdb.CatalogException:
+        rows = []
+    built = rows[0]["snapshot_sha256"] if rows else None
+    if built != current_snapshot():
+        raise StaleBuild(
+            f"the DuckDB build is from snapshot {built}, not the pinned {current_snapshot()}; "
+            "rebuild it with `uv run python -m cairn.ingest`"
+        )
+
+
 def build_observation(
     *,
     tool: str,

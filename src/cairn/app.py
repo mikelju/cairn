@@ -9,6 +9,7 @@ from fastmcp import FastMCP
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from pydantic import BaseModel, Field, ValidationError
 
+from cairn import audit
 from cairn.jobs import Job, JobRunner
 from cairn.retrieval import StaleRetrievalCache
 from cairn.tools import REGISTRY, argument_problems, call_tool
@@ -32,6 +33,7 @@ def create_app() -> FastAPI:
         threads_db = os.environ.get("CAIRN_THREADS_DB", ":memory:")
         async with AsyncSqliteSaver.from_conn_string(threads_db) as saver, mcp_app.lifespan(app):
             app.state.saver = saver
+            await audit.init(saver.conn)
             yield
 
     app = FastAPI(title="Cairn", lifespan=lifespan)

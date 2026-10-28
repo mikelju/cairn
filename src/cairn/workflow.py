@@ -21,7 +21,7 @@ from cairn.decisions import Decision, apply_decisions, noael_sentence
 from cairn.gateway import LLMGateway
 from cairn.incidence import incidence
 from cairn.loop import _has_digit, _shown, strictify
-from cairn.observation import Observation
+from cairn.observation import Observation, check_build
 from cairn.recording import RecordingKey, tool_schema_hash
 from cairn.tk_summary import tk_summary
 from cairn.tools import call_tool, study_design
@@ -119,6 +119,7 @@ def verify_final(state: State) -> Verdict:
 
 def gather_state() -> State:
     """Run the study tools in a fixed order (ledger IDs O1..O5) and the two guidance searches."""
+    check_build()
     observations = [
         study_design(),
         incidence(),
