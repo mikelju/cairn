@@ -174,7 +174,8 @@ def test_record_draft_command_fails_when_the_cost_passes_the_ceiling(
     args = ["record-draft", "--recordings", str(tmp_path)]
     monkeypatch.setattr(live, "make_client", lambda mode: client(1000))
     cheap = CliRunner().invoke(app, args)
-    assert cheap.exit_code == 0 and re.search(r"^cost: 0\.\d{4} USD$", cheap.output, re.M), cheap.output
+    assert cheap.exit_code == 0, cheap.output
+    assert re.search(r"^cost: 0\.\d{4} USD$", cheap.output, re.M), cheap.output
     monkeypatch.setattr(live, "make_client", lambda mode: client(10**8))
     dear = CliRunner().invoke(app, args)
     assert dear.exit_code == 1 and "passes the ceiling" in dear.output
