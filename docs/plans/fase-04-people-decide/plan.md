@@ -6,6 +6,8 @@ Base: branch `claude/fase-04-people-decide-0d45bc` from `main` at 047f764 (phase
 
 ## Records
 - The master plan now shows phase 03 integrated and phase 04 in progress (committed with this plan).
+- From 2026-10-28 the phase continues in a cloud session on branch `claude/jolly-knuth-g8jdjq`, based on the tip f2419be of `claude/fase-04-people-decide-0d45bc`; later commits on that branch are brought in by merge, never by rebase, and delivery (increment 6) pushes and opens the PR from `claude/jolly-knuth-g8jdjq`.
+- User instruction of 2026-10-28, literal: "las tareas de ejecución las deben realizar agentes sonnet 5.5".
 - User priority for this phase, literal: "the project is getting complex. Avoid over-engineering at every step. Do the minimum that meets each criterion; no extra abstractions, configuration, layers or speculative tests; fewer and larger increments when that is simpler; reuse what phases 01-03 already built."
 
 ## Increments
@@ -23,7 +25,8 @@ Reuse, not rebuild: `content.py` (parts), `render.py`, `verify.py` (rules 1-8), 
 - [x] 3. API and E6: endpoints to record decisions (recompute, re-render, re-verify with 0 model calls), confirm and approve; actor per request and author check (decision O3); 403, 409 and idempotent resume; `tests/evals/test_e6.py` in the `evals` check (C6, C7) - verification: `uv run pytest -k "api_ or resume" tests/evals/test_e6.py`
   - Evidence: 13 cases in `tests/evals/test_e6.py` (pauses, 403 on confirm and approve, 409 not at pause or red verify_final, idempotent resume, example set and 4 other forms incl. female NOAEL "not established") green offline; every case asserts the only model call is the draft at start; `npm run check` green.
 - [x] 4. Steps 4 and 5 in the app, demo and deployment: templates built to the 02c mockups under decision O2, HTMX recompute on each dropdown change, fill-example and role buttons, 403 banner, word cap test extended, screenshots at 1440x900 in `evidence/`, offline check extended (C8, C9, C10) - verification: `test_word_cap`, browser walkthrough with network off, `make demo-offline-check` - evidence (2026-10-28, after round 2 fixes, HEAD 7da54c2): `npm run check` exit 0, 556 passed, coverage 97.17%; `make demo-offline-check` green, but the image build needed a proxy CA for `uv sync` (a local Dockerfile copy with the CA, not committed; plain `make` fails at that step in this container); four PNGs at 1440x900 in `evidence/` taken offline (replay), scrollHeight 900 on each page (no vertical overflow)
-- [ ] 5. Adversarial review: independent review with sdd-review over `git diff 047f764`, at most two rounds; confirmed findings fixed with regressions; open items after round 2 go to the user (all criteria) - verification: review table below
+- [x] 5. Adversarial review: independent review with sdd-review over `git diff 047f764`, at most two rounds; confirmed findings fixed with regressions; open items after round 2 go to the user (all criteria) - verification: review table below
+  - Evidence: two rounds in the Adversarial review table; round 1 fixed in E165, round 2 fixed in E167 with regressions; no open finding; the accepted limits of round 2 go to the user with the delivery.
 - [ ] 6. Delivery: PRD-term grep, push `claude/fase-04-people-decide-0d45bc` and open the PR to `main`, not merged, with the required `evals` check green (C1, C11) - verification: `gh pr checks` green, PR URL in Results
 
 ## Briefs
@@ -38,7 +41,10 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | E161 | ejecutor (Sonnet) | Increment 2 closing: one real draft recording with `make record-draft`, ceiling 2 USD | done | 183e731; opus-4-6, 1 attempt, 0.054 USD of 2; 24 tests rerun offline by the supervisor, green |
 | E162 | ejecutor (Sonnet) | Increment 3: API for decisions, confirm and approve, 403, 409, idempotent resume, E6 | done | 3dd8517; E6 rerun offline by the supervisor, green; threads in `:memory:` unless `CAIRN_THREADS_DB` is set |
 | E163 | ejecutor (Sonnet) | Increment 4: steps 4 and 5 to the 02c mockups, HTMX, word cap, offline check | partial | 06a827d; steps 4 and 5 work end to end offline, 24 targeted tests green; screenshots, full `npm run check` and `make demo-offline-check` pending (browser pane refused localhost; slow machine) |
-| E164 | ejecutor (Sonnet) | Increment 4 closing: screenshots at 1440x900, full `npm run check`, `make demo-offline-check` | in progress | |
+| E164 | ejecutor (Sonnet) | Increment 4 closing: screenshots at 1440x900, full `npm run check`, `make demo-offline-check` | cancelled | ran in a local session; its screenshots were never committed and no full check was recorded; superseded by E166 and E167 in a cloud session |
+| E165 | ejecutor (Sonnet) | Round 1 review fixes F1-F6 with regressions | done | 281dca3 and f2419be; verified by R3 |
+| E166 | ejecutor (Opus) | Increment 4 closing on branch `claude/jolly-knuth-g8jdjq` | cancelled | stopped by the supervisor because the user asked for Sonnet executors; its untracked screenshots were reused by E167 |
+| E167 | ejecutor (Sonnet) | Round 2 fixes A1-A4 and increment 4 closing | done | 7bd32d0, 7da54c2, 1485f70; targeted tests 80 passed, rerun by the supervisor; `npm run check` exit 0, 556 passed, 97.17% |
 
 ## User decisions
 Questions the supervisor raises to the user. Statuses: open, answered, deferred; closed with the literal answer.
@@ -54,6 +60,8 @@ Questions the supervisor raises to the user. Statuses: open, answered, deferred;
 ## Adversarial review
 | Round | Backend | Range | Lenses | Findings | Status |
 |---|---|---|---|---|---|
+| 1 (R1, R2) | local revisores, previous session | `git diff 047f764` up to 06a827d | correctness, security and data (the round's reports were not recorded; reconstructed from commits 281dca3 and 46a8d93) | F1 concurrent confirm/approve/decisions on one thread (TOCTOU); F2 any `author` accepted, so the reviewer could confirm their own draft; F3 doses unvalidated (1e9, negatives, NaN -> 500); F4 step pages 500 on bad input, raw JSON on 409, invented actor; F5 prompt edits did not make the recording stale; F6 `record-draft` did not print or check real spend; SEC-001 widened with the thread endpoints. Fixed in E165 | closed |
+| 2 (R3, R4) | local revisores | R3: `git diff 46a8d93 f2419be`; R4: `git diff 047f764 f2419be` | R3 correctness with authorization; R4 evidence and tests | F1-F6 confirmed fixed on the real path (R3 reverted the per-thread lock in a scratch copy and the race test failed 3 of 3). Confirmed and fixed in E167: A1 adverse onset without treatment-related onset, or the control dose, accepted; A2 `record-draft` cost printed with 2 decimals; A3 draft replay test green without DecisionRefs; A4 no test of the HTMX recompute happy path; stale evidence for C1 and C6-C10 (refreshed in E167). Accepted limits, not fixed: the per-thread lock map grows for unknown thread ids (as thread storage already does); `record-draft` saves before the ceiling check and compares the per-call ceiling, not the phase budget (only 0.054 USD spent, no recording planned) | closed |
 
 ## Results
 Per criterion: command or walkthrough run, observed result and reference to the evidence.
