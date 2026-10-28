@@ -34,7 +34,8 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | E172 | ejecutor (Sonnet) | Increment 1: audit chain, verify endpoint, SEC-002 | done | e54e93a; `npm run check` exit 0, 572 passed, 97.24%; refusals chained on confirm as well as approve (supervisor accepts: C3 names refusals without limiting them to approval) |
 | E173 | ejecutor (Sonnet) | Increment 2: judge core and E5 offline | done | d9091c2; `npm run check` exit 0, 595 passed, 96.98%; fixture kappa 0.83; `record-judge` ready, not run, estimated ceiling 0.74 USD for 41 sentences |
 | E174 | ejecutor (Sonnet) | Increment 4: steps 5 and 6 in the app (before increment 3, which waits for the user's review of the E5 cases per O2) | done | 4dfb2d0; `npm run check` exit 0, 600 passed, 96.98%; screenshots without judge recordings (retake after increment 3); offline check passed on a thin uncommitted layer over the previous image because Docker Hub rate-limited the base image pull; Dockerfile must copy `data/judge` once the kappa file exists |
-| R5-R8 | revisor x4 | Round 1 review of increments 1, 2 and 4 (`git diff 3a92dd4 4dfb2d0`), four lenses, while increment 3 waits for the user | in progress | |
+| R5-R8 | revisor x4 | Round 1 review of increments 1, 2 and 4 (`git diff 3a92dd4 4dfb2d0`), four lenses, while increment 3 waits for the user | done | findings in the Adversarial review table |
+| E175 | ejecutor (Sonnet) | Round 1 fixes F1-F11 | done | d76bc9c; `npm run check` exit 0, 609 passed, 96.93% |
 
 ## User decisions
 Questions the supervisor raises to the user. Statuses: open, answered, deferred; closed with the literal answer.
@@ -51,6 +52,7 @@ Questions the supervisor raises to the user. Statuses: open, answered, deferred;
 ## Adversarial review
 | Round | Backend | Range | Lenses | Findings | Status |
 |---|---|---|---|---|---|
+| 1 (R5-R8) | local revisores | `git diff 3a92dd4 4dfb2d0` (increments 1, 2 and 4) | correctness, security and data, evidence and tests, scope and maintenance | No Critical or High. Confirmed and fixed in E175: F1 wrong-step 409 of confirm and approve not chained (C3); F2 kappa file read cwd-relative and missing from the image, offline check blind to it (C10, C12); F3 `record-judge --model` could record with the drafter; F4 three sources for the judge recording pattern; F5 `final_sentences` duplicated the `verify_final` ledger; F6 `first_broken` reported the tampered `seq` value, a non-JSON payload gave 500, an emptied chain gave 404 (C4, C5); F7 `thread_started` checked by substring only; F8 E5 could stay green on fixtures alone; F9 E6 did not check the judge calls are replays; F10 step 6 count and broken branch untested; F11 SEC-002 row overstated (now fixed for workflow sessions, open Low for tools, step 2, Explore and MCP), SEC-001 widened, README and Makefile comments. Accepted, not changed: `threads.start` re-reads the draft recording; `judge_cases.py` reads its list from `tests/evals/` | closed |
 
 ## Results
 Per criterion: command or walkthrough run, observed result and reference to the evidence.
