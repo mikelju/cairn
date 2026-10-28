@@ -1,6 +1,6 @@
 # Phase 04 - People decide: plan and results
 
-Status: ready locally
+Status: integrated
 Spec: `spec.md` (approved, frozen)
 Base: branch `claude/fase-04-people-decide-0d45bc` from `main` at 047f764 (phase 03 merged, PR #11)
 
