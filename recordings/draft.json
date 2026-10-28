@@ -1,0 +1,326 @@
+{
+  "calls": [
+    {
+      "cost_usd": 0.05415,
+      "input_tokens": 5760,
+      "latency_s": 22.281,
+      "output_tokens": 1014,
+      "response": {
+        "container": null,
+        "content": [
+          {
+            "caller": null,
+            "id": "toolu_bdrk_01CadssmdEiGNps1wJ71FYTp",
+            "input": {
+              "design": [
+                {
+                  "parts": [
+                    {
+                      "text": "In study ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "study_id",
+                      "obs_id": "O1",
+                      "type": "ref"
+                    },
+                    {
+                      "text": ", ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "n_examined",
+                      "obs_id": "O1",
+                      "type": "ref"
+                    },
+                    {
+                      "text": " ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "strain",
+                      "obs_id": "O1",
+                      "type": "ref"
+                    },
+                    {
+                      "text": " ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "species",
+                      "obs_id": "O1",
+                      "type": "ref"
+                    },
+                    {
+                      "text": " were dosed via ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "route",
+                      "obs_id": "O1",
+                      "type": "ref"
+                    },
+                    {
+                      "text": " across dose levels of ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "groups.0.dose",
+                      "obs_id": "O1",
+                      "type": "ref"
+                    },
+                    {
+                      "text": ", ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "groups.3.dose",
+                      "obs_id": "O1",
+                      "type": "ref"
+                    },
+                    {
+                      "text": ", ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "groups.5.dose",
+                      "obs_id": "O1",
+                      "type": "ref"
+                    },
+                    {
+                      "text": ", and ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "groups.7.dose",
+                      "obs_id": "O1",
+                      "type": "ref"
+                    },
+                    {
+                      "text": " ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "groups.0.dose_unit",
+                      "obs_id": "O1",
+                      "type": "ref"
+                    },
+                    {
+                      "text": " in both sexes, with main-study, recovery, and toxicokinetic satellite groups",
+                      "type": "text"
+                    }
+                  ]
+                }
+              ],
+              "findings": [
+                {
+                  "parts": [
+                    {
+                      "text": "Recorded decision: ",
+                      "type": "text"
+                    },
+                    {
+                      "slot": "D1",
+                      "type": "decision"
+                    }
+                  ]
+                },
+                {
+                  "parts": [
+                    {
+                      "text": "Recorded decision: ",
+                      "type": "text"
+                    },
+                    {
+                      "slot": "D2",
+                      "type": "decision"
+                    }
+                  ]
+                },
+                {
+                  "parts": [
+                    {
+                      "text": "Recorded decision: ",
+                      "type": "text"
+                    },
+                    {
+                      "slot": "D3",
+                      "type": "decision"
+                    }
+                  ]
+                },
+                {
+                  "parts": [
+                    {
+                      "text": "Recorded decision: ",
+                      "type": "text"
+                    },
+                    {
+                      "slot": "D4",
+                      "type": "decision"
+                    }
+                  ]
+                },
+                {
+                  "parts": [
+                    {
+                      "text": "Recorded decision: ",
+                      "type": "text"
+                    },
+                    {
+                      "slot": "D5",
+                      "type": "decision"
+                    }
+                  ]
+                },
+                {
+                  "parts": [
+                    {
+                      "text": "Recorded decision: ",
+                      "type": "text"
+                    },
+                    {
+                      "slot": "D6",
+                      "type": "decision"
+                    }
+                  ]
+                },
+                {
+                  "parts": [
+                    {
+                      "text": "Recorded decision: ",
+                      "type": "text"
+                    },
+                    {
+                      "slot": "D7",
+                      "type": "decision"
+                    }
+                  ]
+                },
+                {
+                  "parts": [
+                    {
+                      "text": "Recorded decision: ",
+                      "type": "text"
+                    },
+                    {
+                      "slot": "D8",
+                      "type": "decision"
+                    }
+                  ]
+                },
+                {
+                  "parts": [
+                    {
+                      "text": "Recorded decision: ",
+                      "type": "text"
+                    },
+                    {
+                      "slot": "D9",
+                      "type": "decision"
+                    }
+                  ]
+                },
+                {
+                  "parts": [
+                    {
+                      "text": "Recorded decision: ",
+                      "type": "text"
+                    },
+                    {
+                      "slot": "D10",
+                      "type": "decision"
+                    }
+                  ]
+                },
+                {
+                  "parts": [
+                    {
+                      "text": "Recorded decision: ",
+                      "type": "text"
+                    },
+                    {
+                      "slot": "D11",
+                      "type": "decision"
+                    }
+                  ]
+                }
+              ],
+              "tk": [
+                {
+                  "parts": [
+                    {
+                      "text": "The na\u00efve mean ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "test",
+                      "obs_id": "O5",
+                      "type": "ref"
+                    },
+                    {
+                      "text": " was ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "with_quarantined.mean",
+                      "obs_id": "O5",
+                      "type": "ref"
+                    },
+                    {
+                      "text": " when including the quarantined value and ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "without_quarantined.mean",
+                      "obs_id": "O5",
+                      "type": "ref"
+                    },
+                    {
+                      "text": " when excluding it",
+                      "type": "text"
+                    }
+                  ]
+                }
+              ]
+            },
+            "name": "write_draft",
+            "toolset_name": null,
+            "type": "tool_use"
+          }
+        ],
+        "diagnostics": null,
+        "id": "msg_bdrk_011CgSiN3KwrR44eSZrfLhaX",
+        "model": "claude-opus-4-6",
+        "role": "assistant",
+        "stop_details": null,
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "type": "message",
+        "usage": {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "inference_geo": null,
+          "input_tokens": 5760,
+          "output_tokens": 1014,
+          "output_tokens_details": null,
+          "server_tool_use": null,
+          "service_tier": null,
+          "speed": null
+        }
+      }
+    }
+  ],
+  "date": "2026-10-27",
+  "model": "opus-4-6",
+  "model_profile": "eu.anthropic.claude-opus-4-6-v1",
+  "prompt_version": "draft-1",
+  "question_id": "DRAFT",
+  "region": "eu-west-1",
+  "source": "bedrock",
+  "tool_schema_sha256": "fb4485bf0c4cc6b4f787daea0ac681561eab4076c20eacca0f9e4d7972c2fdc2"
+}

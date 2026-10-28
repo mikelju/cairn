@@ -11,7 +11,7 @@ from pydantic import ValidationError
 from cairn import highlight, live, passages, retrieval, weights
 from cairn.canonical import canonical_json
 from cairn.gateway import DEFAULT_MODEL, MODEL_PROFILES, GatewayError
-from cairn.recording import RECORDINGS_DIR, StaleRecording, recorded_model
+from cairn.recording import RECORDINGS_DIR, StaleRecording, recorded_model, total_cost
 from cairn.tools import argument_problems, result_sha256
 from cairn.tools import call_tool as registry_call
 
@@ -177,6 +177,25 @@ def record_command(
     if report.stopped:
         typer.echo(report.stopped, err=report.stopped.startswith("error:"))
     if report.stopped or report.unsaved:
+        raise typer.Exit(1)
+
+
+@app.command("record-draft")
+def record_draft_command(model: str = DEFAULT_MODEL, recordings: Path = RECORDINGS_DIR) -> None:
+    """Record the nonclinical draft against Bedrock (laptop only): one call, 2 USD ceiling."""
+    _known_model(model)
+    ceiling = live.call_ceiling(model)
+    typer.echo(f"ceiling: {ceiling:.2f} USD of {live.DRAFT_BUDGET_USD:.2f}")
+    try:
+        path = live.record_draft(recordings, model)
+    except Exception as error:  # SDK errors and a failing draft end as a plain message
+        typer.echo(f"error: {type(error).__name__}: {error}", err=True)
+        raise typer.Exit(1) from error
+    typer.echo(f"saved {path}")
+    spent = total_cost(json.loads(path.read_text(encoding="utf-8"))) or 0.0
+    typer.echo(f"cost: {spent:.4f} USD")
+    if spent > ceiling:
+        typer.echo(f"error: cost passes the ceiling of {ceiling:.2f} USD", err=True)
         raise typer.Exit(1)
 
 

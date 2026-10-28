@@ -1,0 +1,243 @@
+{
+  "calls": [
+    {
+      "cost_usd": null,
+      "input_tokens": 0,
+      "latency_s": 0,
+      "output_tokens": 0,
+      "response": {
+        "content": [
+          {
+            "id": "t1",
+            "input": {
+              "design": [
+                {
+                  "parts": [
+                    {
+                      "text": "The study ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "study_id",
+                      "obs_id": "O1",
+                      "type": "ref"
+                    },
+                    {
+                      "text": " used ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "n_examined",
+                      "obs_id": "O1",
+                      "type": "ref"
+                    },
+                    {
+                      "text": " animals of species ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "species",
+                      "obs_id": "O1",
+                      "type": "ref"
+                    },
+                    {
+                      "text": " given by ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "route",
+                      "obs_id": "O1",
+                      "type": "ref"
+                    }
+                  ]
+                }
+              ],
+              "findings": [
+                {
+                  "parts": [
+                    {
+                      "text": "Recorded decision: ",
+                      "type": "text"
+                    },
+                    {
+                      "slot": "D1",
+                      "type": "decision"
+                    }
+                  ]
+                },
+                {
+                  "parts": [
+                    {
+                      "text": "Recorded decision: ",
+                      "type": "text"
+                    },
+                    {
+                      "slot": "D2",
+                      "type": "decision"
+                    }
+                  ]
+                },
+                {
+                  "parts": [
+                    {
+                      "text": "Recorded decision: ",
+                      "type": "text"
+                    },
+                    {
+                      "slot": "D3",
+                      "type": "decision"
+                    }
+                  ]
+                },
+                {
+                  "parts": [
+                    {
+                      "text": "Recorded decision: ",
+                      "type": "text"
+                    },
+                    {
+                      "slot": "D4",
+                      "type": "decision"
+                    }
+                  ]
+                },
+                {
+                  "parts": [
+                    {
+                      "text": "Recorded decision: ",
+                      "type": "text"
+                    },
+                    {
+                      "slot": "D5",
+                      "type": "decision"
+                    }
+                  ]
+                },
+                {
+                  "parts": [
+                    {
+                      "text": "Recorded decision: ",
+                      "type": "text"
+                    },
+                    {
+                      "slot": "D6",
+                      "type": "decision"
+                    }
+                  ]
+                },
+                {
+                  "parts": [
+                    {
+                      "text": "Recorded decision: ",
+                      "type": "text"
+                    },
+                    {
+                      "slot": "D7",
+                      "type": "decision"
+                    }
+                  ]
+                },
+                {
+                  "parts": [
+                    {
+                      "text": "Recorded decision: ",
+                      "type": "text"
+                    },
+                    {
+                      "slot": "D8",
+                      "type": "decision"
+                    }
+                  ]
+                },
+                {
+                  "parts": [
+                    {
+                      "text": "Recorded decision: ",
+                      "type": "text"
+                    },
+                    {
+                      "slot": "D9",
+                      "type": "decision"
+                    }
+                  ]
+                },
+                {
+                  "parts": [
+                    {
+                      "text": "Recorded decision: ",
+                      "type": "text"
+                    },
+                    {
+                      "slot": "D10",
+                      "type": "decision"
+                    }
+                  ]
+                },
+                {
+                  "parts": [
+                    {
+                      "text": "Recorded decision: ",
+                      "type": "text"
+                    },
+                    {
+                      "slot": "D11",
+                      "type": "decision"
+                    }
+                  ]
+                }
+              ],
+              "tk": [
+                {
+                  "parts": [
+                    {
+                      "text": "The mean of ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "test",
+                      "obs_id": "O5",
+                      "type": "ref"
+                    },
+                    {
+                      "text": " was ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "with_quarantined.mean",
+                      "obs_id": "O5",
+                      "type": "ref"
+                    },
+                    {
+                      "text": " with and ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "without_quarantined.mean",
+                      "obs_id": "O5",
+                      "type": "ref"
+                    },
+                    {
+                      "text": " without the quarantined value",
+                      "type": "text"
+                    }
+                  ]
+                }
+              ]
+            },
+            "name": "write_draft",
+            "type": "tool_use"
+          }
+        ],
+        "stop_reason": "tool_use",
+        "usage": {
+          "input_tokens": 0,
+          "output_tokens": 0
+        }
+      }
+    }
+  ],
+  "prompt_version": "draft-1",
+  "question_id": "DRAFT",
+  "source": "fixture",
+  "tool_schema_sha256": "fb4485bf0c4cc6b4f787daea0ac681561eab4076c20eacca0f9e4d7972c2fdc2"
+}

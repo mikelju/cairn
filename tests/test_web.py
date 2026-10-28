@@ -20,7 +20,7 @@ def test_healthz_and_landing_page() -> None:
     assert "Public sample data · fictional compound · not GxP-validated" in page
     assert "Role: Study toxicologist (simulated)" in page
     assert re.search(r"v0\.1\.0 · commit \S+ · snapshot [0-9a-f]{12}", page)
-    assert page.count('class="locked"') == 4
+    assert page.count('class="locked"') == 2
     assert 'href="/step/2"' in page and 'href="/step/3"' in page
     assert "/static/vendor/htmx.min.js" in page
 
@@ -338,7 +338,7 @@ def test_navigation_unlocks_step_3_and_keeps_the_rest_locked() -> None:
     with TestClient(create_app()) as client:
         page = client.get("/step/3").text
     assert '<a href="/step/3" aria-current="step">3 Explore</a>' in page
-    assert page.count('class="locked"') == 4
+    assert page.count('class="locked"') == 2
 
 
 def test_highlight_route_serves_only_committed_pngs() -> None:
@@ -448,3 +448,65 @@ def test_web_parses_passages_and_highlights_once_per_process(
     assert calls == {"passages": 1, "highlights": 1}
     passages.stored_passages.cache_clear()
     highlight.highlights_by_sentence.cache_clear()
+
+
+def test_steps_4_and_5_people_decide_and_the_author_cannot_approve() -> None:
+    with TestClient(create_app()) as client:
+        step4 = client.get("/step/4").text  # starts a thread and follows the redirect
+        thread = re.search(r'name="thread" value="([0-9a-f]+)"', step4)
+        assert thread and "Acting as: A. Author" in step4 and "disabled" in step4
+        id_ = thread.group(1)
+        assert "Draft with empty slots" in step4 and "no decision yet" in step4
+        client.post("/step/4/example", data={"thread": id_})
+        confirmed = client.post("/step/4/confirm", data={"thread": id_, "actor": "R. Reviewer"})
+        assert "Acting as: R. Reviewer" in confirmed.text and "Final text" in confirmed.text
+        refused = client.post("/step/5/approve", data={"thread": id_, "actor": "A. Author"})
+        assert "403 · Authors cannot approve their own draft. Enforced by the API" in refused.text
+        done = client.post("/step/5/approve", data={"thread": id_, "actor": "R. Reviewer"})
+        assert "Approved by R. Reviewer" in done.text
+
+
+def _filled_thread(client: TestClient) -> str:
+    step4 = client.get("/step/4", follow_redirects=True).text
+    match = re.search(r'name="thread" value="([0-9a-f]+)"', step4)
+    assert match
+    client.post("/step/4/example", data={"thread": match.group(1)})
+    return match.group(1)
+
+
+def test_step_pages_redirect_on_409_and_reject_bad_input() -> None:
+    with TestClient(create_app(), follow_redirects=False) as client:
+        id_ = _filled_thread(client)
+        client.post("/step/4/confirm", data={"thread": id_, "actor": "R. Reviewer"})
+        again = client.post("/step/4/example", data={"thread": id_})  # back button, Fill example
+        assert again.status_code == 303 and "/step/5?thread=" + id_ in again.headers["location"]
+        twice = client.post("/step/5/approve", data={"thread": id_, "actor": "R. Reviewer"})
+        assert twice.status_code == 200
+        second = client.post("/step/5/approve", data={"thread": id_, "actor": "R. Reviewer"})
+        assert second.status_code == 303 and "/step/5?thread=" in second.headers["location"]
+        for reply in (
+            client.get(f"/step/5?thread={id_}&actor=Mallory"),
+            client.post("/step/5/approve", data={"thread": id_, "actor": "Mallory"}),
+            client.post("/step/4/confirm", data={"thread": id_, "actor": "Mallory"}),
+            client.post("/step/4/decide", data={}),
+        ):
+            assert reply.status_code == 422
+        fresh = _filled_thread(client)
+        slot = client.get(f"/api/threads/{fresh}").json()["slots"][0]["slot"]
+        bad = client.post(
+            "/step/4/decide", data={"thread": fresh, "t_" + slot: "x", "a_" + slot: "x"}
+        )
+        assert bad.status_code == 422
+
+
+def test_step4_decide_recomputes_the_fragment_without_the_page() -> None:
+    with TestClient(create_app()) as client:
+        id_ = _filled_thread(client)
+        slots = client.get(f"/api/threads/{id_}").json()["slots"]
+        data = {"thread": id_}
+        for slot in slots:
+            dose = str(max(slot["doses"]))
+            data |= {"t_" + slot["slot"]: dose, "a_" + slot["slot"]: dose}
+        reply = client.post("/step/4/decide", data=data)
+        assert reply.status_code == 200
+        assert "NOAEL" in reply.text and "<html" not in reply.text

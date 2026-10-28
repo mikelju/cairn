@@ -1,10 +1,12 @@
 """FastAPI application: jobs, REST tool endpoints, the MCP endpoint and the web pages."""
 
+import os
 from contextlib import asynccontextmanager
 from typing import Annotated, Any
 
 from fastapi import Body, FastAPI, HTTPException
 from fastmcp import FastMCP
+from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from pydantic import BaseModel, Field, ValidationError
 
 from cairn.jobs import Job, JobRunner
@@ -27,7 +29,9 @@ def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> Any:
         app.state.runner = JobRunner()
-        async with mcp_app.lifespan(app):
+        threads_db = os.environ.get("CAIRN_THREADS_DB", ":memory:")
+        async with AsyncSqliteSaver.from_conn_string(threads_db) as saver, mcp_app.lifespan(app):
+            app.state.saver = saver
             yield
 
     app = FastAPI(title="Cairn", lifespan=lifespan)

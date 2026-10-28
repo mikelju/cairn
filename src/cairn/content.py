@@ -3,6 +3,7 @@
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
+from pydantic.json_schema import SkipJsonSchema
 
 from cairn.observation import Observation
 
@@ -32,7 +33,20 @@ class QuoteRef(BaseModel):
     sentence_ids: list[str]
 
 
-Part = Annotated[Text | ValueRef | QuoteRef, Field(discriminator="type")]
+class DecisionRef(BaseModel):
+    """A slot a person fills (D1.., NOAEL-F, NOAEL-M); the code places its text.
+
+    Hidden from the JSON schema so the question loop's tool definitions, and the recordings keyed
+    to them, do not change; the draft schema of phase 04 adds it back.
+    """
+
+    type: Literal["decision"] = "decision"
+    slot: str
+
+
+Part = Annotated[
+    Text | ValueRef | QuoteRef | SkipJsonSchema[DecisionRef], Field(discriminator="type")
+]
 
 
 class Sentence(BaseModel):
@@ -49,6 +63,7 @@ class ObservationLedger:
     def __init__(self) -> None:
         self._observations: dict[str, Observation] = {}
         self._retrieved: dict[str, dict[str, str]] = {}
+        self.slots: dict[str, str | None] = {}  # slot ID to decision text; None while empty
 
     def add_guidance(self, result: dict[str, Any]) -> None:
         """Record the passages a `search_guidance` result returned at or above its threshold.
@@ -63,6 +78,17 @@ class ObservationLedger:
                 self._retrieved[hit["passage_id"]] = {
                     s["sentence_id"]: s["text"] for s in hit["sentences"]
                 }
+
+    def place_slot(self, ref: DecisionRef, strict: bool = False) -> str:
+        """The text of a filled slot, or a visible empty slot; strict raises for an empty one."""
+        if ref.slot not in self.slots:
+            raise UnresolvedRef(f"unknown slot {ref.slot}")
+        text = self.slots[ref.slot]
+        if text:
+            return text
+        if strict:
+            raise UnresolvedRef(f"slot {ref.slot} has no decision")
+        return f"[{ref.slot}: no decision yet]"
 
     @property
     def retrieved(self) -> dict[str, dict[str, str]]:

@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% import "_components.html" as a with context %}
+{% block main %}
+{% call a.step(4, "Analyse", "REAL", "People decide treatment relatedness and the dose level; the model does not.", "two-col") %}
+<div class="col-left">
+<p class="meta">TK note: inherited from step 1.</p>
+<form method="post" action="/step/4/example"><input type="hidden" name="thread" value="{{ thread }}"><button type="submit">Fill example decisions (example)</button></form>
+<div id="recompute">{% include "step4_result.html" %}</div>
+{{ a.in_production("named reviewers and signed records.") }}
+</div>
+<div class="col-right card">
+<form hx-post="/step/4/decide" hx-trigger="change" hx-target="#recompute">
+<input type="hidden" name="thread" value="{{ thread }}">
+{{ a.data_table(["Finding", "Sex", "Treatment-related from", "Adverse from"], rows) }}
+</form>
+</div>
+{% endcall %}
+{% endblock %}

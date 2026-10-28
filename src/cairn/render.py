@@ -4,6 +4,7 @@ from collections.abc import Callable
 from typing import Any
 
 from cairn.content import (
+    DecisionRef,
     ObservationLedger,
     QuoteRef,
     Sentence,
@@ -83,19 +84,24 @@ def render_parts(
     sentence: Sentence,
     place: Callable[[ValueRef], str],
     place_quote: Callable[[QuoteRef], str] = render_quote,
+    place_decision: Callable[[DecisionRef], str] | None = None,
 ) -> str:
     """Join the parts in order, adding a space between text and a value only where words fuse."""
     out = ""
-    previous: Text | ValueRef | QuoteRef | None = None
+    previous: Text | ValueRef | QuoteRef | DecisionRef | None = None
     for part in sentence.parts:
         if isinstance(part, Text):
             piece = part.text
         elif isinstance(part, QuoteRef):
             piece = place_quote(part)
+        elif isinstance(part, DecisionRef):
+            piece = place_decision(part) if place_decision else ""
         else:
             piece = place(part)
         mixed = isinstance(part, Text) != isinstance(previous, Text)
-        quoted = isinstance(part, QuoteRef) or isinstance(previous, QuoteRef)
+        quoted = isinstance(part, QuoteRef | DecisionRef) or isinstance(
+            previous, QuoteRef | DecisionRef
+        )
         fused_words = mixed and out[-1:].isalnum() and piece[:1].isalnum()
         bare = not (out[-1:].isspace() or piece[:1].isspace() or piece[:1] in ".,;:")
         if previous is not None and (fused_words or (quoted and out and bare)):
@@ -109,8 +115,14 @@ def render_sentence(
     sentence: Sentence,
     ledger: ObservationLedger,
     place_quote: Callable[[QuoteRef], str] = render_quote,
+    place_decision: Callable[[DecisionRef], str] | None = None,
 ) -> str:
-    return render_parts(sentence, lambda ref: format_value(ledger.resolve(ref)), place_quote)
+    return render_parts(
+        sentence,
+        lambda ref: format_value(ledger.resolve(ref)),
+        place_quote,
+        place_decision or ledger.place_slot,
+    )
 
 
 def render(sentences: list[Sentence], ledger: ObservationLedger) -> str:

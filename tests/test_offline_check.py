@@ -92,6 +92,7 @@ def test_offline_check_passes_against_the_app(
     assert "/step/3 200" in out
     assert "PNG" in out
     assert "POST /step/2/run 200 RECORDED" in out
+    assert "steps 4-5: reviewer approves ok" in out
 
 
 def test_offline_check_fails_without_a_highlight_link(run_check: Callable[..., int]) -> None:
@@ -129,3 +130,7 @@ def test_offline_check_fails_when_a_route_does_not_answer_200(
 ) -> None:
     assert run_check(lambda path: (500, b"boom") if path == route else None) == 1
     assert f"{route} 500" in capsys.readouterr().out
+
+
+def test_offline_check_fails_when_the_author_is_not_refused(run_check: Callable[..., int]) -> None:
+    assert run_check(lambda path: (200, b"approved") if path == "/step/5/approve" else None) == 1
