@@ -33,7 +33,8 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | E171 | ejecutor (Sonnet) | Freeze the spec with the minimal audit chain of U2 | done | 34de8e1; C2, C4, C5, C11 narrowed, numbering kept |
 | E172 | ejecutor (Sonnet) | Increment 1: audit chain, verify endpoint, SEC-002 | done | e54e93a; `npm run check` exit 0, 572 passed, 97.24%; refusals chained on confirm as well as approve (supervisor accepts: C3 names refusals without limiting them to approval) |
 | E173 | ejecutor (Sonnet) | Increment 2: judge core and E5 offline | done | d9091c2; `npm run check` exit 0, 595 passed, 96.98%; fixture kappa 0.83; `record-judge` ready, not run, estimated ceiling 0.74 USD for 41 sentences |
-| E174 | ejecutor (Sonnet) | Increment 4: steps 5 and 6 in the app (before increment 3, which waits for the user's review of the E5 cases per O2) | in progress | |
+| E174 | ejecutor (Sonnet) | Increment 4: steps 5 and 6 in the app (before increment 3, which waits for the user's review of the E5 cases per O2) | done | 4dfb2d0; `npm run check` exit 0, 600 passed, 96.98%; screenshots without judge recordings (retake after increment 3); offline check passed on a thin uncommitted layer over the previous image because Docker Hub rate-limited the base image pull; Dockerfile must copy `data/judge` once the kappa file exists |
+| R5-R8 | revisor x4 | Round 1 review of increments 1, 2 and 4 (`git diff 3a92dd4 4dfb2d0`), four lenses, while increment 3 waits for the user | in progress | |
 
 ## User decisions
 Questions the supervisor raises to the user. Statuses: open, answered, deferred; closed with the literal answer.
