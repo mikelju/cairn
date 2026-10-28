@@ -32,7 +32,8 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | E170 | ejecutor (Sonnet) | Draft spec and plan of phase 05 (document mode) | done | f89a342; seven open decisions, all answered A in U1 |
 | E171 | ejecutor (Sonnet) | Freeze the spec with the minimal audit chain of U2 | done | 34de8e1; C2, C4, C5, C11 narrowed, numbering kept |
 | E172 | ejecutor (Sonnet) | Increment 1: audit chain, verify endpoint, SEC-002 | done | e54e93a; `npm run check` exit 0, 572 passed, 97.24%; refusals chained on confirm as well as approve (supervisor accepts: C3 names refusals without limiting them to approval) |
-| E173 | ejecutor (Sonnet) | Increment 2: judge core and E5 offline | in progress | |
+| E173 | ejecutor (Sonnet) | Increment 2: judge core and E5 offline | done | d9091c2; `npm run check` exit 0, 595 passed, 96.98%; fixture kappa 0.83; `record-judge` ready, not run, estimated ceiling 0.74 USD for 41 sentences |
+| E174 | ejecutor (Sonnet) | Increment 4: steps 5 and 6 in the app (before increment 3, which waits for the user's review of the E5 cases per O2) | in progress | |
 
 ## User decisions
 Questions the supervisor raises to the user. Statuses: open, answered, deferred; closed with the literal answer.
