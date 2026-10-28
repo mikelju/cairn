@@ -193,7 +193,7 @@ def record_draft_command(model: str = DEFAULT_MODEL, recordings: Path = RECORDIN
         raise typer.Exit(1) from error
     typer.echo(f"saved {path}")
     spent = total_cost(json.loads(path.read_text(encoding="utf-8"))) or 0.0
-    typer.echo(f"cost: {spent:.2f} USD")
+    typer.echo(f"cost: {spent:.4f} USD")
     if spent > ceiling:
         typer.echo(f"error: cost passes the ceiling of {ceiling:.2f} USD", err=True)
         raise typer.Exit(1)

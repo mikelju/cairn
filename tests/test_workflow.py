@@ -3,6 +3,7 @@
 import asyncio
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -10,7 +11,7 @@ import pytest
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.types import Command
 
-from cairn.content import Text
+from cairn.content import DecisionRef, Text
 from cairn.decisions import enumerate_slots, example_decisions
 from cairn.gateway import DEFAULT_MODEL, LLMGateway, Mode
 from cairn.recording import ReplayClient, recorded_model
@@ -96,6 +97,9 @@ def test_workflow_draft_replay(directory: Path, tmp_path: Path) -> None:
     sentences = sections_of(state)
     model_text = "".join(p.text for s in sentences for p in s.parts if isinstance(p, Text))
     assert not any(char.isdigit() for char in model_text)
+    refs = [p.slot for s in sentences for p in s.parts if isinstance(p, DecisionRef)]
+    expected = [s.slot for s in slots] + [f"NOAEL-{sex}" for sex in sorted({s.sex for s in slots})]
+    assert sorted(refs) == sorted(expected)
     assert verify_final(state).ok
     assert state["final"]["ok"]
     assert "NOAEL, females: 20 mg/kg/day" in state["final"]["text"]
@@ -170,7 +174,7 @@ def test_record_draft_command_fails_when_the_cost_passes_the_ceiling(
     args = ["record-draft", "--recordings", str(tmp_path)]
     monkeypatch.setattr(live, "make_client", lambda mode: client(1000))
     cheap = CliRunner().invoke(app, args)
-    assert cheap.exit_code == 0 and "cost: 0." in cheap.output, cheap.output
+    assert cheap.exit_code == 0 and re.search(r"^cost: 0\.\d{4} USD$", cheap.output, re.M), cheap.output
     monkeypatch.setattr(live, "make_client", lambda mode: client(10**8))
     dear = CliRunner().invoke(app, args)
     assert dear.exit_code == 1 and "passes the ceiling" in dear.output

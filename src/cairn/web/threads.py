@@ -137,6 +137,10 @@ async def _record(request: Request, thread_id: str, body: Record) -> dict[str, A
         given = (item.treatment_related_from, item.adverse_from)
         if any(d is not None and d not in slot.doses for d in given):
             raise HTTPException(status_code=422, detail=f"dose not in {list(slot.doses)}")
+        if 0 in given:
+            raise HTTPException(status_code=422, detail="the control dose is not a finding dose")
+        if item.adverse_from is not None and item.treatment_related_from is None:
+            raise HTTPException(status_code=422, detail="adverse without treatment-related")
         if None not in given and item.treatment_related_from > item.adverse_from:  # type: ignore[operator]
             raise HTTPException(status_code=422, detail="treatment-related after adverse")
         records.append(

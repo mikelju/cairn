@@ -269,3 +269,17 @@ def test_api_422_when_treatment_related_comes_after_adverse(client: TestClient) 
     bad[0].update(treatment_related_from=doses[-1], adverse_from=doses[0])
     reply = client.post(f"{path}/decisions", json={"actor": AUTHOR, "decisions": bad})
     assert reply.status_code == 422
+
+
+def test_api_422_for_adverse_without_treatment_related_and_for_the_control_dose(
+    client: TestClient,
+) -> None:
+    thread = start(client)
+    path = f"/api/threads/{thread['thread_id']}"
+    dose = max(thread["slots"][0]["doses"])
+    cases = [(None, dose), (0, dose), (dose, 0), (0, 0)]
+    for treatment_related, adverse in cases:
+        bad = form(thread, example)
+        bad[0].update(treatment_related_from=treatment_related, adverse_from=adverse)
+        reply = client.post(f"{path}/decisions", json={"actor": AUTHOR, "decisions": bad})
+        assert reply.status_code == 422, (treatment_related, adverse)

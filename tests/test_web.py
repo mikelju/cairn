@@ -497,3 +497,16 @@ def test_step_pages_redirect_on_409_and_reject_bad_input() -> None:
             "/step/4/decide", data={"thread": fresh, "t_" + slot: "x", "a_" + slot: "x"}
         )
         assert bad.status_code == 422
+
+
+def test_step4_decide_recomputes_the_fragment_without_the_page() -> None:
+    with TestClient(create_app()) as client:
+        id_ = _filled_thread(client)
+        slots = client.get(f"/api/threads/{id_}").json()["slots"]
+        data = {"thread": id_}
+        for slot in slots:
+            dose = str(max(slot["doses"]))
+            data |= {"t_" + slot["slot"]: dose, "a_" + slot["slot"]: dose}
+        reply = client.post("/step/4/decide", data=data)
+        assert reply.status_code == 200
+        assert "NOAEL" in reply.text and "<html" not in reply.text
