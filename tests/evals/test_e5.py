@@ -11,8 +11,9 @@ from pathlib import Path
 import pytest
 
 from cairn import judge
+from cairn.judge import KAPPA_PATH
 from cairn.judge_cases import CASES_PATH, build_cases, load_cases
-from cairn.live import KAPPA_PATH, KAPPA_THRESHOLD
+from cairn.live import KAPPA_THRESHOLD
 from cairn.workflow import build_ledger, gather_state, shown_facts
 
 ROOT = Path(__file__).parents[2]

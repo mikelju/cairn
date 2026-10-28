@@ -1,5 +1,6 @@
 """Steps 4 and 5: thin HTMX handlers over the thread API functions (no model call here)."""
 
+import json
 import re
 from typing import Annotated, Any
 
@@ -9,6 +10,14 @@ from markupsafe import Markup, escape
 
 from cairn.decisions import EXAMPLE, Decision, apply_decisions
 from cairn.gateway import DEFAULT_MODEL
+from cairn.judge import (
+    EXAMPLE_OBS,
+    EXAMPLE_SENTENCE,
+    JUDGE_MODEL,
+    KAPPA_PATH,
+    NOT_JUDGED,
+    replay_judge,
+)
 from cairn.recording import RECORDINGS_DIR, ReplayClient, recorded_model, total_cost
 from cairn.render import render
 from cairn.verify import RULE_REASONS
@@ -28,8 +37,9 @@ from cairn.web.threads import (
     load_view,
     record_decisions,
     start,
+    verify_audit,
 )
-from cairn.workflow import build_ledger, draft_key, sections_of, verify_final
+from cairn.workflow import build_ledger, draft_key, sections_of, shown_facts, verify_final
 
 people = APIRouter()
 EMPTY_SLOT = re.compile(r"\[((?:D\d+|NOAEL-[FM]): no decision yet)\]")
@@ -208,11 +218,45 @@ async def _step5(request: Request, thread: str, actor: str, error: str = "") -> 
             f"{recording['date']} | {recording['region']} | {recording['model']} | "
             f"{latency:.1f} s | " + ("cost n/a" if cost is None else f"{cost:.2f} USD")
         ),
-        checks=[
-            [f"{n} {reason}", "fail" if n in failed else "pass"]
-            for n, reason in RULE_REASONS.items()
-        ],
+        rules=f"Rules: {len(RULE_REASONS) - len(failed)} of {len(RULE_REASONS)} passed, see step 6",
+        judge_meta=_judge_meta(),
+        judge_rows=_judge_rows(view["judge"], state),
+        judged=sum(r["verdict"] != NOT_JUDGED for r in view["judge"]),
+        total=len(view["judge"]),
     )
+
+
+def _judge_meta() -> str:
+    """The kappa and n come from the calibration result file; absent until it is recorded."""
+    try:
+        result = json.loads(KAPPA_PATH.read_text(encoding="utf-8"))
+        calibration = f"n={result['n']} | kappa {result['kappa']:.2f}"
+    except (OSError, ValueError, KeyError):
+        calibration = "n n/a | kappa n/a"
+    return f"{JUDGE_MODEL} | {calibration}"
+
+
+def _judge_rows(results: list[dict[str, str]], state: Any) -> list[list[Any]]:
+    """Each warning, one row for the sentences not judged, then the EXAMPLE overstated sentence."""
+    example = replay_judge(
+        RECORDINGS_DIR, EXAMPLE_SENTENCE, shown_facts(build_ledger(state), EXAMPLE_OBS)
+    )
+    rows: list[list[Any]] = [
+        [r["sentence"], f"warning: {r['category']}", r["reason"]]
+        for r in results
+        if r["verdict"] == "overstated"
+    ]
+    unjudged = sum(r["verdict"] == NOT_JUDGED for r in results)
+    if unjudged:  # one row, so the panel stays on one screen whatever the decisions
+        rows.append([f"{unjudged} sentences of the final text", NOT_JUDGED, "No recording."])
+    verdict = (
+        f"warning: {example['category']}"
+        if example["verdict"] == "overstated"
+        else example["verdict"]
+    )
+    badge = Markup('<span class="badge example">EXAMPLE</span>')
+    rows.append([badge + " " + EXAMPLE_SENTENCE, verdict, example["reason"]])
+    return rows
 
 
 @people.get("/step/5", response_class=HTMLResponse)
@@ -220,6 +264,34 @@ async def step5(request: Request, thread: str | None = None, actor: str = REVIEW
     if thread is None:
         return RedirectResponse("/step/4", status_code=303)
     return await _step5(request, thread, _actor(actor))
+
+
+@people.get("/step/6", response_class=HTMLResponse)
+async def step6(request: Request, thread: str | None = None, actor: str = REVIEWER) -> Response:
+    if thread is None:
+        return RedirectResponse("/step/4", status_code=303)
+    state, waiting, _ = await load_view(request, thread)
+    if waiting == "await_decisions":
+        return RedirectResponse(f"/step/4?thread={thread}", status_code=303)
+    failed = {f.rule: f.reason for f in verify_final(state).failures}
+    chain = await verify_audit(request, thread)
+    return page(
+        request,
+        "step6.html",
+        current=6,
+        actor=_actor(actor),
+        rules=[
+            [n, "fired" if n in failed else "passed", failed.get(n, reason)]
+            for n, reason in RULE_REASONS.items()
+        ],
+        fired=len(failed),
+        chain=(
+            f"Audit chain: {chain['count']} entries, verified."
+            if chain["ok"]
+            else f"Audit chain: broken at entry {chain['first_broken']}."
+        ),
+        chain_ok=chain["ok"],
+    )
 
 
 @people.post("/step/5/approve", response_class=HTMLResponse)

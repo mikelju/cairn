@@ -27,6 +27,7 @@ from cairn.judge import (
     JUDGE_MODEL,
     JUDGE_PROMPT_VERSION,
     JUDGE_TOOL,
+    KAPPA_PATH,
     NOT_JUDGED,
     judge_key,
     judge_sentence,
@@ -183,7 +184,6 @@ def record_draft(directory: Path, model: str) -> Path:
 JUDGE_BUDGET_USD = 2.0  # decision O1 of phase 05, for all the judge recordings kept
 JUDGE_CEILING_INPUT_TOKENS = 4_000  # the longest cited Observation plus the prompt, with room
 KAPPA_THRESHOLD = 0.70  # decision O2
-KAPPA_PATH = Path("data/judge/e5_result.json")
 JUDGE_PATTERN = "j-*.json"
 
 

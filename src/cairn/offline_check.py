@@ -28,7 +28,7 @@ def post(path: str, fields: dict[str, str]) -> str:
 
 
 def people_decide() -> bool:
-    """Steps 4 and 5 end to end: example fill, confirm, author refused, reviewer approves."""
+    """Steps 4 to 6 end to end: example fill, confirm, author refused, reviewer approves, chain."""
     page = get("/step/4")[1].decode()
     found = re.search(r'name="thread" value="([0-9a-f]+)"', page)
     if found is None or "Fill example decisions (example)" not in page:
@@ -39,13 +39,16 @@ def people_decide() -> bool:
     final = post("/step/4/confirm", {"thread": thread, "actor": "R. Reviewer"})
     refused = post("/step/5/approve", {"thread": thread, "actor": "A. Author"})
     approved = post("/step/5/approve", {"thread": thread, "actor": "R. Reviewer"})
+    step6 = get(f"/step/6?thread={thread}")[1].decode()
     checks = {
         "step 5 has the final text": "Final text" in final and "RECORDED" in final,
+        "step 5 has the judge panel": "Judge panel" in final and "see step 6" in final,
+        "step 6 has the chain": "entries, verified." in step6 and "append-only log" in step6,
         "author refused with 403": "403 · Authors cannot approve their own draft" in refused,
         "reviewer approves": "Approved by R. Reviewer" in approved,
     }
     for name, ok in checks.items():
-        print("steps 4-5:", name, "ok" if ok else "FAILED")
+        print("steps 4-6:", name, "ok" if ok else "FAILED")
     return all(checks.values())
 
 

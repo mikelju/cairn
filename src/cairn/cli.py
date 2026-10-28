@@ -274,7 +274,7 @@ def record_judge_command(
     model: str = judge.JUDGE_MODEL,
     recordings: Path = RECORDINGS_DIR,
     cases: Path = CASES_PATH,
-    result: Path = live.KAPPA_PATH,
+    result: Path = judge.KAPPA_PATH,
 ) -> None:
     """Record the judge on the E5 cases and the draft sentences (laptop only): 2 USD ceiling."""
     _known_model(model)

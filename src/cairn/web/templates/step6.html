@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% import "_components.html" as a with context %}
+{% block main %}
+{% call a.step(6, "Check", "REAL", "Rules check form and sources, and every action is chained in the audit trail.", "two-col") %}
+<div class="col-left">
+{{ a.data_table(["Rule", "Result", "Note"], rules) }}
+{% if fired %}{% call a.callout("blocked") %}<p>{{ fired }} rule(s) fired.</p>{% endcall %}{% endif %}
+</div>
+<div class="col-right card">
+<h2>Audit chain</h2>
+{% call a.callout("rules" if chain_ok else "blocked") %}<p>{{ chain }} It detects edits and is not a validated or external log.</p>{% endcall %}
+{{ a.in_production("an external append-only log.") }}
+</div>
+{% endcall %}
+{% endblock %}

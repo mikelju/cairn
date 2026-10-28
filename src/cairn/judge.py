@@ -18,6 +18,7 @@ JUDGE_PROMPT_VERSION = "judge-1"
 JUDGE_MAX_TOKENS = 400
 CATEGORIES = ("none", "causal", "certainty", "safety", "magnitude")
 NOT_JUDGED = "not judged"
+KAPPA_PATH = Path("data/judge/e5_result.json")  # written by record-judge, read by step 5
 JUDGE_TOOL = {
     "name": "judge_verdict",
     "description": "Judge whether the wording of a draft sentence is supported by the data given.",
