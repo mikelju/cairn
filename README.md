@@ -15,12 +15,14 @@ The master plan is in [docs/plans/0_plan_maestro.md](docs/plans/0_plan_maestro.m
 ## Step 2 and the laptop commands
 
 The web app never calls a model: step 2 only replays the recordings in `recordings/`.
-Three commands reach Bedrock and run on a laptop only:
+Five commands reach Bedrock and run on a laptop only:
 - `make record AWS_PROFILE=<profile>` records the questions again into `recordings/`.
 - `make live AWS_PROFILE=<profile> QUESTION=Q2` asks one question to the live model.
 - `make smoke AWS_PROFILE=<profile>` checks the model profiles and writes the smoke evidence.
+- `make record-draft AWS_PROFILE=<profile>` records the draft of the nonclinical summary.
+- `make record-judge AWS_PROFILE=<profile>` records the judge (always Sonnet 4.6) on the E5 cases and the draft sentences.
 
-All three need `AWS_PROFILE`, spend money, and print their estimated spending ceiling before the first call.
+All five need `AWS_PROFILE`, spend money, and print their estimated spending ceiling before the first call.
 
 ## Guidance retrieval commands
 

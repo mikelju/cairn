@@ -3,6 +3,7 @@
 import copy
 import hashlib
 import itertools
+import json
 import shutil
 import sqlite3
 from collections.abc import Iterator
@@ -18,6 +19,7 @@ from cairn.app import create_app
 from cairn.decisions import EXAMPLE
 from cairn.ingest import DEFAULT_DB
 from cairn.observation import StaleBuild, check_build, current_snapshot
+from cairn.recording import RECORDINGS_DIR, recording_path
 from cairn.web.threads import threads
 from cairn.workflow import gather_state
 
@@ -117,16 +119,16 @@ def insert(chain: list[dict[str, Any]]) -> None:
 
 
 CASES = {
-    "edit seq": (edit("seq", 9), 9),
+    "edit seq": (edit("seq", 9), 3),  # the position, not the stored seq
     "edit ts": (edit("ts", "2027-01-01T00:00:00Z"), 3),
     "edit actor": (edit("actor", "R. Reviewer"), 3),
     "edit action": (edit("action", "approved"), 3),
     "edit payload": (edit("payload", {"n": 99}), 3),
     "edit prev_hash": (edit("prev_hash", "f" * 64), 3),
     "edit hash": (edit("hash", "f" * 64), 3),
-    "delete": (lambda chain: chain.pop(2), 4),
-    "swap": (swap, 3),
-    "insert": (insert, 3),
+    "delete": (lambda chain: chain.pop(2), 3),
+    "swap": (swap, 2),
+    "insert": (insert, 4),
 }
 
 
@@ -155,7 +157,7 @@ def test_audit_tamper_truncated_tail_shows_only_against_a_known_head() -> None:
 
 def test_audit_events_follow_the_walkthrough(client: TestClient, db_path: Path) -> None:
     thread = start(client)
-    assert approve(client, thread, REVIEWER).status_code == 409  # wrong step: changes nothing
+    assert approve(client, thread, REVIEWER).status_code == 409  # wrong step: a refusal
     assert decide(client, thread, form(thread)[:-1]).status_code == 409  # slot unfilled
     assert decide(client, thread, form(thread)).status_code == 200
     assert approve(client, thread, AUTHOR).status_code == 403
@@ -163,16 +165,73 @@ def test_audit_events_follow_the_walkthrough(client: TestClient, db_path: Path) 
     rows = stored(db_path, thread["thread_id"])
     assert [(r[1], r[3], r[4]) for r in rows] == [
         (1, AUTHOR, "thread_started"),
-        (2, AUTHOR, "decisions_recorded"),
-        (3, REVIEWER, "refused"),
-        (4, AUTHOR, "decisions_recorded"),
-        (5, REVIEWER, "noael_confirmed"),
-        (6, "system", "verify_final"),
-        (7, "sonnet-4-6", "judge_run"),
-        (8, AUTHOR, "refused"),
-        (9, REVIEWER, "approved"),
+        (2, REVIEWER, "refused"),
+        (3, AUTHOR, "decisions_recorded"),
+        (4, REVIEWER, "refused"),
+        (5, AUTHOR, "decisions_recorded"),
+        (6, REVIEWER, "noael_confirmed"),
+        (7, "system", "verify_final"),
+        (8, "sonnet-4-6", "judge_run"),
+        (9, AUTHOR, "refused"),
+        (10, REVIEWER, "approved"),
     ]
-    assert "snapshot_sha256" in rows[0][5]
+    started = json.loads(rows[0][5])
+    draft = json.loads(recording_path(RECORDINGS_DIR, "DRAFT").read_text(encoding="utf-8"))
+    assert started == {
+        "snapshot_sha256": current_snapshot(),
+        "draft_model": draft["model"],
+        "draft_recorded": draft["date"],
+    }
+    refused = json.loads(rows[1][5])
+    assert refused["status"] == 409 and "not await_approval" in refused["reason"]
+    assert refused["step"] == "approve"
+
+
+def test_audit_a_second_approve_click_is_chained_as_refused(
+    client: TestClient, db_path: Path
+) -> None:
+    thread = start(client)
+    decide(client, thread, form(thread))
+    assert approve(client, thread, REVIEWER).status_code == 200
+    assert approve(client, thread, REVIEWER).status_code == 409
+    last = stored(db_path, thread["thread_id"])[-1]
+    assert (last[3], last[4]) == (REVIEWER, "refused")
+    assert json.loads(last[5])["reason"] == "thread is at done, not await_approval"
+    assert client.get(f"/api/threads/{thread['thread_id']}/audit/verify").json()["ok"] is True
+
+
+def test_audit_422_and_404_add_no_entry(client: TestClient, db_path: Path) -> None:
+    thread = start(client)
+    path = f"/api/threads/{thread['thread_id']}"
+    bad = form(thread)
+    bad[0]["adverse_from"] = 30.0  # not a dose of the slot
+    assert (
+        client.post(f"{path}/decisions", json={"actor": AUTHOR, "decisions": bad}).status_code
+        == 422
+    )
+    missing = client.post("/api/threads/nope/approve", json={"actor": REVIEWER})
+    assert missing.status_code == 404
+    assert [r[4] for r in stored(db_path, thread["thread_id"])] == ["thread_started"]
+    assert stored(db_path, "nope") == []
+
+
+def test_api_audit_verify_reports_a_bad_payload_and_a_thread_without_entries(
+    client: TestClient, db_path: Path
+) -> None:
+    thread = start(client)
+    decide(client, thread, form(thread))
+    path = f"/api/threads/{thread['thread_id']}/audit/verify"
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            "UPDATE audit SET payload = 'not json' WHERE thread_id = ? AND seq = 2",
+            (thread["thread_id"],),
+        )
+    reply = client.get(path)
+    assert reply.status_code == 200
+    assert reply.json() == {"ok": False, "count": 5, "first_broken": 2}
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("DELETE FROM audit WHERE thread_id = ?", (thread["thread_id"],))
+    assert client.get(path).json() == {"ok": False, "count": 0, "first_broken": 1}
 
 
 def test_api_audit_verify_full_walkthrough_and_unknown_thread(

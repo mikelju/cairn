@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from cairn.canonical import canonical_sha256
+from cairn.fetch import REPO_ROOT
 from cairn.gateway import GatewayError, LLMGateway, Mode, Status
 from cairn.recording import RecordingKey, ReplayClient, StaleRecording, tool_schema_hash
 
@@ -18,7 +19,11 @@ JUDGE_PROMPT_VERSION = "judge-1"
 JUDGE_MAX_TOKENS = 400
 CATEGORIES = ("none", "causal", "certainty", "safety", "magnitude")
 NOT_JUDGED = "not judged"
-KAPPA_PATH = Path("data/judge/e5_result.json")  # written by record-judge, read by step 5
+ITEM_PREFIX = "J-"
+RECORDING_PATTERN = ITEM_PREFIX.lower() + "*.json"  # recording files are named by lowercased ID
+KAPPA_PATH = (
+    REPO_ROOT / "data" / "judge" / "e5_result.json"
+)  # written by record-judge, read by step 5
 JUDGE_TOOL = {
     "name": "judge_verdict",
     "description": "Judge whether the wording of a draft sentence is supported by the data given.",
@@ -41,7 +46,7 @@ EXAMPLE_OBS = ("O2",)
 
 def item_id(sentence: str, facts: str) -> str:
     """The recording ID of a sentence with its data: the same inputs always map to one file."""
-    return "J-" + canonical_sha256({"sentence": sentence, "facts": facts})[:16]
+    return ITEM_PREFIX + canonical_sha256({"sentence": sentence, "facts": facts})[:16]
 
 
 def judge_key(sentence: str, facts: str, model: str = JUDGE_MODEL) -> RecordingKey:

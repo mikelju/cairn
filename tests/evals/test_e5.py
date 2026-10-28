@@ -19,7 +19,8 @@ from cairn.workflow import build_ledger, gather_state, shown_facts
 ROOT = Path(__file__).parents[2]
 FIXTURES = ROOT / "tests" / "fixtures" / "recordings"
 REAL = ROOT / "recordings"
-FOLDERS = [FIXTURES, *([REAL] if any(REAL.glob("j-*.json")) else [])]
+REAL_RECORDED = any(REAL.glob(judge.RECORDING_PATTERN))
+FOLDERS = [FIXTURES, *([REAL] if REAL_RECORDED else [])]
 
 
 def verdicts(directory: Path) -> tuple[list[str], list[str]]:
@@ -50,6 +51,12 @@ def test_e5_has_both_labels_and_four_kinds_of_overstatement() -> None:
     assert len({c["sentence"] for c in cases}) == 24
 
 
+def test_e5_real_recordings_and_result_file_go_together() -> None:
+    assert KAPPA_PATH.is_file() == REAL_RECORDED, (
+        "data/judge/e5_result.json and the judge recordings come from one make record-judge"
+    )
+
+
 @pytest.mark.parametrize("directory", FOLDERS, ids=lambda d: d.parent.name + "/" + d.name)
 def test_e5_kappa_of_the_recorded_judge_reaches_the_threshold(directory: Path) -> None:
     labels, found = verdicts(directory)
@@ -57,6 +64,6 @@ def test_e5_kappa_of_the_recorded_judge_reaches_the_threshold(directory: Path) -
     value = judge.kappa(labels, found)
     assert value >= KAPPA_THRESHOLD, f"kappa {value:.3f} is under {KAPPA_THRESHOLD}"
     if directory == REAL:  # the file the panel reads says what the recordings give
-        result = json.loads((ROOT / KAPPA_PATH).read_text(encoding="utf-8"))
+        result = json.loads(KAPPA_PATH.read_text(encoding="utf-8"))
         assert (result["n"], result["kappa"]) == (len(labels), round(value, 4))
         assert result["threshold"] == KAPPA_THRESHOLD

@@ -2,6 +2,7 @@ import hashlib
 import json
 import re
 import shutil
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -583,7 +584,21 @@ def test_step6_shows_rules_chain_status_and_the_production_note() -> None:
         client.post("/step/4/confirm", data={"thread": id_, "actor": "R. Reviewer"})
         page = client.get(f"/step/6?thread={id_}").text
         assert 'class="badge real"' in page and "passed" in page and "fired" not in page
-        assert page.count("<tr>") == 9 and "Audit chain: " in page and "entries, verified." in page
+        assert page.count("<tr>") == 9 and "Audit chain: 5 entries, verified." in page
         assert "not a validated or external log" in page
         assert "In production" in page and "external append-only log" in page
         assert client.get(f"/step/6?thread={id_}&actor=Mallory").status_code == 422
+
+
+def test_step6_says_where_the_chain_is_broken(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db = tmp_path / "threads.db"
+    monkeypatch.setenv("CAIRN_THREADS_DB", str(db))
+    with TestClient(create_app(), follow_redirects=False) as client:
+        id_ = _filled_thread(client)
+        client.post("/step/4/confirm", data={"thread": id_, "actor": "R. Reviewer"})
+        with sqlite3.connect(db) as conn:
+            conn.execute("UPDATE audit SET actor = 'X' WHERE thread_id = ? AND seq = 3", (id_,))
+        page = client.get(f"/step/6?thread={id_}").text
+        assert "Audit chain: broken at entry 3." in page and "verified" not in page

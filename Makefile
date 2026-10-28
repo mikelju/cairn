@@ -20,7 +20,8 @@ demo: build
 
 # Docker cannot publish ports with --network none, so this target proves the offline claim
 # from inside a container that has no network: it fetches the landing page, steps 1 to 3, /explore and /healthz,
-# one highlighted page from step 3 with its PNG, then posts question Q2 to step 2 and requires a 200 carrying the RECORDED badge.
+# one highlighted page from step 3 with its PNG, posts question Q2 to step 2 and requires a 200 carrying the RECORDED badge,
+# then walks steps 4 to 6 (example decisions, confirm, refused self-approval, approval, judge panel n and kappa when recorded, audit chain).
 demo-offline-check: build
 	docker run --rm --platform $(PLATFORM) --network none $(IMAGE) python -m cairn.offline_check
 
@@ -67,7 +68,7 @@ record-draft:
 # Judge recordings (decision O1 of phase 05): E5 cases, example-decisions draft sentences and the EXAMPLE sentence.
 record-judge:
 	$(if $(AWS_PROFILE),,$(error set AWS_PROFILE=<profile>))
-	uv run cairn record-judge $(MODEL_FLAG)
+	uv run cairn record-judge
 
 live:
 	$(if $(AWS_PROFILE),,$(error set AWS_PROFILE=<profile>))

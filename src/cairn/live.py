@@ -29,6 +29,7 @@ from cairn.judge import (
     JUDGE_TOOL,
     KAPPA_PATH,
     NOT_JUDGED,
+    RECORDING_PATTERN,
     judge_key,
     judge_sentence,
     kappa,
@@ -184,7 +185,6 @@ def record_draft(directory: Path, model: str) -> Path:
 JUDGE_BUDGET_USD = 2.0  # decision O1 of phase 05, for all the judge recordings kept
 JUDGE_CEILING_INPUT_TOKENS = 4_000  # the longest cited Observation plus the prompt, with room
 KAPPA_THRESHOLD = 0.70  # decision O2
-JUDGE_PATTERN = "j-*.json"
 
 
 def judge_step(model: str) -> float:
@@ -242,7 +242,7 @@ def record_judge(
     The budget counts the judge recordings already kept. When every E5 case got a verdict the
     kappa against the labels is written to `result_path`.
     """
-    report = JudgeReport(spent=recorded_spend(directory, JUDGE_PATTERN))
+    report = JudgeReport(spent=recorded_spend(directory, RECORDING_PATTERN))
     started = report.spent
     for sentence, facts in inputs.items:
         if report.spent + judge_step(model) > budget:

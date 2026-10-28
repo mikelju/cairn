@@ -271,19 +271,18 @@ def serve(host: str = "127.0.0.1", port: int = 8000) -> None:  # pragma: no cove
 
 @app.command("record-judge")
 def record_judge_command(
-    model: str = judge.JUDGE_MODEL,
     recordings: Path = RECORDINGS_DIR,
     cases: Path = CASES_PATH,
     result: Path = judge.KAPPA_PATH,
 ) -> None:
     """Record the judge on the E5 cases and the draft sentences (laptop only): 2 USD ceiling."""
-    _known_model(model)
+    model = judge.JUDGE_MODEL
     try:
         inputs = live.judge_inputs(cases, recordings)
     except Exception as error:  # a missing draft recording or build ends as a plain message
         typer.echo(f"error: {type(error).__name__}: {error}", err=True)
         raise typer.Exit(1) from error
-    before = live.recorded_spend(recordings, live.JUDGE_PATTERN)
+    before = live.recorded_spend(recordings, judge.RECORDING_PATTERN)
     ceiling = len(inputs.items) * live.judge_step(model)
     typer.echo(
         f"ceiling: {ceiling:.2f} USD more for {len(inputs.items)} sentences, "

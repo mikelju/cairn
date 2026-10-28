@@ -23,7 +23,7 @@ COLUMNS = "seq, ts, actor, action, payload, prev_hash, hash"
 class Check:
     ok: bool
     count: int
-    first_broken: int | None = None  # seq of the first entry that fails
+    first_broken: int | None = None  # 1-based position of the first entry that fails
 
 
 def entry_hash(entry: dict[str, Any]) -> str:
@@ -53,7 +53,7 @@ def verify_chain(entries: list[dict[str, Any]], head: str | None = None) -> Chec
             or entry["prev_hash"] != previous
             or entry["hash"] != entry_hash(entry)
         ):
-            return Check(False, len(entries), entry["seq"])
+            return Check(False, len(entries), position)
         previous = entry["hash"]
     if head is not None and head != previous:
         return Check(False, len(entries), len(entries) + 1)
@@ -71,7 +71,15 @@ async def entries(conn: Any, thread_id: str) -> list[dict[str, Any]]:
     )
     rows = await cursor.fetchall()
     keys = COLUMNS.split(", ")
-    return [{**dict(zip(keys, row, strict=True)), "payload": json.loads(row[4])} for row in rows]
+    return [{**dict(zip(keys, row, strict=True)), "payload": _payload(row[4])} for row in rows]
+
+
+def _payload(text: str) -> Any:
+    """The stored payload; an unparsable one becomes None, which no entry hash matches."""
+    try:
+        return json.loads(text)
+    except ValueError:
+        return None
 
 
 async def append(

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import socket
 import subprocess
@@ -10,6 +11,8 @@ import time
 import urllib.request as http
 from urllib.error import HTTPError
 from urllib.parse import urlencode
+
+from cairn.judge import KAPPA_PATH
 
 BASE = "http://127.0.0.1:8000"
 
@@ -25,6 +28,14 @@ def get(path: str) -> tuple[int, bytes]:
 def post(path: str, fields: dict[str, str]) -> str:
     with http.urlopen(http.Request(BASE + path, data=urlencode(fields).encode())) as response:
         return str(response.read().decode())
+
+
+def _calibration() -> str:
+    """The n and kappa step 5 must show; empty while the image holds no result file."""
+    if not KAPPA_PATH.is_file():
+        return ""
+    result = json.loads(KAPPA_PATH.read_text(encoding="utf-8"))
+    return f"n={result['n']} | kappa {result['kappa']:.2f}"
 
 
 def people_decide() -> bool:
@@ -43,6 +54,7 @@ def people_decide() -> bool:
     checks = {
         "step 5 has the final text": "Final text" in final and "RECORDED" in final,
         "step 5 has the judge panel": "Judge panel" in final and "see step 6" in final,
+        "step 5 panel shows the recorded n and kappa": _calibration() in final,
         "step 6 has the chain": "entries, verified." in step6 and "append-only log" in step6,
         "author refused with 403": "403 · Authors cannot approve their own draft" in refused,
         "reviewer approves": "Approved by R. Reviewer" in approved,

@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 
 from cairn.app import create_app
 from cairn.decisions import EXAMPLE
-from cairn.gateway import LLMGateway
+from cairn.gateway import LLMGateway, Mode
 from cairn.workflow import build_graph
 
 AUTHOR, REVIEWER = "A. Author", "R. Reviewer"
@@ -25,17 +25,18 @@ def client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClie
 
 
 @pytest.fixture
-def model_calls(monkeypatch: pytest.MonkeyPatch) -> list[int]:
-    """Counts model calls from now on; the start of a thread is the only one that may make one."""
-    calls: list[int] = []
+def model_calls(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[Mode]]:
+    """Mode of each model call from now on; all of them must go through replay, never live."""
+    calls: list[Mode] = []
     create = LLMGateway.create
 
     def counting(self: LLMGateway, *args: Any, **kwargs: Any) -> Any:
-        calls.append(1)
+        calls.append(self.mode)
         return create(self, *args, **kwargs)
 
     monkeypatch.setattr(LLMGateway, "create", counting)
-    return calls
+    yield calls
+    assert set(calls) <= {Mode.REPLAY}, f"a model call was not a replay: {calls}"
 
 
 def replayed(body: dict[str, Any]) -> int:
@@ -87,7 +88,7 @@ def test_api_start_pauses_at_decisions_with_slots(client: TestClient) -> None:
 
 
 def test_api_decisions_example_set_recomputes_with_no_model_call(
-    client: TestClient, model_calls: list[int]
+    client: TestClient, model_calls: list[Mode]
 ) -> None:
     thread = start(client)
     path = f"/api/threads/{thread['thread_id']}"
@@ -102,11 +103,11 @@ def test_api_decisions_example_set_recomputes_with_no_model_call(
         json={"actor": AUTHOR, "decisions": form(thread, lambda s: (None, None))},
     ).json()
     assert changed["noael"]["F"]["dose"] == changed["noael"]["M"]["dose"] == 400.0
-    assert model_calls == [1]  # the draft at start, nothing after
+    assert len(model_calls) == 1  # the draft at start, nothing after
 
 
 def test_api_confirm_example_set_reaches_approval_green(
-    client: TestClient, model_calls: list[int]
+    client: TestClient, model_calls: list[Mode]
 ) -> None:
     done = decide(client, start(client), example)
     assert done.status_code == 200
@@ -169,7 +170,7 @@ def test_api_409_approve_when_verify_final_is_not_green(client: TestClient) -> N
     assert approve(client, thread, REVIEWER).status_code == 409
 
 
-def test_resume_idempotent(client: TestClient, model_calls: list[int]) -> None:
+def test_resume_idempotent(client: TestClient, model_calls: list[Mode]) -> None:
     thread = start(client)
     path = f"/api/threads/{thread['thread_id']}"
     first = decide(client, thread, example)
@@ -178,7 +179,8 @@ def test_resume_idempotent(client: TestClient, model_calls: list[int]) -> None:
     before = (client.get(path).json(), saver.conn.total_changes)
     again = client.post(f"{path}/confirm", json={"actor": REVIEWER, "confirmed": ["F", "M"]})
     assert again.status_code == 409
-    assert (client.get(path).json(), saver.conn.total_changes) == before
+    # the state is unchanged; the only write is the one audit entry of the refusal
+    assert (client.get(path).json(), saver.conn.total_changes) == (before[0], before[1] + 1)
     assert approve(client, thread, REVIEWER).status_code == 200
     assert approve(client, thread, REVIEWER).status_code == 409
     assert len(model_calls) == 1 + replayed(first.json())  # the draft, then recorded verdicts
@@ -205,7 +207,7 @@ def only(**adverse: float | None) -> Any:
 )
 def test_api_form_combinations_use_the_noael_rule_with_no_model_call(
     client: TestClient,
-    model_calls: list[int],
+    model_calls: list[Mode],
     rule: Any,
     females: float | None,
     males: float | None,

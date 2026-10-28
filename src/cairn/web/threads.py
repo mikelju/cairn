@@ -120,9 +120,9 @@ async def _refuse(
     raise HTTPException(status_code=status, detail=detail)
 
 
-def _at(waiting: str, expected: str) -> None:
-    if waiting != expected:
-        raise HTTPException(status_code=409, detail=f"thread is at {waiting}, not {expected}")
+def _at(waiting: str, expected: str) -> str | None:
+    """The 409 detail when the thread is at another step, else None."""
+    return None if waiting == expected else f"thread is at {waiting}, not {expected}"
 
 
 @threads.post("", status_code=201)
@@ -160,7 +160,8 @@ async def record_decisions(request: Request, thread_id: str, body: Record) -> di
 
 async def _record(request: Request, thread_id: str, body: Record) -> dict[str, Any]:
     graph, config, state, waiting = await _load(request, thread_id)
-    _at(waiting, "await_decisions")
+    if detail := _at(waiting, "await_decisions"):
+        raise HTTPException(status_code=409, detail=detail)
     slots = {s.slot: s for s in enumerate_slots(build_ledger(state))}
     now = _now()
     records = []
@@ -203,7 +204,8 @@ async def confirm(request: Request, thread_id: str, body: Confirm) -> dict[str, 
 
 async def _confirm(request: Request, thread_id: str, body: Confirm) -> dict[str, Any]:
     graph, config, state, waiting = await _load(request, thread_id)
-    _at(waiting, "await_decisions")
+    if detail := _at(waiting, "await_decisions"):
+        await _refuse(request, thread_id, body.actor, "confirm", 409, detail)
     if body.actor != REVIEWER or body.actor == state.get("author"):
         await _refuse(
             request, thread_id, body.actor, "confirm", 403, "Only the reviewer confirms a NOAEL."
@@ -236,7 +238,8 @@ async def approve(request: Request, thread_id: str, body: Approve) -> dict[str, 
 
 async def _approve(request: Request, thread_id: str, body: Approve) -> dict[str, Any]:
     graph, config, state, waiting = await _load(request, thread_id)
-    _at(waiting, "await_approval")
+    if detail := _at(waiting, "await_approval"):
+        await _refuse(request, thread_id, body.actor, "approve", 409, detail)
     if body.actor == state.get("author"):
         await _refuse(
             request,
@@ -257,10 +260,9 @@ async def _approve(request: Request, thread_id: str, body: Approve) -> dict[str,
 @threads.get("/{thread_id}/audit/verify")
 async def verify_audit(request: Request, thread_id: str) -> dict[str, Any]:
     """Read-only: check the thread's chain and say whether it is intact."""
+    await _load(request, thread_id)  # 404 for an unknown thread
     chain = await audit.entries(request.app.state.saver.conn, thread_id)
-    if not chain:
-        raise HTTPException(status_code=404, detail="thread not found")
-    check = audit.verify_chain(chain)
+    check = audit.verify_chain(chain) if chain else audit.Check(False, 0, 1)  # entries all deleted
     return {"ok": check.ok, "count": check.count, "first_broken": check.first_broken}
 
 

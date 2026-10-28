@@ -1,6 +1,7 @@
 """The judge: verdicts, refusals, replay only, never blocking, kappa, and the record command."""
 
 import asyncio
+import fnmatch
 import hashlib
 import json
 import re
@@ -25,13 +26,16 @@ from cairn.judge import EXAMPLE_SENTENCE
 from cairn.judge_cases import CASES_PATH as CASES
 from cairn.judge_cases import load_cases
 from cairn.recording import ReplayClient, recording_path
+from cairn.render import render_sentence
 from cairn.workflow import (
     build_graph,
     build_ledger,
     draft_key,
     draft_sections,
+    final_ledger,
     final_sentences,
     gather_state,
+    sections_of,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures" / "recordings"
@@ -213,8 +217,7 @@ def walk(client: TestClient) -> dict[str, Any]:
     return body
 
 
-def example_facts() -> dict[str, str]:
-    """Each final sentence of the example walkthrough with the facts the judge is shown."""
+def filled_state() -> Any:
     state = gather_state()
     model = "opus-4-6"
     replay = ReplayClient.load(FIXTURES, draft_key(model))
@@ -222,7 +225,12 @@ def example_facts() -> dict[str, str]:
     slots = enumerate_slots(build_ledger(state))
     state["decisions"] = [d.model_dump() for d in example_decisions(slots, "A", "2026-10-28")]
     state["confirmed"] = ["F", "M"]
-    return dict(final_sentences(state))
+    return state
+
+
+def example_facts() -> dict[str, str]:
+    """Each final sentence of the example walkthrough with the facts the judge is shown."""
+    return dict(final_sentences(filled_state()))
 
 
 def test_judge_warns_never_blocks(client: TestClient) -> None:
@@ -324,3 +332,29 @@ def test_record_judge_command_prints_the_ceiling_first_and_the_spend_after(
     monkeypatch.setattr(live, "make_client", lambda mode: stub_client(wrong))
     low = CliRunner().invoke(app, args)
     assert low.exit_code == 1 and "kappa: 0.0000" in low.output
+
+
+def test_record_judge_has_no_model_option_and_the_judge_always_uses_its_own() -> None:
+    refused = CliRunner().invoke(app, ["record-judge", "--model", "opus-4-6"])
+    assert refused.exit_code == 2  # unknown option: a recording cannot use the drafter's model
+
+
+def test_one_recording_pattern_matches_the_files_a_judge_recording_is_saved_as(
+    tmp_path: Path,
+) -> None:
+    name = recording_path(tmp_path, judge.item_id("A sentence.", "facts")).name
+    assert fnmatch.fnmatch(name, judge.RECORDING_PATTERN)
+    assert not fnmatch.fnmatch("draft.json", judge.RECORDING_PATTERN)
+
+
+def test_the_kappa_file_is_found_from_the_repo_root_not_the_working_directory() -> None:
+    assert judge.KAPPA_PATH.is_absolute()
+    assert Path(__file__).parents[1] / "data" / "judge" / "e5_result.json" == judge.KAPPA_PATH
+
+
+def test_final_sentences_are_checked_on_the_ledger_verify_final_uses() -> None:
+    state = filled_state()
+    ledger = final_ledger(state)
+    assert [text for text, _ in final_sentences(state)] == [
+        render_sentence(s, ledger) for s in sections_of(state)
+    ]

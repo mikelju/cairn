@@ -121,12 +121,17 @@ def sections_of(state: State) -> list[Sentence]:
     return [s for name in SECTIONS for s in adapter.validate_python(sections.get(name, []))]
 
 
-def verify_final(state: State) -> Verdict:
-    """Pure: the verdict on the draft once the decisions and confirmations are applied."""
+def final_ledger(state: State) -> ObservationLedger:
+    """The ledger with the decisions and confirmations applied, as the final text is checked."""
     ledger = build_ledger(state)
     decisions = [Decision.model_validate(d) for d in state.get("decisions", [])]
     apply_decisions(ledger, decisions, frozenset(state.get("confirmed", [])))
-    return verify(sections_of(state), ledger)
+    return ledger
+
+
+def verify_final(state: State) -> Verdict:
+    """Pure: the verdict on the draft once the decisions and confirmations are applied."""
+    return verify(sections_of(state), final_ledger(state))
 
 
 def shown_facts(ledger: ObservationLedger, obs_ids: Iterable[str]) -> str:
@@ -136,9 +141,7 @@ def shown_facts(ledger: ObservationLedger, obs_ids: Iterable[str]) -> str:
 
 def final_sentences(state: State) -> list[tuple[str, str]]:
     """Each sentence of the final text with the facts of the Observations it cites."""
-    ledger = build_ledger(state)
-    decisions = [Decision.model_validate(d) for d in state.get("decisions", [])]
-    apply_decisions(ledger, decisions, frozenset(state.get("confirmed", [])))
+    ledger = final_ledger(state)
     return [
         (
             render_sentence(sentence, ledger),
