@@ -1,0 +1,175 @@
+{
+  "calls": [
+    {
+      "cost_usd": 0.038385,
+      "input_tokens": 5062,
+      "latency_s": 18.407,
+      "output_tokens": 523,
+      "response": {
+        "container": null,
+        "content": [
+          {
+            "caller": null,
+            "id": "toolu_bdrk_01KSEqVXZa6rSHjuwrVLWYHt",
+            "input": {
+              "design": [
+                {
+                  "parts": [
+                    {
+                      "text": "Study ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "study_id",
+                      "obs_id": "O1",
+                      "type": "ref"
+                    },
+                    {
+                      "text": " was conducted in ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "n_examined",
+                      "obs_id": "O1",
+                      "type": "ref"
+                    },
+                    {
+                      "text": " ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "strain",
+                      "obs_id": "O1",
+                      "type": "ref"
+                    },
+                    {
+                      "text": " ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "species",
+                      "obs_id": "O1",
+                      "type": "ref"
+                    },
+                    {
+                      "text": " administered the test article via ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "route",
+                      "obs_id": "O1",
+                      "type": "ref"
+                    },
+                    {
+                      "text": ".",
+                      "type": "text"
+                    }
+                  ]
+                }
+              ],
+              "screen": [
+                {
+                  "parts": [
+                    {
+                      "text": "The incidence screen examined ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "n_examined",
+                      "obs_id": "O2",
+                      "type": "ref"
+                    },
+                    {
+                      "text": " animals and flagged ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "n_findings",
+                      "obs_id": "O2",
+                      "type": "ref"
+                    },
+                    {
+                      "text": " findings for further review.",
+                      "type": "text"
+                    }
+                  ]
+                }
+              ],
+              "tk": [
+                {
+                  "parts": [
+                    {
+                      "text": "For the ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "test",
+                      "obs_id": "O3",
+                      "type": "ref"
+                    },
+                    {
+                      "text": " parameter, the na\u00efve mean was ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "with_quarantined.mean",
+                      "obs_id": "O3",
+                      "type": "ref"
+                    },
+                    {
+                      "text": " with the quarantined value included and ",
+                      "type": "text"
+                    },
+                    {
+                      "field": "without_quarantined.mean",
+                      "obs_id": "O3",
+                      "type": "ref"
+                    },
+                    {
+                      "text": " with it excluded.",
+                      "type": "text"
+                    }
+                  ]
+                }
+              ]
+            },
+            "name": "write_draft",
+            "toolset_name": null,
+            "type": "tool_use"
+          }
+        ],
+        "diagnostics": null,
+        "id": "msg_bdrk_011CgWU69BcNfh6ZGGUn1bda",
+        "model": "claude-opus-4-6",
+        "role": "assistant",
+        "stop_details": null,
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "type": "message",
+        "usage": {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "inference_geo": null,
+          "input_tokens": 5062,
+          "output_tokens": 523,
+          "output_tokens_details": null,
+          "server_tool_use": null,
+          "service_tier": null,
+          "speed": null
+        }
+      }
+    }
+  ],
+  "date": "2026-10-29",
+  "model": "opus-4-6",
+  "model_profile": "eu.anthropic.claude-opus-4-6-v1",
+  "prompt_version": "memo-1",
+  "question_id": "MEMO",
+  "region": "eu-west-1",
+  "source": "bedrock",
+  "tool_schema_sha256": "fa6143dc34f1334478bbf734e835de28674e849b3dc0967feaaa426659e917d9"
+}
