@@ -10,6 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from cairn.app import create_app
+from cairn.fetch import VENDORED_DIR
 from cairn.ingest import DEFAULT_DB, ingest
 from cairn.web import HERE
 
@@ -23,7 +24,7 @@ def test_healthz_and_landing_page() -> None:
     assert "Public sample data · fictional compound · not GxP-validated" in page
     assert "Role: Study toxicologist (simulated)" in page
     assert re.search(r"v0\.1\.0 · commit \S+ · snapshot [0-9a-f]{12}", page)
-    assert page.count('class="locked"') == 1
+    assert page.count('class="locked"') == 0
     assert 'href="/step/2"' in page and 'href="/step/3"' in page
     assert "/static/vendor/htmx.min.js" in page
 
@@ -46,18 +47,26 @@ def test_step1_run_shows_quarantine_and_computed_means() -> None:
     assert "15,956 without it (n=2)" in result
 
 
-def test_inject_switch_fires_rule_without_touching_duckdb(tmp_path: Path) -> None:
+def test_step1_switches_fire_their_rule_without_touching_the_sources(tmp_path: Path) -> None:
     db = tmp_path / "cairn.duckdb"
     ingest(db_path=db)
-    watched = [db] + ([DEFAULT_DB] if DEFAULT_DB.exists() else [])
+    vendored = sorted(VENDORED_DIR.glob("*"))
+    watched = [db, *vendored] + ([DEFAULT_DB] if DEFAULT_DB.exists() else [])
     before = [hashlib.sha256(p.read_bytes()).hexdigest() for p in watched]
+    expected = {
+        "negative": ("pc_concentration_positive", "injected row"),
+        "duplicate": ("dm_usubjid_unique", "repeated"),
+        "dose": ("dm_setcd_in_tx", "99"),
+    }
     with TestClient(create_app()) as client:
-        result = client.post("/step/1/run", data={"inject": "on"}).text
-        plain = client.post("/step/1/run").text
-    assert "<strong>13</strong> quarantined, including the injected row" in result
-    assert 'class="new"' in result
-    assert "pc_concentration_positive" in result
-    assert "pc_concentration_positive" not in plain
+        plain = client.post("/step/1/run", data={"switch": "none"}).text
+        for switch, (rule, shown) in expected.items():
+            result = client.post("/step/1/run", data={"switch": switch}).text
+            assert "<strong>13</strong> quarantined, including the injected row" in result
+            assert 'class="new"' in result and rule in result and shown in result
+            assert all(other not in result for other, _ in expected.values() if other != rule)
+            assert rule not in plain
+        assert client.post("/step/1/run", data={"switch": "bogus"}).status_code == 422
     assert "<strong>12</strong>" in plain
     assert [hashlib.sha256(p.read_bytes()).hexdigest() for p in watched] == before
 
@@ -337,11 +346,11 @@ def test_step3_counts_quotes_verbatim_on_the_cited_page() -> None:
     assert verbatim == total
 
 
-def test_navigation_unlocks_step_3_and_keeps_the_rest_locked() -> None:
+def test_navigation_has_no_locked_step() -> None:
     with TestClient(create_app()) as client:
         page = client.get("/step/3").text
     assert '<a href="/step/3" aria-current="step">3 Explore</a>' in page
-    assert page.count('class="locked"') == 1
+    assert page.count('class="locked"') == 0
 
 
 def test_highlight_route_serves_only_committed_pngs() -> None:
@@ -606,6 +615,31 @@ def test_step6_shows_rules_chain_status_and_the_production_note() -> None:
         assert "not a validated or external log" in page
         assert "In production" in page and "external append-only log" in page
         assert client.get(f"/step/6?thread={id_}&actor=Mallory").status_code == 422
+
+
+def test_step7_closes_the_session_with_one_tool_over_mcp_and_rest() -> None:
+    with TestClient(create_app(), follow_redirects=False) as client:
+        assert client.get("/step/7").headers["location"] == "/step/4"
+        id_ = _filled_thread(client)
+        early = client.get(f"/step/7?thread={id_}")
+        assert early.status_code == 303 and early.headers["location"] == f"/step/4?thread={id_}"
+        client.post("/step/4/confirm", data={"thread": id_, "actor": "R. Reviewer"})
+        client.post("/step/5/approve", data={"thread": id_, "actor": "R. Reviewer"})
+        page = client.get(f"/step/7?thread={id_}").text
+        assert 'class="badge real"' in page and "Same hash, same Observation." in page
+        assert re.search(r"by code, 0 by the model", page) and "copied verbatim" in page
+        assert (
+            re.search(r"\d+ entries, verified", page)
+            and "R. Reviewer" in page
+            and "8 of 8 passed" in page
+        )
+        assert "<details><summary>Production table" in page
+        hashes = re.findall(r"<td>(?:MCP|REST)</td><td>([0-9a-f]{16})</td>", page)
+        assert len(hashes) == 2 and hashes[0] == hashes[1]
+        assert client.get("/docs").status_code == 200
+        assert client.get("/mcp").status_code < 500 and client.get("/pull/6").status_code == 404
+        assert 'href="https://github.com/mikelju/cairn/pull/6"' in page
+        assert 'href="/docs"' in page and 'href="/mcp"' in page
 
 
 def test_step6_says_where_the_chain_is_broken(

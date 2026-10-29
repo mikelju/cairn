@@ -6,8 +6,10 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastmcp import Client
 from markupsafe import Markup, escape
 
+from cairn.content import QuoteRef, Text, ValueRef
 from cairn.decisions import EXAMPLE, Decision, apply_decisions
 from cairn.gateway import DEFAULT_MODEL
 from cairn.judge import (
@@ -20,6 +22,7 @@ from cairn.judge import (
 )
 from cairn.recording import RECORDINGS_DIR, ReplayClient, recorded_model, total_cost
 from cairn.render import render
+from cairn.tools import call_tool
 from cairn.verify import RULE_REASONS
 from cairn.web import _page as page
 from cairn.web import templates
@@ -291,6 +294,75 @@ async def step6(request: Request, thread: str | None = None, actor: str = REVIEW
             else f"Audit chain: broken at entry {chain['first_broken']}."
         ),
         chain_ok=chain["ok"],
+    )
+
+
+REPO = "https://github.com/mikelju/cairn"
+STEP7_LINKS = [
+    ("Data-quality memo commit and its evals check", f"{REPO}/commits/main/workflows"),
+    ("Blocked bad PR", f"{REPO}/pull/6"),
+    ("REST docs", "/docs"),
+    ("MCP endpoint", "/mcp"),
+]
+PRODUCTION = [
+    ["Identity", "Role picker", "SSO and roles"],
+    ["Audit log", "Hash chain in the app", "External append-only log"],
+    ["Draft model", "Recorded call", "Bedrock with Guardrails and WAF"],
+    ["Sign-off", "Approval in step 5", "Electronic signatures"],
+]
+
+
+async def _two_doors(request: Request) -> tuple[str, str]:
+    """The same tool called over MCP and over REST: the content hash of each Observation."""
+    async with Client(request.app.state.mcp) as client:
+        over_mcp = (await client.call_tool("study_design", {})).structured_content or {}
+    return str(over_mcp["content_sha256"]), str(call_tool("study_design", {})["content_sha256"])
+
+
+@people.get("/step/7", response_class=HTMLResponse)
+async def step7(request: Request, thread: str | None = None, actor: str = REVIEWER) -> Response:
+    if thread is None:
+        return RedirectResponse("/step/4", status_code=303)
+    state, waiting, view = await load_view(request, thread)
+    if waiting == "await_decisions":
+        return RedirectResponse(f"/step/4?thread={thread}", status_code=303)
+    parts = [p for s in sections_of(state) for p in s.parts]
+    by_model = sum(c.isdigit() for p in parts if isinstance(p, Text) for c in p.text)
+    model = recorded_model(RECORDINGS_DIR, "DRAFT", DEFAULT_MODEL)
+    recording = ReplayClient.load(RECORDINGS_DIR, draft_key(model)).recording
+    cost = total_cost(recording)
+    latency = sum(float(call.get("latency_s", 0.0)) for call in recording["calls"])
+    chain = await verify_audit(request, thread)
+    failed = len(verify_final(state).failures)
+    over_mcp, over_rest = await _two_doors(request)
+    session = [
+        [
+            "Numbers",
+            f"{sum(isinstance(p, ValueRef) for p in parts)} by code, {by_model} by the model",
+        ],
+        ["Quotations", f"{sum(isinstance(p, QuoteRef) for p in parts)} copied verbatim"],
+        [
+            "Decisions",
+            f"{len(view['decisions'])} by people, {len(view['confirmed'])} NOAEL confirmed",
+        ],
+        [
+            "Recorded draft",
+            f"{latency:.1f} s, " + ("cost n/a" if cost is None else f"{cost:.2f} USD"),
+        ],
+        ["Rules", f"{len(RULE_REASONS) - failed} of {len(RULE_REASONS)} passed"],
+        ["Chain", f"{chain['count']} entries, " + ("verified" if chain["ok"] else "broken")],
+        ["Approval", view["approved_by"] or "not yet"],
+    ]
+    return page(
+        request,
+        "step7.html",
+        current=7,
+        actor=_actor(actor),
+        session=session,
+        doors=[["MCP", over_mcp[:16]], ["REST", over_rest[:16]]],
+        same=over_mcp == over_rest,
+        links=STEP7_LINKS,
+        production=PRODUCTION,
     )
 
 

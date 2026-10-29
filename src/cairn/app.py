@@ -39,6 +39,7 @@ def create_app() -> FastAPI:
             yield
 
     app = FastAPI(title="Cairn", lifespan=lifespan)
+    app.state.mcp = mcp
 
     @app.post("/jobs", status_code=202)
     async def post_job(request: JobRequest) -> Job:
