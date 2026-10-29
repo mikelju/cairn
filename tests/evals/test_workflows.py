@@ -15,7 +15,14 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from cairn.gateway import DEFAULT_MODEL, LLMGateway, Mode
 from cairn.recording import ReplayClient, recorded_model
-from cairn.workflow import build_graph, draft_key, gather_state, load_workflow, verify_final
+from cairn.workflow import (
+    State,
+    build_graph,
+    draft_key,
+    gather_state,
+    load_workflow,
+    verify_final,
+)
 
 CASES = Path(__file__).parent / "workflow_cases"
 FIXTURES = Path(__file__).parents[1] / "fixtures" / "recordings"
@@ -32,7 +39,7 @@ NO_PAUSE = [file.stem for file in FILES if not load_workflow(file.stem).pauses]
 @pytest.mark.parametrize(("name", "case"), CASE_PARAMS)
 def test_workflow_eval_case_fails_exactly_its_rules(name: str, case: dict[str, Any]) -> None:
     workflow = load_workflow(name)
-    state = {**gather_state(workflow), "sections": case["sections"]}
+    state: State = {**gather_state(workflow), "sections": case["sections"]}
     verdict = verify_final(state, workflow)
     assert verdict.rules == case["expect_rules"], [str(f) for f in verdict.failures]
 
