@@ -1,0 +1,58 @@
+{
+  "calls": [
+    {
+      "cost_usd": 0.005664,
+      "input_tokens": 1403,
+      "latency_s": 2.031,
+      "output_tokens": 97,
+      "response": {
+        "container": null,
+        "content": [
+          {
+            "caller": null,
+            "id": "toolu_bdrk_01VXd6tNSo7t11SSrctBNVU5",
+            "input": {
+              "category": "safety",
+              "reason": "The phrase \"well tolerated\" is a safety conclusion that the data do not support; the data only show a body weight value lower than control.",
+              "verdict": "overstated"
+            },
+            "name": "judge_verdict",
+            "toolset_name": null,
+            "type": "tool_use"
+          }
+        ],
+        "diagnostics": null,
+        "id": "msg_bdrk_011CgW1JEW2ajaheDf4WBf4C",
+        "model": "claude-sonnet-4-6",
+        "role": "assistant",
+        "stop_details": null,
+        "stop_reason": "tool_use",
+        "stop_sequence": null,
+        "type": "message",
+        "usage": {
+          "cache_creation": {
+            "ephemeral_1h_input_tokens": 0,
+            "ephemeral_5m_input_tokens": 0
+          },
+          "cache_creation_input_tokens": 0,
+          "cache_read_input_tokens": 0,
+          "inference_geo": null,
+          "input_tokens": 1403,
+          "output_tokens": 97,
+          "output_tokens_details": null,
+          "server_tool_use": null,
+          "service_tier": null,
+          "speed": null
+        }
+      }
+    }
+  ],
+  "date": "2026-10-29",
+  "model": "sonnet-4-6",
+  "model_profile": "eu.anthropic.claude-sonnet-4-6",
+  "prompt_version": "judge-1",
+  "question_id": "J-85740d359413fa74",
+  "region": "eu-west-1",
+  "source": "bedrock",
+  "tool_schema_sha256": "f4a702a2a61a6331e87a776e088d6fb38fc74f2ad39a9b30278487869b35da73"
+}
