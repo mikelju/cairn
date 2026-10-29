@@ -4,33 +4,19 @@ A traceable agentic demo for drug safety science.
 It takes a public toxicology study (SEND, PhUSE PDS2014, fictitious compound) to a draft nonclinical summary in the style of CTD 2.6.6.3.
 The model picks tools and drafts text; code places every number and every verbatim quotation, and scientific decisions are made by a person and audited.
 
-Public sample data · fictitious compound · not GxP-validated.
+Public sample data - fictitious compound - not GxP-validated.
 
-## Status
+Video walkthrough: VIDEO_URL (pending, recorded after the merge).
 
-Steps 1, 2 and 3 of the web demo and Explore work, and the question loop runs against recorded Bedrock answers.
-Step 3 searches four public guidelines (hybrid index with a reranker) and quotes them verbatim with a highlighted page.
-The master plan is in [docs/plans/0_plan_maestro.md](docs/plans/0_plan_maestro.md).
+## Commands
+- `make demo` builds the image and serves the app on `http://127.0.0.1:8000`; it runs offline and replays the recordings in `recordings/`.
+- `make live AWS_PROFILE=<profile> QUESTION=Q2` asks one question to the live model (laptop only; spends money and prints its ceiling first).
+- `make record AWS_PROFILE=<profile>` records the questions again; `record-draft`, `record-memo` and `record-judge` do the same for the nonclinical-summary draft, the data-quality memo and the judge.
+- `make deploy` pushes the image to one Lightsail container service; see [docs/production.md](docs/production.md).
+- `make changelog` regenerates `CHANGELOG.md` from the merged PR titles.
+- `make smoke`, `make weights`, `make guidance` and `make guidance-check` cover the model profiles and the guidance index (a clean clone needs `make weights` before `npm run check`).
 
-## Step 2 and the laptop commands
-
-The web app never calls a model: step 2 only replays the recordings in `recordings/`.
-Five commands reach Bedrock and run on a laptop only:
-- `make record AWS_PROFILE=<profile>` records the questions again into `recordings/`.
-- `make live AWS_PROFILE=<profile> QUESTION=Q2` asks one question to the live model.
-- `make smoke AWS_PROFILE=<profile>` checks the model profiles and writes the smoke evidence.
-- `make record-draft AWS_PROFILE=<profile>` records the draft of the nonclinical summary.
-- `make record-judge AWS_PROFILE=<profile>` records the judge (always Sonnet 4.6) on the E5 cases and the draft sentences.
-
-All five need `AWS_PROFILE`, spend money, and print their estimated spending ceiling before the first call.
-
-## Guidance retrieval commands
-
-A clean clone needs the model weights before `npm run check` (the retrieval tests fail with "weights missing" otherwise):
-- `make weights` downloads the pinned weights into `CAIRN_MODELS` and verifies every SHA-256.
-- `make guidance` rebuilds the generated guidance files from the pinned guideline PDFs.
-- `make guidance-check` compares the committed retrieval cache with a fresh retrieval.
-
-## How we work
-
-The project is developed with SDD Lite; the guide (in Spanish) is in [docs/como-trabajar.md](docs/como-trabajar.md).
+## More
+- [docs/production.md](docs/production.md): what production would need.
+- [docs/adr/](docs/adr/): decisions (Bedrock profiles, workflows).
+- [docs/como-trabajar.md](docs/como-trabajar.md): how the project is developed with SDD Lite (in Spanish).
