@@ -31,7 +31,8 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | ID | Agent | Brief | Status | Result or blocker |
 |---|---|---|---|---|
 | E180 | explorador | Summary of PRs 12 and 13 and PRD-term grep of phases 04 and 05 | done | Summary returned; PRD-term grep 0 hits |
-| E181 | ejecutor | Draft spec and plan of phase 06 (document mode); mark phase 05 integrated | in progress | |
+| E181 | ejecutor | Draft spec and plan of phase 06 (document mode); mark phase 05 integrated | done | Spec and plan drafted, b267d69 |
+| E182 | ejecutor (Sonnet) | Lavish page for phase 06 decisions | done | `.lavish/fase-06.html` (git-ignored) with 3 diagrams and the 6 open decisions as a poll |
 
 ## User decisions
 Questions the supervisor raises to the user. Statuses: open, answered, deferred; closed with the literal answer.
