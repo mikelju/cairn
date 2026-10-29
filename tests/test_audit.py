@@ -275,3 +275,25 @@ def test_snapshot_gather_refuses_a_changed_build(monkeypatch: pytest.MonkeyPatch
     )
     with pytest.raises(StaleBuild):
         gather_state()
+
+
+def test_audit_a_decisions_post_after_confirm_is_chained_as_refused(
+    client: TestClient, db_path: Path
+) -> None:
+    thread = start(client)
+    decide(client, thread, form(thread))
+    before = len(stored(db_path, thread["thread_id"]))
+    path = f"/api/threads/{thread['thread_id']}/decisions"
+    assert client.post(path, json={"actor": AUTHOR, "decisions": form(thread)}).status_code == 409
+    rows = stored(db_path, thread["thread_id"])
+    assert len(rows) == before + 1 and (rows[-1][3], rows[-1][4]) == (AUTHOR, "refused")
+    assert json.loads(rows[-1][5])["reason"] == "thread is at await_approval, not await_decisions"
+    assert client.get(f"/api/threads/{thread['thread_id']}/audit/verify").json()["ok"] is True
+
+
+def test_snapshot_app_startup_refuses_a_changed_build(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "cairn.observation.current_snapshot", lambda: hashlib.sha256(b"x").hexdigest()
+    )
+    with pytest.raises(StaleBuild), TestClient(create_app()):
+        pass

@@ -568,7 +568,7 @@ def test_step5_lists_each_warning_and_the_example_and_approval_still_works(
     )
 
     folder = tmp_path / "recordings"
-    shutil.copytree("recordings", folder)  # the real draft, no judge files yet
+    shutil.copytree("recordings", folder, ignore=shutil.ignore_patterns("j-*.json"))
     for name in ("cairn.web.people", "cairn.web.threads"):
         monkeypatch.setattr(importlib.import_module(name), "RECORDINGS_DIR", folder)
     monkeypatch.setenv("CAIRN_THREADS_DB", str(tmp_path / "threads.db"))
@@ -588,6 +588,7 @@ def test_step5_lists_each_warning_and_the_example_and_approval_still_works(
         page = client.get(f"/step/5?thread={id_}&actor=R.%20Reviewer").text
         assert "warning: magnitude" in page and "Too strong." in page
         assert "warning: causal" in page and "EXAMPLE" in page and "It claims cause." in page
+        assert "not judged" in page  # the other sentences have no recording
         done = client.post("/step/5/approve", data={"thread": id_, "actor": "R. Reviewer"})
         assert "Approved by R. Reviewer" in done.text
 

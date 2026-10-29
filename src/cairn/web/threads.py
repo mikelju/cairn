@@ -161,7 +161,7 @@ async def record_decisions(request: Request, thread_id: str, body: Record) -> di
 async def _record(request: Request, thread_id: str, body: Record) -> dict[str, Any]:
     graph, config, state, waiting = await _load(request, thread_id)
     if detail := _at(waiting, "await_decisions"):
-        raise HTTPException(status_code=409, detail=detail)
+        await _refuse(request, thread_id, body.actor, "decisions", 409, detail)
     slots = {s.slot: s for s in enumerate_slots(build_ledger(state))}
     now = _now()
     records = []

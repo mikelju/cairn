@@ -31,11 +31,17 @@ def post(path: str, fields: dict[str, str]) -> str:
 
 
 def _calibration() -> str:
-    """The n and kappa step 5 must show; empty while the image holds no result file."""
+    """The n and kappa step 5 must show; empty when the image lacks the result file."""
     if not KAPPA_PATH.is_file():
         return ""
     result = json.loads(KAPPA_PATH.read_text(encoding="utf-8"))
     return f"n={result['n']} | kappa {result['kappa']:.2f}"
+
+
+def _judged(page: str) -> bool:
+    """Step 5 says "N of N sentences judged" with N above zero."""
+    found = re.search(r"(\d+) of (\d+) sentences judged", page)
+    return found is not None and found.group(1) == found.group(2) and int(found.group(1)) > 0
 
 
 def people_decide() -> bool:
@@ -46,6 +52,7 @@ def people_decide() -> bool:
         print("step 4 has no thread or no example button")
         return False
     thread = found.group(1)
+    calibration = _calibration()
     post("/step/4/example", {"thread": thread})
     final = post("/step/4/confirm", {"thread": thread, "actor": "R. Reviewer"})
     refused = post("/step/5/approve", {"thread": thread, "actor": "A. Author"})
@@ -54,7 +61,8 @@ def people_decide() -> bool:
     checks = {
         "step 5 has the final text": "Final text" in final and "RECORDED" in final,
         "step 5 has the judge panel": "Judge panel" in final and "see step 6" in final,
-        "step 5 panel shows the recorded n and kappa": _calibration() in final,
+        "step 5 panel shows the recorded n and kappa": bool(calibration) and calibration in final,
+        "step 5 judged every sentence": _judged(final),
         "step 6 has the chain": "entries, verified." in step6 and "append-only log" in step6,
         "author refused with 403": "403 · Authors cannot approve their own draft" in refused,
         "reviewer approves": "Approved by R. Reviewer" in approved,
