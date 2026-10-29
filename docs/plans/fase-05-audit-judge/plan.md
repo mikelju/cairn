@@ -37,7 +37,8 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | R5-R8 | revisor x4 | Round 1 review of increments 1, 2 and 4 (`git diff 3a92dd4 4dfb2d0`), four lenses, while increment 3 waits for the user | done | findings in the Adversarial review table |
 | E175 | ejecutor (Sonnet) | Round 1 fixes F1-F11 | done | d76bc9c; `npm run check` exit 0, 609 passed, 96.93% |
 | E176 | ejecutor (Sonnet) | Increment 3: record and calibrate the judge with Bedrock, retake the step 5 and 6 screenshots | blocked | `make record-judge AWS_PROFILE=default` refused twice by Bedrock with 403 "The security token included in the request is invalid"; 0 recordings, 0.0000 USD spent; the cloud container's AWS credentials are invalid or lack a session token; see U4; the recording itself was then done by the user (a1bbc69) |
-| E177 | ejecutor (Sonnet) | Increment 3 closing on the user's recordings: offline replay, screenshots, offline check, full check | in progress | |
+| E177 | ejecutor (Sonnet) | Increment 3 closing on the user's recordings: offline replay, screenshots, offline check, full check | done | 446cf9d; 41 recordings verified (sonnet-4-6, eu-west-1, summed cost 0.2708 USD); kappa 1.00 on n=24; step 5 16 of 16 judged, 2 warnings, 900 px; CI failure of a step 5 test that assumed no judge recordings fixed in the test; `npm run check` exit 0, 652 passed, 96.93%; offline check on an uncommitted thin layer because the image build's `uv sync` failed in this container |
+| R9-R10 | revisor x2 | Round 2 review of the round 1 fixes and increment 3 (`git diff 4dfb2d0 446cf9d`) | in progress | |
 
 ## User decisions
 Questions the supervisor raises to the user. Statuses: open, answered, deferred; closed with the literal answer.
