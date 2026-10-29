@@ -1,9 +1,9 @@
 import hashlib
+import importlib
 import json
 import re
 import shutil
 import sqlite3
-import sys
 from pathlib import Path
 
 import pytest
@@ -521,7 +521,13 @@ def _step5_thread(client: TestClient) -> str:
     return id_
 
 
-def test_step5_without_judge_recordings_shows_not_judged_and_the_rules_line() -> None:
+def test_step5_without_judge_recordings_shows_not_judged_and_the_rules_line(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    folder = tmp_path / "recordings"
+    shutil.copytree("recordings", folder, ignore=shutil.ignore_patterns("j-*.json"))
+    for name in ("cairn.web.people", "cairn.web.threads"):
+        monkeypatch.setattr(importlib.import_module(name), "RECORDINGS_DIR", folder)
     with TestClient(create_app()) as client:
         id_ = _step5_thread(client)
         page = client.get(f"/step/5?thread={id_}&actor=R.%20Reviewer").text
@@ -531,6 +537,17 @@ def test_step5_without_judge_recordings_shows_not_judged_and_the_rules_line() ->
         assert "Checks" not in page
         done = client.post("/step/5/approve", data={"thread": id_, "actor": "R. Reviewer"})
         assert "Approved by R. Reviewer" in done.text
+
+
+def test_step5_with_the_real_recordings_shows_real_verdicts(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CAIRN_THREADS_DB", str(tmp_path / "threads.db"))
+    with TestClient(create_app()) as client:
+        id_ = _step5_thread(client)
+        page = client.get(f"/step/5?thread={id_}&actor=R.%20Reviewer").text
+        assert "16 of 16 sentences judged" in page and "sonnet-4-6" in page
+        assert "n=24" in page and "kappa 1.00" in page and "EXAMPLE" in page
 
 
 def test_step5_lists_each_warning_and_the_example_and_approval_still_works(
@@ -553,7 +570,7 @@ def test_step5_lists_each_warning_and_the_example_and_approval_still_works(
     folder = tmp_path / "recordings"
     shutil.copytree("recordings", folder)  # the real draft, no judge files yet
     for name in ("cairn.web.people", "cairn.web.threads"):
-        monkeypatch.setattr(sys.modules[name], "RECORDINGS_DIR", folder)
+        monkeypatch.setattr(importlib.import_module(name), "RECORDINGS_DIR", folder)
     monkeypatch.setenv("CAIRN_THREADS_DB", str(tmp_path / "threads.db"))
     state = gather_state()
     model = recorded_model(folder, "DRAFT", DEFAULT_MODEL)
