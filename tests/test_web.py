@@ -5,6 +5,7 @@ import re
 import shutil
 import sqlite3
 from pathlib import Path
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -661,6 +662,19 @@ def test_step7_rest_door_goes_through_the_http_route(monkeypatch: pytest.MonkeyP
         page = client.get(f"/step/7?thread={id_}").text
     assert "The hashes differ." in page and "Same hash" not in page
     assert "xxxxxxxxxxxxxxxx" in page
+
+
+def test_step7_survives_a_non_http_error_in_the_rest_door(monkeypatch: pytest.MonkeyPatch) -> None:
+    def broken(name: str, args: dict[str, Any]) -> dict[str, Any]:
+        raise KeyError(name)
+
+    with TestClient(create_app(), follow_redirects=False) as client:
+        id_ = _filled_thread(client)
+        client.post("/step/4/confirm", data={"thread": id_, "actor": "R. Reviewer"})
+        monkeypatch.setattr(app_module, "call_tool", broken)
+        reply = client.get(f"/step/7?thread={id_}")
+    assert reply.status_code == 200
+    assert "HTTP 500" in reply.text and "The hashes differ." in reply.text
 
 
 def test_step6_says_where_the_chain_is_broken(

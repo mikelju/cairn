@@ -32,10 +32,10 @@ demo-offline-check: build
 # MSYS_NO_PATHCONV stops Git Bash from rewriting /healthz into a Windows path; exported by make so cmd runs it too.
 deploy: export MSYS_NO_PATHCONV := 1
 # Only the variables already set in make's environment go to the container (set them with $env: or export, never on the command line).
-# Values must not contain commas or spaces. The deployment line is silent so make does not print them.
+# Values may only have letters, digits and hyphens (make and the shell would reinterpret $, commas and spaces). The deployment line is silent so make does not print them.
 comma := ,
 space := $(empty) $(empty)
-DEPLOY_VARS = CAIRN_ACCESS_CODE CAIRN_LIVE_CAP_USD AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
+DEPLOY_VARS = CAIRN_ACCESS_CODE CAIRN_LIVE_CAP_USD
 DEPLOY_ENV = $(subst $(space),$(comma),$(strip $(foreach v,$(DEPLOY_VARS),$(if $($(v)),$(v)=$($(v))))))
 deploy: $(if $(SKIP_BUILD),,build)
 	aws lightsail get-container-services --service-name $(SERVICE) --region $(REGION) > /dev/null 2>&1 \
@@ -43,7 +43,7 @@ deploy: $(if $(SKIP_BUILD),,build)
 	aws lightsail push-container-image --service-name $(SERVICE) --label app --image $(IMAGE) --region $(REGION)
 	@echo "deploying with environment variables: $(foreach v,$(DEPLOY_VARS),$(if $($(v)),$(v)))"
 	@aws lightsail create-container-service-deployment --service-name $(SERVICE) --region $(REGION) \
-		--containers "app={image=$$(aws lightsail get-container-images --service-name $(SERVICE) --region $(REGION) --query 'containerImages[0].image' --output text),$(if $(DEPLOY_ENV),environment={$(DEPLOY_ENV)},)ports={8000=HTTP}}" \
+		--containers "app={image=$$(aws lightsail get-container-images --service-name $(SERVICE) --region $(REGION) --query 'containerImages[0].image' --output text),$(if $(DEPLOY_ENV),environment={$(DEPLOY_ENV)}$(comma))ports={8000=HTTP}}" \
 		--public-endpoint "containerName=app,containerPort=8000,healthCheck={path=/healthz}"
 	uv run python -m cairn.wait_running $(SERVICE) $(REGION)
 	aws lightsail get-container-services --service-name $(SERVICE) --region $(REGION) --query 'containerServices[0].[state,url]' --output text

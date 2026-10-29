@@ -322,7 +322,7 @@ async def _two_doors(request: Request) -> tuple[str, str]:
     """
     async with Client(request.app.state.mcp) as client:
         over_mcp = (await client.call_tool("study_design", {})).structured_content or {}
-    transport = httpx.ASGITransport(app=request.app)
+    transport = httpx.ASGITransport(app=request.app, raise_app_exceptions=False)
     async with httpx.AsyncClient(transport=transport, base_url="http://cairn") as http:
         reply = await http.post("/api/tools/study_design", json={})
     over_rest = reply.json().get("content_sha256") if reply.status_code == 200 else None
