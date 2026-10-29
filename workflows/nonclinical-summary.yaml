@@ -1,0 +1,18 @@
+name: nonclinical-summary
+steps: [gather, draft, await_decisions, verify_final, judge, await_approval, approve]
+pauses: [await_decisions, await_approval]
+gather:
+  - tool: study_design
+  - tool: incidence
+  - tool: body_weight_change
+    arguments: {sex: F}
+  - tool: body_weight_change
+    arguments: {sex: M}
+  - tool: tk_summary
+    arguments: {sex: M, dose: 20.0, day: 1.0}
+guidance: [NS1, NS2]
+prompt: ../src/cairn/prompts/draft.md
+prompt_version: draft-1
+recording: DRAFT
+sections: [design, findings, tk, noael]
+quality_note: {section: tk, obs: O5}

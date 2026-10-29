@@ -47,6 +47,8 @@ from cairn.recording import (
     total_cost,
 )
 from cairn.workflow import (
+    NONCLINICAL_SUMMARY,
+    Workflow,
     draft_key,
     draft_sections,
     final_sentences,
@@ -163,20 +165,25 @@ def record_questions(
 DRAFT_BUDGET_USD = 2.0  # decision O1 of phase 04
 
 
-def record_draft(directory: Path, model: str) -> Path:
-    """Record the one draft call; save only if the example decisions, confirmed, verify green."""
+def record_draft(directory: Path, model: str, workflow: Workflow = NONCLINICAL_SUMMARY) -> Path:
+    """Record the one draft call; save only if the draft, with example decisions when the
+    workflow has them, verifies green."""
     from cairn.decisions import enumerate_slots, example_decisions
     from cairn.workflow import build_ledger
 
-    state = gather_state()
-    recorder = RecordingClient(make_client(Mode.RECORD), draft_key(model), REGION)
-    state["sections"] = draft_sections(state, LLMGateway(Mode.RECORD, client=recorder), model)
-    slots = enumerate_slots(build_ledger(state))
-    state["decisions"] = [
-        d.model_dump() for d in example_decisions(slots, "Recorder", date.today().isoformat())
-    ]
-    state["confirmed"] = ["F", "M"]
-    verdict = verify_final(state)
+    state = gather_state(workflow)
+    key = draft_key(model, workflow)
+    recorder = RecordingClient(make_client(Mode.RECORD), key, REGION)
+    state["sections"] = draft_sections(
+        state, LLMGateway(Mode.RECORD, client=recorder), model, workflow
+    )
+    if "await_decisions" in workflow.steps:
+        slots = enumerate_slots(build_ledger(state))
+        state["decisions"] = [
+            d.model_dump() for d in example_decisions(slots, "Recorder", date.today().isoformat())
+        ]
+        state["confirmed"] = ["F", "M"]
+    verdict = verify_final(state, workflow)
     if not verdict.ok:
         raise ValueError("the draft fails the rules: " + "; ".join(map(str, verdict.failures)))
     return recorder.save(directory)

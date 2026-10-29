@@ -11,56 +11,100 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Annotated, Any, TypedDict
 
+import yaml
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
-from pydantic import BaseModel, Field, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError, create_model
 
-from cairn.body_weight import body_weight_change
 from cairn.content import DecisionRef, ObservationLedger, QuoteRef, Sentence, Text, ValueRef
 from cairn.decisions import Decision, apply_decisions, noael_sentence
 from cairn.gateway import LLMGateway
-from cairn.incidence import incidence
 from cairn.judge import not_judged, replay_judge
 from cairn.loop import _has_digit, _shown, strictify
 from cairn.observation import Observation, check_build
 from cairn.recording import RecordingKey, tool_schema_hash
 from cairn.render import render_sentence
-from cairn.tk_summary import tk_summary
-from cairn.tools import call_tool, study_design
+from cairn.tools import REGISTRY, call_tool
 from cairn.verify import Verdict, data_quality_note, verify
 
-DRAFT_ID = "DRAFT"
 DRAFT_TOOL = "write_draft"
-DRAFT_PROMPT = (Path(__file__).parent / "prompts" / "draft.md").read_text(encoding="utf-8")
-DRAFT_PROMPT_VERSION = "draft-1"
-SECTIONS = ("design", "findings", "tk", "noael")
-TK_OBS = "O5"
-GUIDANCE_QUERIES = ("NS1", "NS2")
+STEPS = ("gather", "draft", "await_decisions", "verify_final", "judge", "await_approval", "approve")
 QUERIES_PATH = Path(__file__).parents[2] / "data" / "guidance" / "fixed_queries.json"
+WORKFLOWS_DIR = Path(__file__).parents[2] / "workflows"
+
+
+class WorkflowError(ValueError):
+    """A workflow file that cannot be loaded; the message names the file and the problem."""
+
+
+class GatherCall(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    tool: str
+    arguments: dict[str, Any] = {}
+
+
+class QualityNote(BaseModel):
+    """The fixed data-quality sentence that code appends to a section."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    section: str
+    obs: str
 
 
 class Workflow(BaseModel):
-    """The shape of a workflow: the steps in order and the steps that wait for a person."""
+    """A workflow as its YAML file says it: the steps, the pauses, what to gather and draft."""
+
+    model_config = ConfigDict(extra="forbid")
 
     name: str
     steps: list[str]
     pauses: list[str]
+    gather: list[GatherCall]  # study tools, in order: ledger IDs O1..On
+    guidance: list[str] = []  # fixed queries searched after the tools (ledger IDs go on)
+    prompt: str  # path of the drafting prompt, relative to the workflows folder
+    prompt_version: str
+    recording: str  # the question ID of the draft recording
+    sections: list[str]  # in order; the model drafts all of them but "noael", which code writes
+    quality_note: QualityNote | None = None
+
+    def validate_content(self) -> None:
+        if unknown := [step for step in self.steps if step not in STEPS]:
+            raise ValueError(f"unknown step {unknown[0]}; known steps: {', '.join(STEPS)}")
+        if unknown := [step for step in self.pauses if step not in self.steps]:
+            raise ValueError(f"pause {unknown[0]} is not one of the steps")
+        if unknown := [c.tool for c in self.gather if c.tool not in REGISTRY]:
+            raise ValueError(f"unknown tool {unknown[0]}; known tools: {', '.join(REGISTRY)}")
+        if self.quality_note and self.quality_note.section not in self.sections:
+            raise ValueError(f"quality note section {self.quality_note.section} is not a section")
+
+    @property
+    def drafted(self) -> list[str]:
+        return [name for name in self.sections if name != "noael"]
+
+    @property
+    def prompt_text(self) -> str:
+        return (WORKFLOWS_DIR / self.prompt).read_text(encoding="utf-8")
 
 
-NONCLINICAL_SUMMARY = Workflow(
-    name="nonclinical-summary",
-    steps=[
-        "gather",
-        "draft",
-        "await_decisions",
-        "verify_final",
-        "judge",
-        "await_approval",
-        "approve",
-    ],
-    pauses=["await_decisions", "await_approval"],
-)
+def load_workflow(name: str, directory: Path = WORKFLOWS_DIR) -> Workflow:
+    """Read `<name>.yaml` into a Workflow, or raise WorkflowError saying what is wrong."""
+    path = directory / f"{name}.yaml"
+    try:
+        workflow = Workflow.model_validate(yaml.safe_load(path.read_text(encoding="utf-8")))
+        workflow.validate_content()
+    except (OSError, yaml.YAMLError, ValidationError, ValueError) as error:
+        raise WorkflowError(f"{path.name}: {error}") from error
+    return workflow
+
+
+NONCLINICAL_SUMMARY = load_workflow("nonclinical-summary")
+DRAFT_ID = NONCLINICAL_SUMMARY.recording
+DRAFT_PROMPT_VERSION = NONCLINICAL_SUMMARY.prompt_version
+SECTIONS = tuple(NONCLINICAL_SUMMARY.sections)
+TK_OBS = "O5"
 
 
 # The draft schema: like the question loop's, but a part may also point to a decision slot.
@@ -71,27 +115,29 @@ class DraftSentence(Sentence):
     parts: list[DraftPart]
 
 
-class DraftOutput(BaseModel):
-    design: list[DraftSentence]
-    findings: list[DraftSentence]
-    tk: list[DraftSentence]
+def draft_output(workflow: Workflow) -> type[BaseModel]:
+    """The draft schema: one list of sentences per section the model writes."""
+    fields: Any = {name: (list[DraftSentence], ...) for name in workflow.drafted}
+    return create_model("DraftOutput", **fields)
 
 
-def draft_tool() -> dict[str, Any]:
+def draft_tool(workflow: Workflow = NONCLINICAL_SUMMARY) -> dict[str, Any]:
     return {
         "name": DRAFT_TOOL,
         "description": "Write the design, findings and toxicokinetics sections of the draft.",
         "strict": True,
-        "input_schema": strictify(DraftOutput.model_json_schema()),
+        "input_schema": strictify(draft_output(workflow).model_json_schema()),
     }
 
 
-def draft_schema_hash() -> str:
-    return tool_schema_hash([draft_tool()])
+def draft_schema_hash(workflow: Workflow = NONCLINICAL_SUMMARY) -> str:
+    return tool_schema_hash([draft_tool(workflow)])
 
 
-def draft_key(model: str) -> RecordingKey:
-    return RecordingKey(DRAFT_ID, DRAFT_PROMPT_VERSION, draft_schema_hash(), model)
+def draft_key(model: str, workflow: Workflow = NONCLINICAL_SUMMARY) -> RecordingKey:
+    return RecordingKey(
+        workflow.recording, workflow.prompt_version, draft_schema_hash(workflow), model
+    )
 
 
 class State(TypedDict, total=False):
@@ -115,10 +161,12 @@ def build_ledger(state: State) -> ObservationLedger:
     return ledger
 
 
-def sections_of(state: State) -> list[Sentence]:
+def sections_of(state: State, workflow: Workflow = NONCLINICAL_SUMMARY) -> list[Sentence]:
     adapter = TypeAdapter(list[Sentence])
     sections = state.get("sections", {})
-    return [s for name in SECTIONS for s in adapter.validate_python(sections.get(name, []))]
+    return [
+        s for name in workflow.sections for s in adapter.validate_python(sections.get(name, []))
+    ]
 
 
 def final_ledger(state: State) -> ObservationLedger:
@@ -129,9 +177,9 @@ def final_ledger(state: State) -> ObservationLedger:
     return ledger
 
 
-def verify_final(state: State) -> Verdict:
+def verify_final(state: State, workflow: Workflow = NONCLINICAL_SUMMARY) -> Verdict:
     """Pure: the verdict on the draft once the decisions and confirmations are applied."""
-    return verify(sections_of(state), final_ledger(state))
+    return verify(sections_of(state, workflow), final_ledger(state))
 
 
 def shown_facts(ledger: ObservationLedger, obs_ids: Iterable[str]) -> str:
@@ -151,20 +199,15 @@ def final_sentences(state: State) -> list[tuple[str, str]]:
     ]
 
 
-def gather_state() -> State:
-    """Run the study tools in a fixed order (ledger IDs O1..O5) and the two guidance searches."""
+def gather_state(workflow: Workflow = NONCLINICAL_SUMMARY) -> State:
+    """Run the workflow's study tools in order (ledger IDs O1..) and its guidance searches."""
     check_build()
-    observations = [
-        study_design(),
-        incidence(),
-        body_weight_change(sex="F"),
-        body_weight_change(sex="M"),
-        tk_summary(sex="M", dose=20.0, day=1.0),
-    ]
     queries = {q["id"]: q["query"] for q in json.loads(QUERIES_PATH.read_text("utf-8"))["queries"]}
     return {
-        "observations": [o.model_dump(mode="json") for o in observations],
-        "guidance": [call_tool("search_guidance", {"query": queries[q]}) for q in GUIDANCE_QUERIES],
+        "observations": [call_tool(c.tool, c.arguments) for c in workflow.gather],
+        "guidance": [
+            call_tool("search_guidance", {"query": queries[q]}) for q in workflow.guidance
+        ],
     }
 
 
@@ -175,32 +218,33 @@ def slot_ids(state: State) -> list[str]:
 
 
 def draft_sections(
-    state: State, gateway: LLMGateway, model: str
+    state: State, gateway: LLMGateway, model: str, workflow: Workflow = NONCLINICAL_SUMMARY
 ) -> dict[str, list[dict[str, Any]]]:
     """One model call forced to write_draft; code adds the NOAEL section and the quality note."""
     ledger = build_ledger(state)
     shown = "\n".join(_shown(obs_id, ledger.get(obs_id)) for obs_id in ledger.ids)
-    message = f"Tool results:\n{shown}\n\nDecision slots, in order: {', '.join(slot_ids(state))}"
+    message = f"Tool results:\n{shown}"
+    if "await_decisions" in workflow.steps:
+        message += f"\n\nDecision slots, in order: {', '.join(slot_ids(state))}"
     reply = gateway.create(
         model,
         [{"role": "user", "content": message}],
-        system=DRAFT_PROMPT,
-        tools=[draft_tool()],
+        system=workflow.prompt_text,
+        tools=[draft_tool(workflow)],
         tool_choice={"type": "tool", "name": DRAFT_TOOL},
     )
     uses = [b for b in reply.content if b.get("type") == "tool_use" and b["name"] == DRAFT_TOOL]
     if not uses:
         raise ValueError(f"the model did not write a draft: {reply.message or reply.stop_reason}")
-    out = DraftOutput.model_validate(uses[0]["input"])
-    if _has_digit([*out.design, *out.findings, *out.tk]):
+    out = draft_output(workflow).model_validate(uses[0]["input"])
+    written: dict[str, list[Sentence]] = {name: [*getattr(out, name)] for name in workflow.drafted}
+    if _has_digit([s for items in written.values() for s in items]):
         raise ValueError("the model wrote a digit; rejected before rendering")
-    sections: dict[str, list[Sentence]] = {
-        "design": [*out.design],
-        "findings": [*out.findings],
-        "tk": [*out.tk, data_quality_note(TK_OBS)],
-        "noael": [noael_sentence("F"), noael_sentence("M")],
-    }
-    return {name: [s.model_dump(mode="json") for s in items] for name, items in sections.items()}
+    if note := workflow.quality_note:
+        written[note.section].append(data_quality_note(note.obs))
+    if "noael" in workflow.sections:
+        written["noael"] = [noael_sentence("F"), noael_sentence("M")]
+    return {name: [s.model_dump(mode="json") for s in written[name]] for name in workflow.sections}
 
 
 def build_graph(
@@ -216,17 +260,17 @@ def build_graph(
     """
 
     async def gather(state: State) -> State:
-        return gather_state()
+        return gather_state(workflow)
 
     async def draft(state: State) -> State:
-        return {"sections": draft_sections(state, gateway, model)}
+        return {"sections": draft_sections(state, gateway, model, workflow)}
 
     async def await_decisions(state: State) -> State:
         answer = interrupt({"waiting": "decisions", "slots": slot_ids(state)})
         return {"decisions": answer["decisions"], "confirmed": answer.get("confirmed", [])}
 
     async def verify_node(state: State) -> State:
-        verdict = verify_final(state)
+        verdict = verify_final(state, workflow)
         failures = [str(f) for f in verdict.failures]
         return {"final": {"ok": verdict.ok, "text": verdict.text, "failures": failures}}
 
