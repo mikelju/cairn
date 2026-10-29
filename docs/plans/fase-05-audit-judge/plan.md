@@ -1,6 +1,6 @@
 # Phase 05 - Audit and judge: plan and results
 
-Status: in progress
+Status: ready locally
 Spec: `spec.md` (approved by the user on 2026-10-28, see U1 and U2)
 Base: branch `claude/jolly-knuth-g8jdjq` from `main` at 3a92dd4 (phase 04 merged, PR https://github.com/mikelju/cairn/pull/12)
 
@@ -40,7 +40,7 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | E177 | ejecutor (Sonnet) | Increment 3 closing on the user's recordings: offline replay, screenshots, offline check, full check | done | 446cf9d; 41 recordings verified (sonnet-4-6, eu-west-1, summed cost 0.2708 USD); kappa 1.00 on n=24; step 5 16 of 16 judged, 2 warnings, 900 px; CI failure of a step 5 test that assumed no judge recordings fixed in the test; `npm run check` exit 0, 652 passed, 96.93%; offline check on an uncommitted thin layer because the image build's `uv sync` failed in this container |
 | R9-R10 | revisor x2 | Round 2 review of the round 1 fixes and increment 3 (`git diff 4dfb2d0 446cf9d`) | done | findings in the Adversarial review table |
 | E178 | ejecutor (Sonnet) | Round 2 fixes G1-G4 and the real image build (G5) | done | e2b315d; `npm run check` exit 0, 656 passed, 96.97%; image workflow https://github.com/mikelju/cairn/actions/runs/40834712107 success on e2b315d (native amd64 build of the committed Dockerfile with `cairn guidance check`); its artifact loaded and `python -m cairn.offline_check` with `--network none` exit 0, steps 1-6 ok including n, kappa and judged sentences |
-| E179 | ejecutor (Sonnet) | Delivery: C13 grep, push, PR to `main`, checks | in progress | |
+| E179 | ejecutor (Sonnet) | Delivery: C13 grep, push, PR to `main`, checks | done | 5df7dfb; PR https://github.com/mikelju/cairn/pull/13; `evals` green on dc9e8df (runs 40835625342 and 40835550049); 12-digit and GxP grep clean; PRD-term grep pending for the user |
 
 ## User decisions
 Questions the supervisor raises to the user. Statuses: open, answered, deferred; closed with the literal answer.
