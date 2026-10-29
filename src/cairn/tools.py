@@ -1,7 +1,8 @@
 """The tool registry: one list of typed functions served over MCP, REST and the CLI."""
 
+import threading
 from collections.abc import Callable
-from functools import lru_cache
+from contextvars import ContextVar
 from typing import Any
 
 from pydantic import BaseModel, ValidationError, validate_call
@@ -59,11 +60,20 @@ def study_design() -> Observation:
     )
 
 
-@lru_cache(maxsize=1)
-def _live_index() -> Any:  # pragma: no cover - needs the weights; record and live modes only
-    from cairn import retrieval
+LIVE_SEARCH: ContextVar[bool] = ContextVar("live_search", default=False)
+_index_lock = threading.Lock()
+_index: Any = None
 
-    return retrieval.build_index()
+
+def _live_index() -> Any:
+    """The shared index, built once even when the first live requests arrive together (SEC-003)."""
+    global _index
+    with _index_lock:
+        if _index is None:
+            from cairn import retrieval
+
+            _index = retrieval.build_index()
+        return _index
 
 
 def search_guidance(query: str) -> dict[str, Any]:
@@ -75,7 +85,7 @@ def search_guidance(query: str) -> dict[str, Any]:
     """
     from cairn import retrieval
 
-    if mode_from_env() is Mode.REPLAY:
+    if mode_from_env() is Mode.REPLAY and not LIVE_SEARCH.get():
         guidance = retrieval.cached_guidance(query)
     else:  # pragma: no cover - needs the weights
         guidance = retrieval.search_guidance(_live_index(), query)

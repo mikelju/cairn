@@ -232,18 +232,24 @@ def _step2_context(question_id: str, directory: Path) -> dict[str, Any]:
     client = ReplayClient.load(directory, key)
     recording = client.recording
     result = ask(QUESTIONS[question_id], LLMGateway(Mode.REPLAY, client=client), model)
-    verdict = result.verdict
     cost = total_cost(recording)
     latency = sum(float(call.get("latency_s", 0.0)) for call in recording["calls"])
     fixture = recording.get("source") == "fixture"
+    meta = (
+        f"{recording['date']} | {recording['region']} | {recording['model']} | "
+        f"{latency:.1f} s | " + ("cost n/a" if cost is None else f"{cost:.2f} USD")
+    )
+    return result_context(result, "FIXTURE" if fixture else "RECORDED", meta)
+
+
+def result_context(result: LoopResult, badge: str, meta: str) -> dict[str, Any]:
+    """The template data of one answered, declined or rejected question, recorded or live."""
+    verdict = result.verdict
     doses, rows = _screen(result)
     trace = " -> ".join(step.tool for step in result.steps if step.tool in STUDY_TOOLS)
     return {
-        "badge": "FIXTURE" if fixture else "RECORDED",
-        "meta": (
-            f"{recording['date']} | {recording['region']} | {recording['model']} | "
-            f"{latency:.1f} s | " + ("cost n/a" if cost is None else f"{cost:.2f} USD")
-        ),
+        "badge": badge,
+        "meta": meta,
         "trace": trace,
         "status": result.status.value,
         "message": result.message,
@@ -372,7 +378,10 @@ async def highlight_image(name: str) -> FileResponse:
 @router.get("/explore", response_class=HTMLResponse)
 async def explore(request: Request) -> HTMLResponse:
     badge = _step2_badge(_recordings_dir())
-    return _page(request, "explore.html", current=0, questions=QUESTIONS, page_badge=badge)
+    live = bool(os.environ.get("CAIRN_ACCESS_CODE"))
+    return _page(
+        request, "explore.html", current=0, questions=QUESTIONS, page_badge=badge, live=live
+    )
 
 
 @router.post("/explore/run", response_class=HTMLResponse)
@@ -387,6 +396,7 @@ def explore_run(request: Request, question: Annotated[str, Form()]) -> HTMLRespo
 
 
 def mount_web(app: FastAPI) -> None:
+    from cairn.web.explore_live import explore_live
     from cairn.web.people import people  # imports this module's helpers, so it loads late
 
     app.state.commit = _commit()
@@ -394,4 +404,5 @@ def mount_web(app: FastAPI) -> None:
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
     app.include_router(router)
     app.include_router(people)
+    app.include_router(explore_live)
     app.include_router(threads)

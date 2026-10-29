@@ -1,6 +1,6 @@
 """Laptop-only commands that can reach Bedrock: ask, record and smoke.
 
-Nothing in the web package imports this module (decision D8).
+Only the gated live Explore route (`web/explore_live.py`) imports this module (D8, phase 06).
 """
 
 import json
