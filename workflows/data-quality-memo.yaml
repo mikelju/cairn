@@ -1,0 +1,13 @@
+name: data-quality-memo
+steps: [gather, draft, verify_final]
+pauses: []
+gather:
+  - tool: study_design
+  - tool: incidence
+  - tool: tk_summary
+    arguments: {sex: M, dose: 20.0, day: 1.0}
+prompt: data-quality-memo.md
+prompt_version: memo-1
+recording: MEMO
+sections: [design, screen, tk]
+quality_note: {section: tk, obs: O3}
