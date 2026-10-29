@@ -27,7 +27,7 @@ It works if a person with no context finishes the 7-step web walkthrough in 5 mi
 | 03 | RAG over public guidelines: 4 guidelines with pinned SHA-256, hybrid index with reranker, `search_guidance`, QuoteRef, rule 8, highlighted page, E3, E4, Explore with recorded questions and step 3 | 02c | integrated |
 | 04 | People decide: `nonclinical-summary` workflow in LangGraph with two pauses, DecisionRef, decision form and model-free NOAEL rule, 403 and 409, E6 and steps 4 and 5 without judge | 03 | integrated |
 | 05 | Audit and judge: per-session SHA-256 chain with verify and tampering, calibrated Sonnet judge (E5, kappa), judge panel in step 5 and step 6 | 04 | integrated (PR https://github.com/mikelju/cairn/pull/13) |
-| 06 | Live question and delivery: live Explore behind an access code and cap, remaining step 1 switches, step 7, configuration-only `data-quality-memo` workflow, clean-clone and timed tests, documentation and v0.1.0 | 05 | in progress |
+| 06 | Live question and delivery: live Explore behind an access code and cap, remaining step 1 switches, step 7, configuration-only `data-quality-memo` workflow, clean-clone and timed tests, documentation and v0.1.0 | 05 | ready locally (PR https://github.com/mikelju/cairn/pull/14) |
 
 Statuses: pending, spec in review, spec approved, in progress, blocked, ready locally, integrated.
 Only the user adds, removes or reorders phases; the agent proposes.
