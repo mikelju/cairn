@@ -1,7 +1,7 @@
 # Phase 06 - Live question and delivery: plan and results
 
 Status: in progress
-Spec: `spec.md` (spec in review, see U1)
+Spec: `spec.md` (spec approved, see U1)
 Base: branch `claude/fase-06-live-delivery-b608ff` from `main` at d7a68e3 (phase 05 merged, PR https://github.com/mikelju/cairn/pull/13)
 
 ## Records
@@ -33,13 +33,14 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | E180 | explorador | Summary of PRs 12 and 13 and PRD-term grep of phases 04 and 05 | done | Summary returned; PRD-term grep 0 hits |
 | E181 | ejecutor | Draft spec and plan of phase 06 (document mode); mark phase 05 integrated | done | Spec and plan drafted, b267d69 |
 | E182 | ejecutor (Sonnet) | Lavish page for phase 06 decisions | done | `.lavish/fase-06.html` (git-ignored) with 3 diagrams and the 6 open decisions as a poll |
+| E183 | ejecutor (Sonnet) | Increment 1: live Explore behind code and cap, SEC-003 | in progress | |
 
 ## User decisions
 Questions the supervisor raises to the user. Statuses: open, answered, deferred; closed with the literal answer.
 
 | ID | Question | Options and recommendation | Status | User answer |
 |---|---|---|---|---|
-| U1 | Spec open decisions O1-O6 and approval of the spec | See `spec.md`, Open decisions; recommended A for all six | open | |
+| U1 | Spec open decisions O1-O6 and approval of the spec | See `spec.md`, Decisions; recommended A for all six | answered | "Apruebo la spec de la fase 06 con A en O1-O6, tope Bedrock de 2 USD para la fase y 2 USD/día para la pregunta en vivo. Ejecuta con Sonnet 5.5 hasta la PR." |
 
 ## Deviations
 | ID | Summary | Affects criteria | Status |
