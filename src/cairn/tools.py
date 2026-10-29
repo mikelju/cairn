@@ -87,7 +87,7 @@ def search_guidance(query: str) -> dict[str, Any]:
 
     if mode_from_env() is Mode.REPLAY and not LIVE_SEARCH.get():
         guidance = retrieval.cached_guidance(query)
-    else:  # pragma: no cover - needs the weights
+    else:
         guidance = retrieval.search_guidance(_live_index(), query)
     result = guidance.model_dump(mode="json")
     passages = stored_passages()

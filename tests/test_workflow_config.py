@@ -1,5 +1,6 @@
 """Workflow YAML loading: the shipped files load, and a bad file is rejected with a clear error."""
 
+import re
 from pathlib import Path
 
 import pytest
@@ -22,6 +23,16 @@ def test_workflow_config_nonclinical_summary_loads_as_before() -> None:
         (GOOD.replace("tool: incidence", "tool: guess"), "unknown tool guess"),
         (GOOD.replace("name: nonclinical-summary\n", ""), "name"),
         (GOOD.replace("pauses: [await_decisions", "pauses: [nowhere, await_decisions"), "nowhere"),
+        (
+            GOOD.replace("[gather, draft", "[gather, gather, draft", 1),
+            "gather appears more than once",
+        ),
+        (
+            re.sub(r"^steps: .*$", "steps: []", GOOD, flags=re.M).replace(
+                "pauses: [await_decisions, await_approval]", "pauses: []"
+            ),
+            "steps is empty",
+        ),
         ("name: [unclosed", "nonclinical-summary.yaml"),
     ],
 )

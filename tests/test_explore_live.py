@@ -12,6 +12,8 @@ from fastapi.testclient import TestClient
 
 from cairn import live, retrieval, tools
 from cairn.app import create_app
+from cairn.gateway import DEFAULT_MODEL
+from cairn.pricing import call_cost
 from cairn.web import explore_live
 
 LIVE_RUN = {
@@ -87,9 +89,14 @@ def test_explore_live_answers_with_real_badge_and_never_shows_the_code(live_box:
 
 
 def test_explore_live_shows_a_cut_or_a_failure_as_is(live_box: LiveFake) -> None:
-    live_box.replies = [{"stop_reason": "max_tokens", "content": [], "usage": {}}]
+    partial = LIVE_ANSWER["content"]
+    live_box.replies = [{"stop_reason": "max_tokens", "content": partial, "usage": {}}]
     page = ask_box("s3cret")
-    assert "cut off" in page and "<strong>No data" not in page
+    assert "cut off" in page and "No data." not in page
+    live_box.calls = 0
+    live_box.replies = [{"stop_reason": "refusal", "content": [], "usage": {}}]
+    declined = ask_box("s3cret")
+    assert "declined" in declined and "No data." not in declined
     live_box.replies = [TimeoutError("slow")]
     assert "The live call failed (TimeoutError)" in ask_box("s3cret")
 
@@ -192,3 +199,57 @@ def test_live_index_loads_the_reranker_once(monkeypatch: pytest.MonkeyPatch) -> 
 def test_live_cap_default_and_bad_value(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CAIRN_LIVE_CAP_USD", "oops")
     assert explore_live.daily_cap() == 2.0
+
+
+def test_live_cap_counts_the_spend_of_calls_made_before_a_failure(live_box: LiveFake) -> None:
+    live_box.replies = [LIVE_RUN, LIVE_RUN, TimeoutError("slow")]
+    ask_box("s3cret")
+    real = 2 * call_cost(DEFAULT_MODEL, 1000, 100)
+    assert explore_live.spent_today() == pytest.approx(real + live.call_ceiling(DEFAULT_MODEL))
+    assert live_box.calls == 3
+
+
+def test_live_cap_is_checked_again_once_the_lock_is_held(live_box: LiveFake) -> None:
+    class Lock:  # another question finishes and uses the budget while this one waits
+        def acquire(self, blocking: bool = True) -> bool:
+            explore_live._add_spend(5.0)
+            return True
+
+        def release(self) -> None:
+            pass
+
+    explore_live._busy = Lock()  # type: ignore[assignment]
+    try:
+        assert "daily live budget" in ask_box("s3cret")
+    finally:
+        explore_live._busy = threading.Lock()
+    assert live_box.calls == 0
+
+
+@pytest.mark.parametrize("value", ["nan", "inf", "-inf", "-1"])
+def test_live_cap_ignores_a_non_finite_or_negative_value(
+    monkeypatch: pytest.MonkeyPatch, value: str
+) -> None:
+    monkeypatch.setenv("CAIRN_LIVE_CAP_USD", value)
+    assert explore_live.daily_cap() == 2.0
+
+
+def test_live_question_reaches_the_search_tool_with_the_live_flag(
+    live_box: LiveFake, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: list[str] = []
+    guidance = retrieval.Guidance(
+        query="x", abstained=True, best_score=0.0, threshold=1.0, message="none", hits=[]
+    )
+
+    def fake_search(index: object, query: str) -> retrieval.Guidance:
+        seen.append(query)
+        return guidance
+
+    monkeypatch.setattr(tools, "_live_index", lambda: "index")
+    monkeypatch.setattr(retrieval, "search_guidance", fake_search)
+    monkeypatch.setenv("CAIRN_LLM_MODE", "replay")
+    search = {"type": "tool_use", "id": "s", "name": "search_guidance", "input": {"query": "x"}}
+    live_box.replies = [LIVE_RUN, {**LIVE_RUN, "content": [search]}, LIVE_ANSWER]
+    ask_box("s3cret")
+    assert seen == ["x"]

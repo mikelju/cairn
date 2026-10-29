@@ -4,7 +4,8 @@ Cairn is a demo on public data with a fictitious compound.
 This is what would change to run it for real; nothing here is built.
 
 ## Deployment
-- Today: one Lightsail container service (`make deploy`), one instance, no autoscaling, state in the image and in a local SQLite file.
+- Today: one Lightsail container service (`make deploy`), one instance, no autoscaling, state in the image; threads and their pauses live in memory unless `CAIRN_THREADS_DB` points to a SQLite file, and a restart loses what is in memory.
+- `make deploy` passes `CAIRN_ACCESS_CODE`, `CAIRN_LIVE_CAP_USD` and the AWS credential variables to the container only if they are set in the environment (use `$env:` first, never the command line; values without commas or spaces).
 - Production: managed database for threads, decisions and the audit chain; at least two instances behind a load balancer; deploy from CI with a rollback.
 - Offline mode (`make demo`) stays as the fallback and as the check that the recordings still replay.
 

@@ -80,7 +80,8 @@ def _result(
     extra = extra or []
     return {
         "injected": injected,
-        "total": report["quarantine"]["total"] + len(extra),
+        "reported": bool(extra),
+        "total": report["quarantine"]["total"],
         "rows": [r for r in rows if r["rule"] == RULE_AUC],
         "fired": [r for r in rows if r["rule"] == RULE_CONC] + extra,
         "with_bad": _number(naive["with_quarantined"]["mean"]),
@@ -169,10 +170,9 @@ async def step1(request: Request) -> HTMLResponse:
 @router.post("/step/1/run", response_class=HTMLResponse)
 async def step1_run(request: Request, switch: Annotated[str, Form()] = "none") -> HTMLResponse:
     extra: list[dict[str, Any]] = []
-    injected = switch != "none"
     if switch not in (*SWITCHES, "none"):
         raise HTTPException(status_code=422, detail="unknown switch")
-    if injected:
+    if switch != "none":
         report, extra = _revalidate(switch)
     else:
         runner: JobRunner = request.app.state.runner
@@ -180,7 +180,7 @@ async def step1_run(request: Request, switch: Annotated[str, Form()] = "none") -
         await runner.tasks[job.job_id]
         report = (runner.jobs[job.job_id].outputs or {})["report"]
     return templates.TemplateResponse(
-        request, "step1_result.html", {"r": _result(report, injected, extra)}
+        request, "step1_result.html", {"r": _result(report, switch == "negative", extra)}
     )
 
 

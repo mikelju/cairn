@@ -4,6 +4,7 @@ import json
 import re
 from typing import Annotated, Any
 
+import httpx
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastmcp import Client
@@ -22,7 +23,6 @@ from cairn.judge import (
 )
 from cairn.recording import RECORDINGS_DIR, ReplayClient, recorded_model, total_cost
 from cairn.render import render
-from cairn.tools import call_tool
 from cairn.verify import RULE_REASONS
 from cairn.web import _page as page
 from cairn.web import templates
@@ -299,7 +299,10 @@ async def step6(request: Request, thread: str | None = None, actor: str = REVIEW
 
 REPO = "https://github.com/mikelju/cairn"
 STEP7_LINKS = [
-    ("Data-quality memo commit and its evals check", f"{REPO}/commits/main/workflows"),
+    (
+        "Data-quality memo commit (no .py files; its evals check is green on the phase PR)",
+        f"{REPO}/commit/7897d079c8665301821fe0e0faffdfd988b6ce82",
+    ),
     ("Blocked bad PR", f"{REPO}/pull/6"),
     ("REST docs", "/docs"),
     ("MCP endpoint", "/mcp"),
@@ -313,10 +316,17 @@ PRODUCTION = [
 
 
 async def _two_doors(request: Request) -> tuple[str, str]:
-    """The same tool called over MCP and over REST: the content hash of each Observation."""
+    """The same tool called over MCP and over REST: the content hash of each Observation.
+
+    REST goes through the app's own HTTP route, in process, so a broken route shows as a failure.
+    """
     async with Client(request.app.state.mcp) as client:
         over_mcp = (await client.call_tool("study_design", {})).structured_content or {}
-    return str(over_mcp["content_sha256"]), str(call_tool("study_design", {})["content_sha256"])
+    transport = httpx.ASGITransport(app=request.app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://cairn") as http:
+        reply = await http.post("/api/tools/study_design", json={})
+    over_rest = reply.json().get("content_sha256") if reply.status_code == 200 else None
+    return str(over_mcp["content_sha256"]), str(over_rest or f"HTTP {reply.status_code}")
 
 
 @people.get("/step/7", response_class=HTMLResponse)

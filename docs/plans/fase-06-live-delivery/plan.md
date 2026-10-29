@@ -41,6 +41,7 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | E188 | ejecutor (Sonnet) | Increment 3: full check confirmation | done | `npm run check` green: 684 passed, 1 skipped, 97.07% coverage |
 | E189 | ejecutor (Sonnet) | Increment 5, docs: README, ADR-002, production, make changelog | done | README, ADR-002, production.md and `make changelog` (CHANGELOG.md generated from 11 merged PRs); commit 5dacc9e confirmed by the full `npm run check` of E190 (686 passed, 97.07% coverage) |
 | E190 | ejecutor (Sonnet) | Increment 4 record: memo recording, live evidence, full check | done | `npm run check` green on the committed tree: 686 passed, 97.07% coverage, `npm ls` and hooks tests; memo.json a1b76ec; `make demo-offline-check` of the clean clone pending |
+| E191 | ejecutor (Sonnet) | Round 1 review fixes | done | 12 findings fixed with regression tests; unfixed ones logged in Adversarial review; full `npm run check` green |
 
 ## User decisions
 Questions the supervisor raises to the user. Statuses: open, answered, deferred; closed with the literal answer.
@@ -56,6 +57,7 @@ Questions the supervisor raises to the user. Statuses: open, answered, deferred;
 ## Adversarial review
 | Round | Backend | Range | Lenses | Findings | Status |
 |---|---|---|---|---|---|
+| 1 | opus | `main...5dacc9e` | correctness, security and data, evidence and tests, scope | 12 confirmed, fixed in E191: partial live spend lost on failure, cap checked outside the lock, `nan`/`inf`/negative cap, REST door not over HTTP, step 7 memo link, empty or repeated workflow steps, step 1 false quarantine and "injected row" text, dead constants, untested live search and truncated/refusal paths, `make deploy` env, ADR-002 and production claims, no attempt limit (SEC-006). Recorded, not fixed: fixed `write_draft` description (changing it invalidates the W2 recording), no total time limit per question (6 x 45 s), repeated "DRAFT" literal, cost/latency computed in step 5 and step 7, sh quotes in `make changelog`, `VIDEO_URL` pending until the video, CHANGELOG generated before the merge (the user regenerates it with `make changelog` in its own PR after merging and before the tag), no test that the code is not logged (there is no logging), no security scanners installed | fixed, awaiting check |
 
 ## Results
 Per criterion: command or walkthrough run, observed result and reference to the evidence.

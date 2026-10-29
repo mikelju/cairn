@@ -1,5 +1,6 @@
 {% import "_components.html" as a %}
 <p class="figure"><strong>{{ r.total }}</strong> quarantined{% if r.injected %}, including the injected row{% endif %}.</p>
+{% if r.reported %}<p class="figure">The rule below fired and is reported; the validator does not quarantine it.</p>{% endif %}
 {% if r.fired %}
 {% set fired = namespace(rows=[]) %}
 {% for f in r.fired %}{% set fired.rows = fired.rows + [[f.rule, f.usubjid, f.test, f.value]] %}{% endfor %}

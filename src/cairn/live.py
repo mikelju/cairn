@@ -108,8 +108,27 @@ def ask_replay(question_id: str, directory: Path, model: str) -> LoopResult:
     return ask(QUESTIONS[question_id], LLMGateway(Mode.REPLAY, client=client), model)
 
 
-def ask_live(text: str, model: str) -> LoopResult:
-    return ask(text, LLMGateway(Mode.LIVE, client=make_client(Mode.LIVE)), model)
+class SpendGateway(LLMGateway):
+    """A live gateway that tallies its spend: real cost per call, the ceiling for a failed one."""
+
+    spent = 0.0
+
+    def create(self, model: str, *args: Any, **kwargs: Any) -> Any:
+        try:
+            reply = super().create(model, *args, **kwargs)
+        except Exception:
+            self.spent += call_ceiling(model)
+            raise
+        self.spent += call_cost(model, reply.input_tokens, reply.output_tokens)
+        return reply
+
+
+def spend_gateway() -> SpendGateway:
+    return SpendGateway(Mode.LIVE, client=make_client(Mode.LIVE))
+
+
+def ask_live(text: str, model: str, gateway: LLMGateway | None = None) -> LoopResult:
+    return ask(text, gateway or spend_gateway(), model)
 
 
 # Outcomes worth keeping as a recording; a truncated, capped or failed run is not saved.

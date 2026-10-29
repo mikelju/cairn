@@ -5,6 +5,7 @@ Without the code, with a wrong code, over the length limit or at the cap it make
 """
 
 import hmac
+import math
 import os
 import threading
 from datetime import UTC, date, datetime
@@ -34,9 +35,10 @@ def utc_today() -> date:
 
 def daily_cap() -> float:
     try:
-        return float(os.environ.get("CAIRN_LIVE_CAP_USD", DEFAULT_CAP_USD))
+        cap = float(os.environ.get("CAIRN_LIVE_CAP_USD", DEFAULT_CAP_USD))
     except ValueError:
         return DEFAULT_CAP_USD
+    return cap if math.isfinite(cap) and cap >= 0 else DEFAULT_CAP_USD
 
 
 def code_ok(code: str) -> bool:
@@ -77,11 +79,15 @@ def explore_ask_live(
     if not _busy.acquire(blocking=False):
         return _refused(request, "Another live question is running. Try again in a minute.")
     try:
+        if spent_today() >= daily_cap():  # a question that just finished may have used it up
+            return _refused(request, "The daily live budget is used up. Try a recorded question.")
+        gateway: live.SpendGateway | None = None
         token = LIVE_SEARCH.set(True)
         try:
-            result = live.ask_live(question, DEFAULT_MODEL)
-        except Exception as error:  # a timeout or a Bedrock error: count a call at its ceiling
-            _add_spend(live.call_ceiling(DEFAULT_MODEL))
+            gateway = live.spend_gateway()
+            result = live.ask_live(question, DEFAULT_MODEL, gateway)
+        except Exception as error:  # a timeout or a Bedrock error: count what the calls cost
+            _add_spend(gateway.spent if gateway else 0.0)
             return _refused(request, f"The live call failed ({type(error).__name__}).")
         finally:
             LIVE_SEARCH.reset(token)

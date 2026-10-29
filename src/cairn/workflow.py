@@ -71,6 +71,10 @@ class Workflow(BaseModel):
     quality_note: QualityNote | None = None
 
     def validate_content(self) -> None:
+        if not self.steps:
+            raise ValueError("steps is empty; a workflow needs at least one step")
+        if repeated := [step for step in dict.fromkeys(self.steps) if self.steps.count(step) > 1]:
+            raise ValueError(f"step {repeated[0]} appears more than once")
         if unknown := [step for step in self.steps if step not in STEPS]:
             raise ValueError(f"unknown step {unknown[0]}; known steps: {', '.join(STEPS)}")
         if unknown := [step for step in self.pauses if step not in self.steps]:
@@ -101,10 +105,8 @@ def load_workflow(name: str, directory: Path = WORKFLOWS_DIR) -> Workflow:
 
 
 NONCLINICAL_SUMMARY = load_workflow("nonclinical-summary")
-DRAFT_ID = NONCLINICAL_SUMMARY.recording
 DRAFT_PROMPT_VERSION = NONCLINICAL_SUMMARY.prompt_version
 SECTIONS = tuple(NONCLINICAL_SUMMARY.sections)
-TK_OBS = "O5"
 
 
 # The draft schema: like the question loop's, but a part may also point to a decision slot.

@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from cairn import app as app_module
 from cairn.app import create_app
 from cairn.fetch import VENDORED_DIR
 from cairn.ingest import DEFAULT_DB, ingest
@@ -62,7 +63,11 @@ def test_step1_switches_fire_their_rule_without_touching_the_sources(tmp_path: P
         plain = client.post("/step/1/run", data={"switch": "none"}).text
         for switch, (rule, shown) in expected.items():
             result = client.post("/step/1/run", data={"switch": switch}).text
-            assert "<strong>13</strong> quarantined, including the injected row" in result
+            if switch == "negative":
+                assert "<strong>13</strong> quarantined, including the injected row" in result
+            else:  # the validator reports these rules and does not quarantine them
+                assert "<strong>12</strong> quarantined." in result
+                assert "does not quarantine it" in result and "injected row" not in result
             assert 'class="new"' in result and rule in result and shown in result
             assert all(other not in result for other, _ in expected.values() if other != rule)
             assert rule not in plain
@@ -637,9 +642,25 @@ def test_step7_closes_the_session_with_one_tool_over_mcp_and_rest() -> None:
         hashes = re.findall(r"<td>(?:MCP|REST)</td><td>([0-9a-f]{16})</td>", page)
         assert len(hashes) == 2 and hashes[0] == hashes[1]
         assert client.get("/docs").status_code == 200
-        assert client.get("/mcp").status_code < 500 and client.get("/pull/6").status_code == 404
+        assert client.get("/mcp").status_code < 500
         assert 'href="https://github.com/mikelju/cairn/pull/6"' in page
+        assert (
+            'href="https://github.com/mikelju/cairn/commit/7897d079c8665301821fe0e0faffdfd988b6ce82"'
+            in page
+        )
         assert 'href="/docs"' in page and 'href="/mcp"' in page
+
+
+def test_step7_rest_door_goes_through_the_http_route(monkeypatch: pytest.MonkeyPatch) -> None:
+    with TestClient(create_app(), follow_redirects=False) as client:
+        id_ = _filled_thread(client)
+        client.post("/step/4/confirm", data={"thread": id_, "actor": "R. Reviewer"})
+        monkeypatch.setattr(
+            app_module, "call_tool", lambda name, args: {"content_sha256": "x" * 64}
+        )
+        page = client.get(f"/step/7?thread={id_}").text
+    assert "The hashes differ." in page and "Same hash" not in page
+    assert "xxxxxxxxxxxxxxxx" in page
 
 
 def test_step6_says_where_the_chain_is_broken(
