@@ -1,0 +1,25 @@
+[
+  {
+    "name": "species written by hand",
+    "expect_rules": [
+      7
+    ],
+    "sections": {
+      "design": [
+        {
+          "parts": [
+            {
+              "type": "text",
+              "text": "The study used a rat given doses of "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O1",
+              "field": "n_examined"
+            }
+          ]
+        }
+      ]
+    }
+  }
+]
