@@ -15,8 +15,11 @@
 {{ a.in_production("an editor with tracked changes.") }}
 </div>
 <div class="col-right card">
-<h2>Checks</h2>
-{{ a.data_table(["Check", "Result"], checks) }}
+<h2>Judge panel</h2>
+<p class="meta">{{ a.badge("RECORDED") }} {{ judge_meta }}</p>
+{% call a.callout("stale") %}<p>The judge warns and never blocks. {{ judged }} of {{ total }} sentences judged.</p>{% endcall %}
+{{ a.data_table(["Sentence", "Judge", "Reason"], judge_rows) }}
+<p><a href="/step/6?thread={{ thread }}&amp;actor={{ actor }}">{{ rules }}</a></p>
 </div>
 {% endcall %}
 {% endblock %}

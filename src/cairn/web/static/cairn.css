@@ -153,6 +153,8 @@ h1 { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); f
 .badge.computed-at-build::before { content: "\25A3"; }
 .badge.simulated { background: var(--color-surface); border-style: dashed; border-color: var(--color-simulated); color: var(--color-simulated); }
 .badge.simulated::before { content: "\25C6"; }
+.badge.example { background: var(--color-surface); border-style: dashed; border-color: var(--color-fixture); color: var(--color-fixture); }
+.badge.example::before { content: "\25C7"; }
 .badge.fixture {
   background: repeating-linear-gradient(45deg, var(--color-fixture-tint), var(--color-fixture-tint) var(--space-1), var(--color-surface) var(--space-1), var(--color-surface) var(--space-2));
   border-style: dotted;

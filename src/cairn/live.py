@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from cairn.gateway import (
+    DEFAULT_MODEL,
     MAX_TOKENS,
     MODEL_PROFILES,
     REGION,
@@ -19,12 +20,40 @@ from cairn.gateway import (
     Status,
     build_client,
 )
+from cairn.judge import (
+    EXAMPLE_OBS,
+    EXAMPLE_SENTENCE,
+    JUDGE_MAX_TOKENS,
+    JUDGE_MODEL,
+    JUDGE_PROMPT_VERSION,
+    JUDGE_TOOL,
+    KAPPA_PATH,
+    NOT_JUDGED,
+    RECORDING_PATTERN,
+    judge_key,
+    judge_sentence,
+    kappa,
+)
+from cairn.judge_cases import load_cases
 from cairn.loop import MAX_CALLS, PROMPT, PROMPT_VERSION, LoopResult, LoopStatus, ask, schema_hash
 from cairn.loop import tool_definitions as loop_tools
 from cairn.pricing import call_cost
 from cairn.questions import QUESTIONS
-from cairn.recording import RecordingClient, RecordingKey, ReplayClient, total_cost
-from cairn.workflow import draft_key, draft_sections, gather_state, verify_final
+from cairn.recording import (
+    RecordingClient,
+    RecordingKey,
+    ReplayClient,
+    recorded_model,
+    total_cost,
+)
+from cairn.workflow import (
+    draft_key,
+    draft_sections,
+    final_sentences,
+    gather_state,
+    shown_facts,
+    verify_final,
+)
 
 BUDGET_USD = 10.0  # smoke
 RECORD_BUDGET_USD = 5.0  # phase ceiling (O5, D107): counts what is already recorded
@@ -34,20 +63,6 @@ CEILING_OUTPUT_TOKENS = MAX_TOKENS
 SMOKE_CALLS_PER_PROFILE = 3
 SMOKE_MAX_TOKENS = 512
 SMOKE_PATH = Path("docs/adr/evidence/bedrock-smoke.json")
-JUDGE_TOOL = {
-    "name": "judge_verdict",
-    "description": "Judge whether a draft sentence is supported by the evidence given.",
-    "strict": True,
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "verdict": {"type": "string", "enum": ["supported", "unsupported"]},
-            "reason": {"type": "string"},
-        },
-        "required": ["verdict", "reason"],
-        "additionalProperties": False,
-    },
-}
 
 
 def make_client(mode: Mode) -> Any:
@@ -63,10 +78,10 @@ def record_ceiling(model: str, count: int) -> float:
     return count * MAX_CALLS * call_ceiling(model)
 
 
-def recorded_spend(directory: Path) -> float:
+def recorded_spend(directory: Path, pattern: str = "*.json") -> float:
     """Spend already kept in the recordings of a folder (fixtures carry no cost and count zero)."""
     total = 0.0
-    for path in sorted(directory.glob("*.json")) if directory.is_dir() else []:
+    for path in sorted(directory.glob(pattern)) if directory.is_dir() else []:
         try:
             total += total_cost(json.loads(path.read_text(encoding="utf-8"))) or 0.0
         except (ValueError, KeyError, TypeError):  # not a recording: it carries no spend
@@ -165,6 +180,119 @@ def record_draft(directory: Path, model: str) -> Path:
     if not verdict.ok:
         raise ValueError("the draft fails the rules: " + "; ".join(map(str, verdict.failures)))
     return recorder.save(directory)
+
+
+JUDGE_BUDGET_USD = 2.0  # decision O1 of phase 05, for all the judge recordings kept
+JUDGE_CEILING_INPUT_TOKENS = 4_000  # the longest cited Observation plus the prompt, with room
+KAPPA_THRESHOLD = 0.70  # decision O2
+
+
+def judge_step(model: str) -> float:
+    """Ceiling for one judge call: a generous prompt and the reply cap."""
+    return call_cost(model, JUDGE_CEILING_INPUT_TOKENS, JUDGE_MAX_TOKENS)
+
+
+@dataclass
+class JudgeInputs:
+    """What the judge is recorded on: (sentence, facts) pairs, and the E5 cases among them."""
+
+    items: list[tuple[str, str]]
+    cases: list[dict[str, Any]]
+
+
+def judge_inputs(cases_path: Path, draft_dir: Path) -> JudgeInputs:
+    """The E5 cases, the draft sentences under the example decisions and the EXAMPLE sentence."""
+    from cairn.decisions import enumerate_slots, example_decisions
+    from cairn.workflow import build_ledger
+
+    state = gather_state()
+    ledger = build_ledger(state)
+    cases = load_cases(cases_path)
+    items = [(c["sentence"], shown_facts(ledger, c["obs"])) for c in cases]
+    model = recorded_model(draft_dir, "DRAFT", DEFAULT_MODEL)
+    client = ReplayClient.load(draft_dir, draft_key(model))
+    state["sections"] = draft_sections(state, LLMGateway(Mode.REPLAY, client=client), model)
+    slots = enumerate_slots(ledger)
+    decisions = example_decisions(slots, "Recorder", date.today().isoformat())
+    state["decisions"] = [d.model_dump() for d in decisions]
+    state["confirmed"] = ["F", "M"]
+    items += final_sentences(state)
+    items.append((EXAMPLE_SENTENCE, shown_facts(ledger, EXAMPLE_OBS)))
+    return JudgeInputs(list(dict.fromkeys(items)), cases)
+
+
+@dataclass
+class JudgeReport:
+    saved: int = 0
+    spent: float = 0.0
+    stopped: str = ""
+    kappa: float | None = None
+    verdicts: dict[str, str] = field(default_factory=dict)  # sentence to verdict
+
+
+def record_judge(
+    inputs: JudgeInputs,
+    directory: Path,
+    model: str = JUDGE_MODEL,
+    result_path: Path = KAPPA_PATH,
+    budget: float = JUDGE_BUDGET_USD,
+) -> JudgeReport:
+    """Record one judge call per sentence; stop before a call could pass the budget.
+
+    The budget counts the judge recordings already kept. When every E5 case got a verdict the
+    kappa against the labels is written to `result_path`.
+    """
+    report = JudgeReport(spent=recorded_spend(directory, RECORDING_PATTERN))
+    started = report.spent
+    for sentence, facts in inputs.items:
+        if report.spent + judge_step(model) > budget:
+            report.stopped = f"stopped: ceiling would pass {budget:.2f} USD"
+            break
+        recorder = RecordingClient(
+            make_client(Mode.RECORD), judge_key(sentence, facts, model), REGION
+        )
+        try:
+            result = judge_sentence(
+                LLMGateway(Mode.RECORD, client=recorder), sentence, facts, model
+            )
+        except Exception as error:  # keep what is saved, report the spending and stop
+            report.spent += total_cost({"calls": recorder.calls}) or 0.0
+            report.stopped = f"error: {type(error).__name__}: {error}"
+            break
+        report.spent += total_cost({"calls": recorder.calls}) or 0.0
+        report.verdicts[sentence] = result["verdict"]
+        if report.spent + started > budget:  # the real cost passed the ceiling: keep nothing more
+            report.stopped = f"stopped: spend passed {budget:.2f} USD, this call is not saved"
+            break
+        if result["verdict"] != NOT_JUDGED:
+            recorder.save(directory)
+            report.saved += 1
+    report.spent -= started  # this run only
+    cases = inputs.cases
+    predicted = [report.verdicts.get(c["sentence"], NOT_JUDGED) for c in cases]
+    if NOT_JUDGED not in predicted:
+        report.kappa = kappa([_label(c["label"]) for c in cases], predicted)
+        write_kappa(result_path, model, len(cases), report.kappa)
+    return report
+
+
+def _label(label: str) -> str:
+    return "supported" if label == "faithful" else "overstated"
+
+
+def write_kappa(path: Path, model: str, n: int, value: float) -> None:
+    """The result the judge panel reads: judge, prompt version, n, kappa and the label source."""
+    data = {
+        "judge": model,
+        "prompt_version": JUDGE_PROMPT_VERSION,
+        "n": n,
+        "kappa": round(value, 4),
+        "threshold": KAPPA_THRESHOLD,
+        "labels": "built by code from the study findings, not by independent experts",
+        "date": date.today().isoformat(),
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
 def mask_account_ids(node: Any) -> Any:

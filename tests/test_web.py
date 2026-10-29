@@ -1,6 +1,9 @@
 import hashlib
+import importlib
 import json
 import re
+import shutil
+import sqlite3
 from pathlib import Path
 
 import pytest
@@ -20,7 +23,7 @@ def test_healthz_and_landing_page() -> None:
     assert "Public sample data · fictional compound · not GxP-validated" in page
     assert "Role: Study toxicologist (simulated)" in page
     assert re.search(r"v0\.1\.0 · commit \S+ · snapshot [0-9a-f]{12}", page)
-    assert page.count('class="locked"') == 2
+    assert page.count('class="locked"') == 1
     assert 'href="/step/2"' in page and 'href="/step/3"' in page
     assert "/static/vendor/htmx.min.js" in page
 
@@ -338,7 +341,7 @@ def test_navigation_unlocks_step_3_and_keeps_the_rest_locked() -> None:
     with TestClient(create_app()) as client:
         page = client.get("/step/3").text
     assert '<a href="/step/3" aria-current="step">3 Explore</a>' in page
-    assert page.count('class="locked"') == 2
+    assert page.count('class="locked"') == 1
 
 
 def test_highlight_route_serves_only_committed_pngs() -> None:
@@ -510,3 +513,110 @@ def test_step4_decide_recomputes_the_fragment_without_the_page() -> None:
         reply = client.post("/step/4/decide", data=data)
         assert reply.status_code == 200
         assert "NOAEL" in reply.text and "<html" not in reply.text
+
+
+def _step5_thread(client: TestClient) -> str:
+    id_ = _filled_thread(client)
+    client.post("/step/4/confirm", data={"thread": id_, "actor": "R. Reviewer"})
+    return id_
+
+
+def test_step5_without_judge_recordings_shows_not_judged_and_the_rules_line(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    folder = tmp_path / "recordings"
+    shutil.copytree("recordings", folder, ignore=shutil.ignore_patterns("j-*.json"))
+    for name in ("cairn.web.people", "cairn.web.threads"):
+        monkeypatch.setattr(importlib.import_module(name), "RECORDINGS_DIR", folder)
+    with TestClient(create_app()) as client:
+        id_ = _step5_thread(client)
+        page = client.get(f"/step/5?thread={id_}&actor=R.%20Reviewer").text
+        assert "Judge panel" in page and "never blocks" in page and "0 of " in page
+        assert "not judged" in page and "EXAMPLE" in page and "RECORDED" in page
+        assert "Rules: 8 of 8 passed, see step 6" in page and f"/step/6?thread={id_}" in page
+        assert "Checks" not in page
+        done = client.post("/step/5/approve", data={"thread": id_, "actor": "R. Reviewer"})
+        assert "Approved by R. Reviewer" in done.text
+
+
+def test_step5_with_the_real_recordings_shows_real_verdicts(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("CAIRN_THREADS_DB", str(tmp_path / "threads.db"))
+    with TestClient(create_app()) as client:
+        id_ = _step5_thread(client)
+        page = client.get(f"/step/5?thread={id_}&actor=R.%20Reviewer").text
+        assert "16 of 16 sentences judged" in page and "sonnet-4-6" in page
+        assert "n=24" in page and "kappa 1.00" in page and "EXAMPLE" in page
+
+
+def test_step5_lists_each_warning_and_the_example_and_approval_still_works(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import test_judge as tj
+    from cairn.decisions import enumerate_slots, example_decisions
+    from cairn.gateway import DEFAULT_MODEL, LLMGateway, Mode
+    from cairn.judge import EXAMPLE_OBS, EXAMPLE_SENTENCE
+    from cairn.recording import ReplayClient, recorded_model
+    from cairn.workflow import (
+        build_ledger,
+        draft_key,
+        draft_sections,
+        final_sentences,
+        gather_state,
+        shown_facts,
+    )
+
+    folder = tmp_path / "recordings"
+    shutil.copytree("recordings", folder, ignore=shutil.ignore_patterns("j-*.json"))
+    for name in ("cairn.web.people", "cairn.web.threads"):
+        monkeypatch.setattr(importlib.import_module(name), "RECORDINGS_DIR", folder)
+    monkeypatch.setenv("CAIRN_THREADS_DB", str(tmp_path / "threads.db"))
+    state = gather_state()
+    model = recorded_model(folder, "DRAFT", DEFAULT_MODEL)
+    replay = ReplayClient.load(folder, draft_key(model))
+    state["sections"] = draft_sections(state, LLMGateway(Mode.REPLAY, client=replay), model)
+    slots = enumerate_slots(build_ledger(state))
+    state["decisions"] = [d.model_dump() for d in example_decisions(slots, "A", "2026-10-28")]
+    state["confirmed"] = ["F", "M"]
+    first, facts = final_sentences(state)[0]
+    tj.save_recording(folder, first, facts, tj.reply("overstated", "magnitude", "Too strong."))
+    example = shown_facts(build_ledger(gather_state()), EXAMPLE_OBS)
+    tj.save_recording(folder, EXAMPLE_SENTENCE, example, tj.reply("overstated", "causal"))
+    with TestClient(create_app()) as client:
+        id_ = _step5_thread(client)
+        page = client.get(f"/step/5?thread={id_}&actor=R.%20Reviewer").text
+        assert "warning: magnitude" in page and "Too strong." in page
+        assert "warning: causal" in page and "EXAMPLE" in page and "It claims cause." in page
+        assert "not judged" in page  # the other sentences have no recording
+        done = client.post("/step/5/approve", data={"thread": id_, "actor": "R. Reviewer"})
+        assert "Approved by R. Reviewer" in done.text
+
+
+def test_step6_shows_rules_chain_status_and_the_production_note() -> None:
+    with TestClient(create_app(), follow_redirects=False) as client:
+        assert client.get("/step/6").headers["location"] == "/step/4"
+        id_ = _filled_thread(client)
+        early = client.get(f"/step/6?thread={id_}")
+        assert early.status_code == 303 and early.headers["location"] == f"/step/4?thread={id_}"
+        client.post("/step/4/confirm", data={"thread": id_, "actor": "R. Reviewer"})
+        page = client.get(f"/step/6?thread={id_}").text
+        assert 'class="badge real"' in page and "passed" in page and "fired" not in page
+        assert page.count("<tr>") == 9 and "Audit chain: 5 entries, verified." in page
+        assert "not a validated or external log" in page
+        assert "In production" in page and "external append-only log" in page
+        assert client.get(f"/step/6?thread={id_}&actor=Mallory").status_code == 422
+
+
+def test_step6_says_where_the_chain_is_broken(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db = tmp_path / "threads.db"
+    monkeypatch.setenv("CAIRN_THREADS_DB", str(db))
+    with TestClient(create_app(), follow_redirects=False) as client:
+        id_ = _filled_thread(client)
+        client.post("/step/4/confirm", data={"thread": id_, "actor": "R. Reviewer"})
+        with sqlite3.connect(db) as conn:
+            conn.execute("UPDATE audit SET actor = 'X' WHERE thread_id = ? AND seq = 3", (id_,))
+        page = client.get(f"/step/6?thread={id_}").text
+        assert "Audit chain: broken at entry 3." in page and "verified" not in page

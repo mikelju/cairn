@@ -1,0 +1,9 @@
+{
+  "date": "2026-10-29",
+  "judge": "sonnet-4-6",
+  "kappa": 1.0,
+  "labels": "built by code from the study findings, not by independent experts",
+  "n": 24,
+  "prompt_version": "judge-1",
+  "threshold": 0.7
+}

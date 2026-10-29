@@ -9,7 +9,9 @@ from fastmcp import FastMCP
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from pydantic import BaseModel, Field, ValidationError
 
+from cairn import audit
 from cairn.jobs import Job, JobRunner
+from cairn.observation import check_build
 from cairn.retrieval import StaleRetrievalCache
 from cairn.tools import REGISTRY, argument_problems, call_tool
 from cairn.web import mount_web
@@ -28,10 +30,12 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> Any:
+        check_build()  # SEC-002: refuse to start on a stale or unstamped DuckDB build
         app.state.runner = JobRunner()
         threads_db = os.environ.get("CAIRN_THREADS_DB", ":memory:")
         async with AsyncSqliteSaver.from_conn_string(threads_db) as saver, mcp_app.lifespan(app):
             app.state.saver = saver
+            await audit.init(saver.conn)
             yield
 
     app = FastAPI(title="Cairn", lifespan=lifespan)

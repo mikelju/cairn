@@ -72,7 +72,7 @@ def test_quarantine_is_absent_from_domains_present_in_quarantine_and_unchanged(
     frames, zeros, _ = study
     validation = validate_study(frames, zeros)
     db = tmp_path / "cairn.duckdb"
-    ingest.write_database(validation, db)
+    ingest.write_database(validation, db, "snap")
     pp = ingest.read_table(db, "pp")
     quarantine = ingest.read_table(db, "quarantine")
     assert len(pp) == len(frames["PP"]) - 12
@@ -88,7 +88,7 @@ def test_quarantine_is_absent_from_domains_present_in_quarantine_and_unchanged(
 def test_database_opens_read_only(report: dict[str, Any], tmp_path: Path) -> None:
     db = tmp_path / "ro.duckdb"
     frames, zeros, _ = ingest.load_study()
-    ingest.write_database(validate_study(frames, zeros), db)
+    ingest.write_database(validate_study(frames, zeros), db, "snap")
     connection = duckdb.connect(str(db), read_only=True)
     with pytest.raises(duckdb.Error):
         connection.execute("CREATE TABLE x (a INTEGER)")

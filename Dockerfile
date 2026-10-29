@@ -21,6 +21,7 @@ COPY src ./src
 COPY data/manifest.json ./data/manifest.json
 COPY data/pds2014 ./data/pds2014
 COPY recordings ./recordings
+COPY data/judge ./data/judge
 COPY data/guidelines ./data/guidelines
 COPY data/guidance ./data/guidance
 # The cryptography<=46.0.3 constraint in pyproject.toml is already pinned in uv.lock; linux x86_64 wheels exist.

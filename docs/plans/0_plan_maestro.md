@@ -25,8 +25,8 @@ It works if a person with no context finishes the 7-step web walkthrough in 5 mi
 | 02b | An agent that writes no numbers, live and recorded: Bedrock smoke test and ADR-001, LLMGateway (replay, record, live), the question loop, Q2 and Q6 recordings and step 2 | 02a | integrated |
 | 02c | App visual design that invites use: a visual system (type, colour, spacing, components, badges, tables, trace) applied to the landing page and steps 1 and 2, plus approved mockups of steps 3 to 7 that later phases build to, all within 1440x900 and the word caps | 02b | integrated |
 | 03 | RAG over public guidelines: 4 guidelines with pinned SHA-256, hybrid index with reranker, `search_guidance`, QuoteRef, rule 8, highlighted page, E3, E4, Explore with recorded questions and step 3 | 02c | integrated |
-| 04 | People decide: `nonclinical-summary` workflow in LangGraph with two pauses, DecisionRef, decision form and model-free NOAEL rule, 403 and 409, E6 and steps 4 and 5 without judge | 03 | ready locally (PR https://github.com/mikelju/cairn/pull/12) |
-| 05 | Audit and judge: per-session SHA-256 chain with verify and tampering, calibrated Sonnet judge (E5, kappa), judge panel in step 5 and step 6 | 04 | pending |
+| 04 | People decide: `nonclinical-summary` workflow in LangGraph with two pauses, DecisionRef, decision form and model-free NOAEL rule, 403 and 409, E6 and steps 4 and 5 without judge | 03 | integrated |
+| 05 | Audit and judge: per-session SHA-256 chain with verify and tampering, calibrated Sonnet judge (E5, kappa), judge panel in step 5 and step 6 | 04 | ready locally (PR https://github.com/mikelju/cairn/pull/13) |
 | 06 | Live question and delivery: live Explore behind an access code and cap, remaining step 1 switches, step 7, configuration-only `data-quality-memo` workflow, clean-clone and timed tests, documentation and v0.1.0 | 05 | pending |
 
 Statuses: pending, spec in review, spec approved, in progress, blocked, ready locally, integrated.

@@ -126,7 +126,7 @@ def _rendered_state(name: str) -> str:
             return client.get("/").text
         if name == "step3":
             return client.get("/step/3").text
-        if name.startswith(("step4", "step5")):
+        if name.startswith(("step4", "step5", "step6")):
             return _people_state(client, name)
         if name.startswith("step2_"):
             page = client.get("/step/2").text
@@ -156,6 +156,8 @@ def _people_state(client: TestClient, name: str) -> str:
     client.post("/step/4/confirm", data={"thread": thread, "actor": "R. Reviewer"})
     if name == "step5":
         return client.get(f"/step/5?thread={thread}").text
+    if name == "step6":
+        return client.get(f"/step/6?thread={thread}").text
     refused = client.post("/step/5/approve", data={"thread": thread, "actor": "A. Author"})
     assert "Authors cannot approve their own draft" in refused.text
     return refused.text
@@ -222,6 +224,7 @@ def test_result_fragment_lands_inside_the_result_element() -> None:
         "step4_filled",
         "step5",
         "step5_refused",
+        "step6",
     ],
 )
 def test_word_cap_rendered(state: str) -> None:

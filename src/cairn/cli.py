@@ -8,9 +8,10 @@ import typer
 import uvicorn
 from pydantic import ValidationError
 
-from cairn import highlight, live, passages, retrieval, weights
+from cairn import highlight, judge, live, passages, retrieval, weights
 from cairn.canonical import canonical_json
 from cairn.gateway import DEFAULT_MODEL, MODEL_PROFILES, GatewayError
+from cairn.judge_cases import CASES_PATH
 from cairn.recording import RECORDINGS_DIR, StaleRecording, recorded_model, total_cost
 from cairn.tools import argument_problems, result_sha256
 from cairn.tools import call_tool as registry_call
@@ -266,3 +267,38 @@ def guidance_weights_command() -> None:  # pragma: no cover
 def serve(host: str = "127.0.0.1", port: int = 8000) -> None:  # pragma: no cover
     """Serve the web app, REST API and MCP endpoint."""
     uvicorn.run("cairn.app:create_app", factory=True, host=host, port=port)
+
+
+@app.command("record-judge")
+def record_judge_command(
+    recordings: Path = RECORDINGS_DIR,
+    cases: Path = CASES_PATH,
+    result: Path = judge.KAPPA_PATH,
+) -> None:
+    """Record the judge on the E5 cases and the draft sentences (laptop only): 2 USD ceiling."""
+    model = judge.JUDGE_MODEL
+    try:
+        inputs = live.judge_inputs(cases, recordings)
+    except Exception as error:  # a missing draft recording or build ends as a plain message
+        typer.echo(f"error: {type(error).__name__}: {error}", err=True)
+        raise typer.Exit(1) from error
+    before = live.recorded_spend(recordings, judge.RECORDING_PATTERN)
+    ceiling = len(inputs.items) * live.judge_step(model)
+    typer.echo(
+        f"ceiling: {ceiling:.2f} USD more for {len(inputs.items)} sentences, "
+        f"{before:.2f} already recorded, of {live.JUDGE_BUDGET_USD:.2f}"
+    )
+    report = live.record_judge(inputs, recordings, model, result)
+    typer.echo(f"saved {report.saved} recordings")
+    typer.echo(f"spent: {report.spent:.4f} USD")
+    if report.stopped:
+        typer.echo(report.stopped, err=report.stopped.startswith("error:"))
+    if report.kappa is None:
+        typer.echo("kappa: not computed (an E5 case has no verdict)", err=True)
+        raise typer.Exit(1)
+    typer.echo(
+        f"kappa: {report.kappa:.4f} (threshold {live.KAPPA_THRESHOLD:.2f}) "
+        f"on {len(inputs.cases)} cases"
+    )
+    if report.stopped or report.kappa < live.KAPPA_THRESHOLD:
+        raise typer.Exit(1)
