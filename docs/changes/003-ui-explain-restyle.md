@@ -1,6 +1,6 @@
 # 003 - Demo redesign: a landing that sells, visual hierarchy, in-page reading cues and an ES/EN toggle
 
-Status: proposed
+Status: in progress
 
 ## Contract
 Goal and reason: the user did not approve proposal 1 (explanation drawer plus restyle) and widened the scope.
@@ -35,7 +35,7 @@ Current authorisation and limits: E5 produces mockups v3; E6 records the user de
 
 ## Plan
 Each increment fits one Sonnet executor with limited context.
-- [ ] 1. Tokens and shell with locale: dark `:root` values, floating pill header bar with the ES/EN toggle, mono footer, badges as pills keeping glyphs and border styles; a string catalogue (one EN and one ES table of our own UI text), locale from query parameter and cookie, every shell string read from it; update `test_design_tokens_*`; catalogue key-parity test (C2, C5, C7, C8, C14).
+- [x] 1. Tokens and shell with locale: dark `:root` values, floating pill header bar with the ES/EN toggle, mono footer, badges as pills keeping glyphs and border styles; a string catalogue (one EN and one ES table of our own UI text), locale from query parameter and cookie, every shell string read from it; update `test_design_tokens_*`; catalogue key-parity test (C2, C5, C7, C8, C14).
 - [ ] 2. Components: a disclosure macro (`<details>` with a pill `<summary>` taking content label and count) and in-page reading cues (ordered path or section labels) for every page, from the catalogue; remove the help button and any help panel; tests for C1 and C11 in both locales (C1, C5, C11).
 - [ ] 3. Landing: one-line message, `h1`, four-stage journey diagram with icons, one primary CTA to step 1, badge legend inline as a reading cue; within the cap in both locales (C3, C4, C13, C14).
 - [ ] 4. Explore guided sequence: three numbered stages (study, limits and trick questions, guidelines), cards with the question text, answer inside its stage under its card, format line on every answer (step 2 too), vanilla JS scroll reveal that degrades to fully visible; tests in both locales (C3, C10, C12, C14, C15).
@@ -84,6 +84,7 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | E4 | ejecutor | Rewrite this record: contract, criteria, decisions U1 to U8, plan in Sonnet-sized increments | done | Record rewritten |
 | E5 | ejecutor | Mockups v3: landing, step 3 and the Explore guided sequence with the ES/EN toggle and in-page cues | in progress | |
 | E6 | ejecutor | Record the user answers to U4 to U8 and the help removal; rework criteria and plan | done | This record |
+| E7 | ejecutor | Increment 1: dark tokens, pill shell with ES/EN toggle, string catalogue and parity test | done | See plan item 1 and Evidence |
 
 ## User decisions
 Questions the supervisor raises with the user. Statuses: open, answered, deferred; each closes with the user's literal answer.
@@ -99,6 +100,7 @@ Questions the supervisor raises with the user. Statuses: open, answered, deferre
 | U7 | Word cap. Today it counts only visible text inside `<main>`, a closed disclosure by its summary and a table body as one word (`tests/test_word_cap.py:17-75`) | A: keep the rule and the cap of 93, adding Explore states. B: raise the cap for Spanish by about 15 percent | answered | "Replace the Explore word cap with a guided path. The 11 cards are piled up without a clear reading order and the right column goes its own way. Wanted: a natural sequence while navigating (scroll that reveals by stages, or animations): first one group, then the second, then the third, not all at once. Text should stay short, but the criterion is the sequence, not a word count." (via Jefe) |
 | U8 | Viewport. The frozen rule is the 7-step walkthrough at 1440x900 without scrolling | A: no scroll on the landing and the 7 steps; vertical scroll only on Explore, never horizontal. B: no scroll anywhere | answered | Resolved by U7: no scroll on the landing and steps 1 to 7; Explore scrolls vertically by design, never horizontally (supervisor decision, recorded as such) |
 | U9 | Keep the "? How to read this page" help button? | Raised by the user | answered | "Remove the '? How to read this page' button. The page itself must mark the path and teach how to read it without going to a help panel. Apply it to every page, not only Explore." (via Jefe) |
+| U10 | Approve change 003 for implementation? | Raised by the supervisor after mockups v3 | answered | "Apruebo el cambio 003 con los criterios C1-C15 de la spec actual: estilo oscuro, IBM Plex, selector ES/EN con datos y respuestas grabadas en inglés, recorrido guiado por etapas en Explore, sin panel de ayuda y tope de 93 palabras en portada y pasos. Implementa hasta la PR" |
 
 ## Adversarial review
 | Round | Backend | Range | Lenses | Findings | Status |
@@ -107,6 +109,8 @@ Questions the supervisor raises with the user. Statuses: open, answered, deferre
 ## Evidence
 - Before set at commit ceb0f17: `uv run cairn serve --port 8765` (after `uv run python -m cairn.ingest`), headless Edge over the DevTools protocol at 1440x900; landing, steps 1 to 7 measured `scrollHeight` 900 and `scrollWidth` 1440; Explore after Q1 measured 985.
 - Word counts before (`tests/test_word_cap.py`, cap 93): landing 41, step1 before 45, after 71, injected 80, duplicate 89, dose 89, step2 before 20, Q2 80, Q2 open 92, Q6 39, step3 93, step4 empty 75, filled 79, step5 77, refused 92, step6 46, step7 60.
+
+- Increment 1 (E7): dark `:root` in `src/cairn/web/static/cairn.css` (C2); pill shell in `_components.html` and `base.html`; catalogue `src/cairn/web/i18n.py` (EN and ES dicts, `?lang=` query parameter remembered by the `cairn_lang` cookie through an ASGI middleware, default ES); `tests/test_i18n.py` checks key parity, the default, the toggle, persistence and toggle links; `tests/test_design.py` pins the new tokens. Deviation: `--color-control-border` is `#5f6f79`, not `#4a5862`, because the specified value gave 2.55:1 on paper and C5 needs 3:1 (now 3.59:1 on paper, 3.31:1 on surface). Existing tests that read English shell strings now request `?lang=en`. Body strings are not translated yet (increments 2 to 5).
 
 ## Delivery
 Not started.

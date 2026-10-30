@@ -3,27 +3,29 @@
 
 {% macro badge_meta(kind, meta) %}<p class="meta">{{ badge(kind) }} {{ meta }}</p>{% endmacro %}
 
-{% macro shell_header(steps, current, role, actor=none) %}
+{% macro shell_header(steps, current, t, locale, lang_links, actor=none) %}
 <header>
-  <a class="brand" href="/">Cairn</a>
-  <nav class="steps" aria-label="Steps">
-    {% for name in steps %}
-      {% set n = loop.index %}
-      {% if n <= 7 %}
-        <a href="/step/{{ n }}"{% if current == n %} aria-current="step"{% endif %}>{{ n }} {{ name }}</a>
-      {% else %}
-        <span class="locked" aria-disabled="true">{{ n }} {{ name }}</span>
-      {% endif %}
-    {% endfor %}
-  </nav>
-  <span class="role">{% if actor %}Acting as: {{ actor }} {{ badge("SIMULATED") }}{% else %}Role: {{ role }} (simulated){% endif %}</span>
+  <div class="bar">
+    <a class="brand" href="/">{{ t.brand }}</a>
+    <nav class="steps" aria-label="{{ t.nav_steps }}">
+      {% for n in steps %}
+        <a href="/step/{{ n }}"{% if current == n %} aria-current="step"{% endif %}><span class="n">{{ "%02d"|format(n) }}</span>{{ t["step_" ~ n] }}</a>
+      {% endfor %}
+    </nav>
+    <span class="role">{% if actor %}{{ t.acting_as }} {{ actor }} {{ badge("SIMULATED") }}{% else %}{{ t.role }}{% endif %}</span>
+    <div class="lang" role="group" aria-label="{{ t.lang_label }}">
+      {% for code in ("es", "en") %}
+      <a href="{{ lang_links[code] }}" hreflang="{{ code }}" lang="{{ code }}"{% if locale == code %} aria-current="true"{% endif %}>{{ code|upper }}</a>
+      {% endfor %}
+    </div>
+  </div>
 </header>
 {% endmacro %}
 
-{% macro shell_footer(footer) %}
+{% macro shell_footer(footer, t) %}
 <footer>
-  <span>Public sample data · fictional compound · not GxP-validated</span>
-  <span>v{{ footer.version }} · commit {{ footer.commit }} · snapshot {{ footer.snapshot[:12] }}</span>
+  <span>{{ t.footer_note }}</span>
+  <span>v{{ footer.version }} · {{ t.footer_build }} {{ footer.commit }} · {{ t.footer_snapshot }} {{ footer.snapshot[:12] }}</span>
 </footer>
 {% endmacro %}
 

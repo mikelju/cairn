@@ -81,15 +81,20 @@ def test_design_tokens_single_root_block() -> None:
 def test_design_tokens_define_the_adopted_values() -> None:
     css = CSS_PATH.read_text()
     for token, value in {
-        "--color-paper": "#fbfaf7",
-        "--color-ink": "#1b2430",
-        "--color-accent": "#0e4d5c",
-        "--color-recorded": "#1d4f91",
-        "--color-block": "#a12622",
+        "--color-paper": "#0e1316",
+        "--color-surface": "#151c20",
+        "--color-ink": "#e6ecee",
+        "--color-accent": "#6cbcf5",
+        "--color-recorded": "#8fc3f2",
+        "--color-block": "#ff8f86",
+        "--tracking-display": "-0.025em",
+        "--tracking-eyebrow": "0.14em",
         "--text-2xs": "11px",
-        "--text-2xl": "40px",
+        "--text-xl": "30px",
+        "--text-2xl": "52px",
         "--space-7": "48px",
-        "--radius-md": "8px",
+        "--radius-md": "10px",
+        "--radius-pill": "999px",
     }.items():
         assert re.search(rf"{token}:\s*{re.escape(value)}\s*;", css), token
     assert "IBM Plex Sans" in css and "IBM Plex Mono" in css

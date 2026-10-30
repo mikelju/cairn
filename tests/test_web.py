@@ -20,7 +20,7 @@ from cairn.web import HERE
 def test_healthz_and_landing_page() -> None:
     with TestClient(create_app()) as client:
         assert client.get("/healthz").status_code == 200
-        page = client.get("/").text
+        page = client.get("/?lang=en").text
     for badge in ("REAL", "RECORDED", "SIMULATED"):
         assert f'class="badge {badge.lower()}"' in page
     assert "Public sample data · fictional compound · not GxP-validated" in page
@@ -354,8 +354,10 @@ def test_step3_counts_quotes_verbatim_on_the_cited_page() -> None:
 
 def test_navigation_has_no_locked_step() -> None:
     with TestClient(create_app()) as client:
-        page = client.get("/step/3").text
-    assert '<a href="/step/3" aria-current="step">3 Explore</a>' in page
+        page = client.get("/step/3?lang=en").text
+    assert re.search(
+        r'<a href="/step/3" aria-current="step"><span [^>]*>03</span>Explore</a>', page
+    )
     assert page.count('class="locked"') == 0
 
 
@@ -470,7 +472,7 @@ def test_web_parses_passages_and_highlights_once_per_process(
 
 def test_steps_4_and_5_people_decide_and_the_author_cannot_approve() -> None:
     with TestClient(create_app()) as client:
-        step4 = client.get("/step/4").text  # starts a thread and follows the redirect
+        step4 = client.get("/step/4?lang=en").text  # starts a thread and follows the redirect
         thread = re.search(r'name="thread" value="([0-9a-f]+)"', step4)
         assert thread and "Acting as: A. Author" in step4 and "disabled" in step4
         id_ = thread.group(1)

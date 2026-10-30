@@ -32,13 +32,13 @@ from cairn.recording import (
 )
 from cairn.render import quotations
 from cairn.validate import RULE_AUC, RULE_CONC, validate_study
+from cairn.web import i18n
 from cairn.web.threads import threads
 
 HERE = Path(__file__).parent
 templates = Jinja2Templates(directory=HERE / "templates")
 router = APIRouter()
-ROLE = "Study toxicologist"
-STEPS = ["Validate", "Ask", "Explore", "Analyse", "Draft", "Check", "Review"]
+STEP_COUNT = 7
 
 
 def _commit() -> str:
@@ -68,7 +68,8 @@ def _page(request: Request, name: str, **context: Any) -> HTMLResponse:
         "commit": request.app.state.commit,
         "snapshot": request.app.state.snapshot,
     }
-    base = {"role": ROLE, "steps": STEPS, "footer": footer, **context}
+    shell = i18n.context(request, context.get("current"))
+    base = {"steps": range(1, STEP_COUNT + 1), "footer": footer, **shell, **context}
     return templates.TemplateResponse(request, name, base)
 
 
@@ -451,6 +452,7 @@ def mount_web(app: FastAPI) -> None:
     from cairn.web.explore_live import explore_live
     from cairn.web.people import people  # imports this module's helpers, so it loads late
 
+    app.add_middleware(i18n.LocaleCookie)
     app.state.commit = _commit()
     app.state.snapshot = load_study()[2]
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
