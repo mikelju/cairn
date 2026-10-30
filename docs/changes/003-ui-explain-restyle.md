@@ -92,6 +92,7 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | E13 | ejecutor | Increment 5 part B, first half: steps 4 and 5 in ES and EN (tiles, reading path, pills, catalogue strings) | done | See plan item 5 (part B) and Evidence |
 | E14 | ejecutor | Increment 5 part B, second half: steps 6 and 7 in ES and EN (tiles, reading path, pills, catalogue strings) | done | See plan item 5 (part B) and Evidence |
 | E15 | ejecutor | Increment 6: walkthrough of all states in ES and EN, word-cap and scroll measurements, offline check fixed for the new locale, final `npm run check` | done | See plan item 6 and Evidence |
+| E16 | ejecutor | Corrections from adversarial review (C4, C9, C11, C14) | done | See Adversarial review |
 
 ## User decisions
 Questions the supervisor raises with the user. Statuses: open, answered, deferred; each closes with the user's literal answer.
@@ -112,6 +113,14 @@ Questions the supervisor raises with the user. Statuses: open, answered, deferre
 ## Adversarial review
 | Round | Backend | Range | Lenses | Findings | Status |
 |---|---|---|---|---|---|
+
+E16 fixed six confirmed findings, each with a regression test in `tests/test_i18n.py`:
+1. The ES/EN toggle on POST-rendered pages (the 403 refusal) keeps `thread` and `actor`, so switching language keeps the same thread.
+2. The landing secondary link now opens Explore ("Explore the questions" / "Explorar las preguntas") instead of a threadless `/step/5`.
+3. `highlight.html` reads its title, lede, labels and alt text from the catalogue in both locales.
+4. Code-generated words (rules "none", evidence labels, "cost n/a", the 403 line, "the model declined") are rendered from the catalogue at render time; gateway and loop output are unchanged.
+5. `_card_kinds` skips unreadable recordings, so Explore renders.
+6. Disclosure pills with no content (evidence, trace) are not rendered.
 
 ## Evidence
 - Before set at commit ceb0f17: `uv run cairn serve --port 8765` (after `uv run python -m cairn.ingest`), headless Edge over the DevTools protocol at 1440x900; landing, steps 1 to 7 measured `scrollHeight` 900 and `scrollWidth` 1440; Explore after Q1 measured 985.

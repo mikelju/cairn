@@ -16,7 +16,7 @@
 {% endif %}
 {% if r.message or r.failures %}
 {% call a.callout("blocked" if (not r.answered or r.failures) else "note") %}
-{% if r.message %}<p>{{ r.message }}</p>{% endif %}
+{% if r.message %}<p>{{ t[r.message_key] if r.message_key else r.message }}</p>{% endif %}
 {% if r.failures %}<ul>{% for f in r.failures %}<li>{{ f }}</li>{% endfor %}</ul>{% endif %}
 {% endcall %}
 {% endif %}
@@ -28,10 +28,10 @@
 {{ a.data_table([t.exp_th_sex, t.exp_th_tissue, t.exp_th_finding] + r.doses, screen.rows) }}
 {% endcall %}{% endif %}
 {% if r.written %}{% call a.disclosure("model_text", r.written.split()|length, "words") %}<p>{{ r.written }}</p>{% endcall %}{% endif %}
-{% call a.disclosure("trace", r.calls, "calls") %}
+{% if r.calls %}{% call a.disclosure("trace", r.calls, "calls") %}
 {{ a.trace(r.trace, t.exp_trace) }}
-{% call a.callout("rules") %}<p>{{ t.exp_rules }} {{ r.rules }}</p>{% endcall %}
-{% endcall %}
+{% call a.callout("rules") %}<p>{{ t.exp_rules }} {{ r.rules or t.exp_none }}</p>{% endcall %}
+{% endcall %}{% else %}{% call a.callout("rules") %}<p>{{ t.exp_rules }} {{ r.rules or t.exp_none }}</p>{% endcall %}{% endif %}
 {{ a.evidence_panel(r.evidence) }}
 </div>
 </article>

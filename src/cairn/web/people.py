@@ -405,5 +405,5 @@ async def step5_approve(
         if refusal.status_code != 403:
             raise
         t = i18n.context(request)["t"]
-        error = f"403 · {refusal.detail} {t['s5_enforced']}"
+        error = t["s5_refused"].format(detail=refusal.detail)
     return await _step5(request, thread, who, error)

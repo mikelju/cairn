@@ -69,7 +69,8 @@ def _page(request: Request, name: str, **context: Any) -> HTMLResponse:
         "commit": request.app.state.commit,
         "snapshot": request.app.state.snapshot,
     }
-    shell = i18n.context(request, context.get("current"))
+    keep = {k: str(context[k]) for k in ("thread", "actor") if context.get(k)}
+    shell = i18n.context(request, context.get("current"), keep)
     base = {"steps": range(1, STEP_COUNT + 1), "footer": footer, **shell, **context}
     return templates.TemplateResponse(request, name, base)
 
@@ -256,13 +257,15 @@ def _evidence(result: LoopResult) -> list[dict[str, str]]:
     for o in result.ledger.observations:
         ids = sorted({str(row["usubjid"]) for row in o.source_rows if "usubjid" in row})
         # Incidence source rows are the affected animals; n is the examined count.
-        label = "affected" if o.kind.startswith("incidence") else "animals"
+        label = "ev_affected" if o.kind.startswith("incidence") else "ev_animals"
         evidence.append(
             {
                 "tool": o.tool.name,
                 "population": o.population,
                 "n": "n/a" if o.n_examined is None else str(o.n_examined),
-                "sources": f"{len(ids)} {label}, from {ids[0]}" if ids else "none",
+                "count": len(ids),
+                "label": label,
+                "first": ids[0] if ids else "",
             }
         )
     return evidence
@@ -282,7 +285,9 @@ def _with_highlight(quote: dict[str, Any]) -> dict[str, Any]:
     return {**quote, "highlight": f"/highlight/{first}" if _highlighted(first) else ""}
 
 
-def _step2_context(question_id: str, directory: Path) -> dict[str, Any]:
+def _step2_context(
+    question_id: str, directory: Path, t: dict[str, str] | None = None
+) -> dict[str, Any]:
     model = recorded_model(directory, question_id, DEFAULT_MODEL)
     key = RecordingKey(question_id, PROMPT_VERSION, schema_hash(), model)
     client = ReplayClient.load(directory, key)
@@ -293,7 +298,8 @@ def _step2_context(question_id: str, directory: Path) -> dict[str, Any]:
     fixture = recording.get("source") == "fixture"
     meta = (
         f"{recording['date']} | {recording['region']} | {recording['model']} | "
-        f"{latency:.1f} s | " + ("cost n/a" if cost is None else f"{cost:.2f} USD")
+        f"{latency:.1f} s | "
+        + ((t or i18n.CATALOGUES["en"])["s5_cost_na"] if cost is None else f"{cost:.2f} USD")
     )
     return result_context(result, "FIXTURE" if fixture else "RECORDED", meta)
 
@@ -323,7 +329,8 @@ def result_context(result: LoopResult, badge: str, meta: str) -> dict[str, Any]:
         "answered": result.status is LoopStatus.ANSWERED,
         "text": result.rendered,
         "failures": [str(f) for f in verdict.failures] if verdict else [],
-        "rules": ", ".join(str(r) for r in verdict.rules) if verdict and verdict.rules else "none",
+        "rules": ", ".join(str(r) for r in verdict.rules) if verdict and verdict.rules else "",
+        "message_key": "exp_declined" if result.message == "the model declined" else "",
         "written": _written(result),
         "doses": doses,
         "rows": rows,
@@ -349,7 +356,7 @@ def step2_run(request: Request, question: Annotated[str, Form()]) -> HTMLRespons
     if question not in QUESTIONS:
         raise HTTPException(status_code=422, detail="unknown question")
     try:
-        context = _step2_context(question, _recordings_dir())
+        context = _step2_context(question, _recordings_dir(), i18n.context(request)["t"])
     except StaleRecording as error:
         return templates.TemplateResponse(
             request, "step2_result.html", {**i18n.context(request), "stale": str(error)}
@@ -471,7 +478,7 @@ def _card_kinds(directory: Path) -> dict[str, str]:
     for question_id in QUESTIONS:
         try:
             kinds[question_id] = _step2_context(question_id, directory)["kind"]
-        except StaleRecording:
+        except (StaleRecording, ValueError):
             kinds[question_id] = "text"
     return kinds
 
@@ -491,7 +498,7 @@ def explore_run(request: Request, question: Annotated[str, Form()]) -> HTMLRespo
     if question not in QUESTIONS:
         raise HTTPException(status_code=422, detail="unknown question")
     try:
-        context = _step2_context(question, _recordings_dir())
+        context = _step2_context(question, _recordings_dir(), i18n.context(request)["t"])
     except StaleRecording as error:
         return templates.TemplateResponse(
             request, "explore_answer.html", {**i18n.context(request), "stale": str(error)}

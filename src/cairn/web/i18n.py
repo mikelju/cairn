@@ -5,7 +5,7 @@ The locale is the `lang` query parameter, remembered in a cookie; the default is
 """
 
 from typing import Any
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, quote
 
 from starlette.requests import Request
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -47,6 +47,18 @@ EN: dict[str, str] = {
     "unit_quotes": "quote|quotes",
     "unit_items": "item|items",
     "unit_calls": "call|calls",
+    "exp_none": "none",
+    "exp_declined": "the model declined",
+    "ev_affected": "affected",
+    "ev_animals": "animals",
+    "ev_from": "from",
+    "hl_title": "Explore",
+    "hl_badge": "COMPUTED AT BUILD",
+    "hl_lede": "The quoted sentence is highlighted on its page of the guideline.",
+    "hl_page": "Page",
+    "hl_official": "official page",
+    "hl_back": "back to step 3",
+    "hl_alt": "Guideline page {page} with the quoted sentence highlighted",
     "land_title_a": "From study to draft,",
     "land_title_b": "no invented numbers.",
     "land_sub": "AI picks tools and drafts; code places every number and quotation; people decide.",
@@ -64,7 +76,7 @@ EN: dict[str, str] = {
     "land_stage_4_d": "Every number leads to its row",
     "land_journey_label": "The journey",
     "land_cta": "Start the journey",
-    "land_cta_2": "See the final draft",
+    "land_cta_2": "Explore the questions",
     "land_legend": "Every item carries its label:",
     "land_real": "computed now",
     "land_recorded": "saved AI answer",
@@ -216,7 +228,7 @@ EN: dict[str, str] = {
     "s5_warning": "warning:",
     "s5_unjudged": "sentences of the final text",
     "s5_no_recording": "No recording.",
-    "s5_enforced": "Enforced by the API",
+    "s5_refused": "403 · {detail} Enforced by the API",
     "s6_lede": "Rules check form and sources; the audit trail chains every action.",
     "s6_path_1": "Read the rules",
     "s6_path_2": "Check the chain",
@@ -311,6 +323,18 @@ ES: dict[str, str] = {
     "unit_quotes": "cita|citas",
     "unit_items": "elemento|elementos",
     "unit_calls": "llamada|llamadas",
+    "exp_none": "ninguna",
+    "exp_declined": "el modelo declinó",
+    "ev_affected": "afectados",
+    "ev_animals": "animales",
+    "ev_from": "desde",
+    "hl_title": "Explorar",
+    "hl_badge": "CALCULADO EN LA COMPILACIÓN",
+    "hl_lede": "La frase citada aparece resaltada en su página de la guía.",
+    "hl_page": "Página",
+    "hl_official": "página oficial",
+    "hl_back": "volver al paso 3",
+    "hl_alt": "Página {page} de la guía con la frase citada resaltada",
     "land_title_a": "Del estudio al borrador,",
     "land_title_b": "sin cifras inventadas.",
     "land_sub": (
@@ -331,7 +355,7 @@ ES: dict[str, str] = {
     "land_stage_4_d": "Cada cifra lleva a su fila",
     "land_journey_label": "El recorrido",
     "land_cta": "Empezar el recorrido",
-    "land_cta_2": "Ver el borrador final",
+    "land_cta_2": "Explorar las preguntas",
     "land_legend": "Cada dato lleva su etiqueta:",
     "land_real": "calculado ahora",
     "land_recorded": "respuesta de IA guardada",
@@ -489,7 +513,7 @@ ES: dict[str, str] = {
     "s5_warning": "aviso:",
     "s5_unjudged": "frases del texto final",
     "s5_no_recording": "Sin grabación.",
-    "s5_enforced": "Lo impone la API",
+    "s5_refused": "Rechazado (403). Lo impone la API. Texto de la API: {detail}",
     "s6_lede": "Las reglas revisan forma y fuentes; el rastro de auditoría encadena cada acción.",
     "s6_path_1": "Lee las reglas",
     "s6_path_2": "Comprueba la cadena",
@@ -563,13 +587,16 @@ def locale_of(request: Request) -> str:
     return DEFAULT_LOCALE
 
 
-def context(request: Request, current: int | None = None) -> dict[str, Any]:
+def context(
+    request: Request, current: int | None = None, keep: dict[str, str] | None = None
+) -> dict[str, Any]:
     """Template variables for the shell: the catalogue and the toggle links."""
     locale = locale_of(request)
     if request.method == "GET":
         base = request.url
     else:  # a POST page has no GET twin: toggle on the step it shows
-        base = request.url.replace(path=f"/step/{current}" if current else "/", query="")
+        query = "&".join(f"{k}={quote(v)}" for k, v in (keep or {}).items())
+        base = request.url.replace(path=f"/step/{current}" if current else "/", query=query)
     links = {code: f"{base.path}?{base.include_query_params(lang=code).query}" for code in LOCALES}
     return {"t": CATALOGUES[locale], "locale": locale, "lang_links": links}
 

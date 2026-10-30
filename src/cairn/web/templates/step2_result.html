@@ -13,19 +13,18 @@
 {% endif %}
 {% if r.message or r.failures %}
 {% call a.callout("blocked" if (not r.answered or r.failures) else "note") %}
-{% if r.message %}<p>{{ r.message }}</p>{% endif %}
+{% if r.message %}<p>{{ t[r.message_key] if r.message_key else r.message }}</p>{% endif %}
 {% if r.failures %}<ul>{% for f in r.failures %}<li>{{ f }}</li>{% endfor %}</ul>{% endif %}
 {% endcall %}
 {% endif %}
 <div class="detail">{{ a.cue(3) }}
 {% if r.written %}{% call a.disclosure("model_text", r.written.split()|length, "words") %}<p>{{ r.written }}</p>{% endcall %}{% endif %}
-{% call a.disclosure("trace", r.calls, "calls") %}
-{{ a.badge_meta(r.badge, r.meta) }}
+{% macro trace_body() %}{{ a.badge_meta(r.badge, r.meta) }}
 {{ a.trace(r.trace, t.exp_trace) }}
-{% call a.callout("rules") %}<p>{{ t.exp_rules }} {{ r.rules }}</p>{% endcall %}
+{% call a.callout("rules") %}<p>{{ t.exp_rules }} {{ r.rules or t.exp_none }}</p>{% endcall %}
 {% if r.rows %}<p>{{ r.rule }}</p>{% endif %}
-{{ a.evidence_panel(r.evidence) }}
-{% endcall %}
+{{ a.evidence_panel(r.evidence) }}{% endmacro %}
+{% if r.calls %}{% call a.disclosure("trace", r.calls, "calls") %}{{ trace_body() }}{% endcall %}{% else %}{{ trace_body() }}{% endif %}
 </div>
 </div>
 {% if r.rows or r.quotes %}

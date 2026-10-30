@@ -61,11 +61,11 @@
 {% macro trace(steps, label="Trace") %}<p class="trace">{{ label }}: {{ steps }}</p>{% endmacro %}
 
 {% macro evidence_panel(items) %}
-{% call disclosure("evidence", items|length, "items") %}<div class="evidence">
+{% if items %}{% call disclosure("evidence", items|length, "items") %}<div class="evidence">
 {% for e in items %}
-<p>{{ e.tool }}, {{ e.population }}, n={{ e.n }}, {{ e.sources }}</p>
+<p>{{ e.tool }}, {{ e.population }}, n={{ e.n }}, {% if e.count %}{{ e.count }} {{ t[e.label] }}, {{ t.ev_from }} {{ e.first }}{% else %}{{ t.exp_none }}{% endif %}</p>
 {% endfor %}
-</div>{% endcall %}
+</div>{% endcall %}{% endif %}
 {% endmacro %}
 
 {# kind: rules, blocked, stale or note. #}
