@@ -1,15 +1,22 @@
 {% extends "base.html" %}
 {% import "_components.html" as a with context %}
 {% block main %}
-{% call a.step(6, "Check", "REAL", "Rules check form and sources, and every action is chained in the audit trail.", "two-col") %}
+{% call a.step(6, t.step_6, "REAL", t.s6_lede, "two-col") %}
+{{ a.reading_path([t.s6_path_1, t.s6_path_2], t.s_path_label) }}
 <div class="col-left">
-{{ a.data_table(["Rule", "Result", "Note"], rules) }}
-{% if fired %}{% call a.callout("blocked") %}<p>{{ fired }} rule(s) fired.</p>{% endcall %}{% endif %}
+<div class="tiles">
+{{ a.tile(passed ~ "/" ~ rule_total, t.s6_tile_passed, 1, tone="ok") }}
+{{ a.tile(fired, t.s6_tile_fired) }}
+</div>
+{{ a.data_table([t.s6_th_rule, t.s6_th_result, t.s6_th_note], rules) }}
 </div>
 <div class="col-right card">
-<h2>Audit chain</h2>
-{% call a.callout("rules" if chain_ok else "blocked") %}<p>{{ chain }} It detects edits and is not a validated or external log.</p>{% endcall %}
-{{ a.in_production("an external append-only log.") }}
+<h2>{{ a.cue(2) }}{{ t.s6_chain_h }}</h2>
+<div class="tiles">
+{{ a.tile(entries, t.s6_tile_entries, tone="ok" if chain_ok else "") }}
+</div>
+{% call a.callout("rules" if chain_ok else "blocked") %}<p>{{ chain }} {{ t.s6_chain_note }}</p>{% endcall %}
+{{ a.in_production(t.s6_prod, label=t.exp_prod_label) }}
 </div>
 {% endcall %}
 {% endblock %}

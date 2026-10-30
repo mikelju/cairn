@@ -287,6 +287,7 @@ async def step6(request: Request, thread: str | None = None, actor: str = REVIEW
     state, waiting, _ = await load_view(request, thread)
     if waiting == "await_decisions":
         return RedirectResponse(f"/step/4?thread={thread}", status_code=303)
+    t = i18n.context(request)["t"]
     failed = {f.rule: f.reason for f in verify_final(state).failures}
     chain = await verify_audit(request, thread)
     return page(
@@ -295,14 +296,17 @@ async def step6(request: Request, thread: str | None = None, actor: str = REVIEW
         current=6,
         actor=_actor(actor),
         rules=[
-            [n, "fired" if n in failed else "passed", failed.get(n, reason)]
+            [n, t["s6_fired"] if n in failed else t["s6_passed"], failed.get(n, reason)]
             for n, reason in RULE_REASONS.items()
         ],
         fired=len(failed),
+        passed=len(RULE_REASONS) - len(failed),
+        rule_total=len(RULE_REASONS),
+        entries=chain["count"],
         chain=(
-            f"Audit chain: {chain['count']} entries, verified."
+            t["s6_chain_ok"]
             if chain["ok"]
-            else f"Audit chain: broken at entry {chain['first_broken']}."
+            else t["s6_chain_broken"].format(n=chain["first_broken"])
         ),
         chain_ok=chain["ok"],
     )
@@ -310,20 +314,12 @@ async def step6(request: Request, thread: str | None = None, actor: str = REVIEW
 
 REPO = "https://github.com/mikelju/cairn"
 STEP7_LINKS = [
-    (
-        "Data-quality memo commit (no .py files; its evals check is green on the phase PR)",
-        f"{REPO}/commit/7897d079c8665301821fe0e0faffdfd988b6ce82",
-    ),
-    ("Blocked bad PR", f"{REPO}/pull/6"),
-    ("REST docs", "/docs"),
-    ("MCP endpoint", "/mcp"),
+    ("s7_link_memo", f"{REPO}/commit/7897d079c8665301821fe0e0faffdfd988b6ce82"),
+    ("s7_link_pr", f"{REPO}/pull/6"),
+    ("s7_link_rest", "/docs"),
+    ("s7_link_mcp", "/mcp"),
 ]
-PRODUCTION = [
-    ["Identity", "Role picker", "SSO and roles"],
-    ["Audit log", "Hash chain in the app", "External append-only log"],
-    ["Draft model", "Recorded call", "Bedrock with Guardrails and WAF"],
-    ["Sign-off", "Approval in step 5", "Electronic signatures"],
-]
+PRODUCTION_KEYS = ["identity", "audit", "model", "sign"]
 
 
 async def _two_doors(request: Request) -> tuple[str, str]:
@@ -356,23 +352,24 @@ async def step7(request: Request, thread: str | None = None, actor: str = REVIEW
     chain = await verify_audit(request, thread)
     failed = len(verify_final(state).failures)
     over_mcp, over_rest = await _two_doors(request)
+    t = i18n.context(request)["t"]
+    code_numbers = sum(isinstance(p, ValueRef) for p in parts)
     session = [
         [
-            "Numbers",
-            f"{sum(isinstance(p, ValueRef) for p in parts)} by code, {by_model} by the model",
-        ],
-        ["Quotations", f"{sum(isinstance(p, QuoteRef) for p in parts)} copied verbatim"],
-        [
-            "Decisions",
-            f"{len(view['decisions'])} by people, {len(view['confirmed'])} NOAEL confirmed",
+            t["s7_draft"],
+            f"{latency:.1f} s, " + (t["s5_cost_na"] if cost is None else f"{cost:.2f} USD"),
         ],
         [
-            "Recorded draft",
-            f"{latency:.1f} s, " + ("cost n/a" if cost is None else f"{cost:.2f} USD"),
+            t["s7_rules"],
+            t["s7_rules_value"].format(a=len(RULE_REASONS) - failed, b=len(RULE_REASONS)),
         ],
-        ["Rules", f"{len(RULE_REASONS) - failed} of {len(RULE_REASONS)} passed"],
-        ["Chain", f"{chain['count']} entries, " + ("verified" if chain["ok"] else "broken")],
-        ["Approval", view["approved_by"] or "not yet"],
+        [
+            t["s7_chain"],
+            t["s7_chain_value"].format(
+                n=chain["count"], state=t["s7_verified"] if chain["ok"] else t["s7_broken"]
+            ),
+        ],
+        [t["s7_approval"], view["approved_by"] or t["s7_not_yet"]],
     ]
     return page(
         request,
@@ -380,10 +377,17 @@ async def step7(request: Request, thread: str | None = None, actor: str = REVIEW
         current=7,
         actor=_actor(actor),
         session=session,
+        numbers=code_numbers,
+        by_model=by_model,
+        quotes=sum(isinstance(p, QuoteRef) for p in parts),
+        decisions=len(view["decisions"]),
+        confirmed=len(view["confirmed"]),
         doors=[["MCP", over_mcp[:16]], ["REST", over_rest[:16]]],
         same=over_mcp == over_rest,
-        links=STEP7_LINKS,
-        production=PRODUCTION,
+        links=[(t[key], href) for key, href in STEP7_LINKS],
+        production=[
+            [t[f"s7_p_{k}"], t[f"s7_p_{k}_demo"], t[f"s7_p_{k}_prod"]] for k in PRODUCTION_KEYS
+        ],
     )
 
 

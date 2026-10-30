@@ -628,14 +628,16 @@ def test_step5_lists_each_warning_and_the_example_and_approval_still_works(
 
 def test_step6_shows_rules_chain_status_and_the_production_note() -> None:
     with TestClient(create_app(), follow_redirects=False) as client:
+        _english(client)
         assert client.get("/step/6").headers["location"] == "/step/4"
         id_ = _filled_thread(client)
         early = client.get(f"/step/6?thread={id_}")
         assert early.status_code == 303 and early.headers["location"] == f"/step/4?thread={id_}"
         client.post("/step/4/confirm", data={"thread": id_, "actor": "R. Reviewer"})
         page = client.get(f"/step/6?thread={id_}").text
-        assert 'class="badge real"' in page and "passed" in page and "fired" not in page
-        assert page.count("<tr>") == 9 and "Audit chain: 5 entries, verified." in page
+        assert 'class="badge real"' in page and "passed" in page and "<td>fired</td>" not in page
+        assert page.count("<tr>") == 9 and "Verified." in page and "chained entries" in page
+        assert "8/8" in page and "rules passed" in page
         assert "not a validated or external log" in page
         assert "In production" in page and "external append-only log" in page
         assert client.get(f"/step/6?thread={id_}&actor=Mallory").status_code == 422
@@ -643,6 +645,7 @@ def test_step6_shows_rules_chain_status_and_the_production_note() -> None:
 
 def test_step7_closes_the_session_with_one_tool_over_mcp_and_rest() -> None:
     with TestClient(create_app(), follow_redirects=False) as client:
+        _english(client)
         assert client.get("/step/7").headers["location"] == "/step/4"
         id_ = _filled_thread(client)
         early = client.get(f"/step/7?thread={id_}")
@@ -651,13 +654,13 @@ def test_step7_closes_the_session_with_one_tool_over_mcp_and_rest() -> None:
         client.post("/step/5/approve", data={"thread": id_, "actor": "R. Reviewer"})
         page = client.get(f"/step/7?thread={id_}").text
         assert 'class="badge real"' in page and "Same hash, same Observation." in page
-        assert re.search(r"by code, 0 by the model", page) and "copied verbatim" in page
+        assert "numbers by code (0 by the model)" in page and "quotes verbatim" in page
         assert (
             re.search(r"\d+ entries, verified", page)
             and "R. Reviewer" in page
             and "8 of 8 passed" in page
         )
-        assert "Ver tabla de producción" in page
+        assert "Show production table" in page
         hashes = re.findall(r"<td>(?:MCP|REST)</td><td>([0-9a-f]{16})</td>", page)
         assert len(hashes) == 2 and hashes[0] == hashes[1]
         assert client.get("/docs").status_code == 200
@@ -672,6 +675,7 @@ def test_step7_closes_the_session_with_one_tool_over_mcp_and_rest() -> None:
 
 def test_step7_rest_door_goes_through_the_http_route(monkeypatch: pytest.MonkeyPatch) -> None:
     with TestClient(create_app(), follow_redirects=False) as client:
+        _english(client)
         id_ = _filled_thread(client)
         client.post("/step/4/confirm", data={"thread": id_, "actor": "R. Reviewer"})
         monkeypatch.setattr(
@@ -687,6 +691,7 @@ def test_step7_survives_a_non_http_error_in_the_rest_door(monkeypatch: pytest.Mo
         raise KeyError(name)
 
     with TestClient(create_app(), follow_redirects=False) as client:
+        _english(client)
         id_ = _filled_thread(client)
         client.post("/step/4/confirm", data={"thread": id_, "actor": "R. Reviewer"})
         monkeypatch.setattr(app_module, "call_tool", broken)
@@ -701,12 +706,13 @@ def test_step6_says_where_the_chain_is_broken(
     db = tmp_path / "threads.db"
     monkeypatch.setenv("CAIRN_THREADS_DB", str(db))
     with TestClient(create_app(), follow_redirects=False) as client:
+        _english(client)
         id_ = _filled_thread(client)
         client.post("/step/4/confirm", data={"thread": id_, "actor": "R. Reviewer"})
         with sqlite3.connect(db) as conn:
             conn.execute("UPDATE audit SET actor = 'X' WHERE thread_id = ? AND seq = 3", (id_,))
         page = client.get(f"/step/6?thread={id_}").text
-        assert "Audit chain: broken at entry 3." in page and "verified" not in page
+        assert "Broken at entry 3." in page and "Verified." not in page
 
 
 @pytest.mark.parametrize("lang", ["es", "en"])

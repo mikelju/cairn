@@ -267,9 +267,11 @@ def test_word_cap_rendered(state: str) -> None:
         "step4_filled",
         "step5",
         "step5_refused",
+        "step6",
+        "step7",
     ],
 )
-def test_steps_1_to_5_are_within_the_cap_in_both_locales(state: str, lang: str) -> None:
+def test_steps_1_to_7_are_within_the_cap_in_both_locales(state: str, lang: str) -> None:
     html = rendered_state(state, lang)
     print(state, lang, rendered_words(html))
     assert f'<html lang="{lang}"' in html
