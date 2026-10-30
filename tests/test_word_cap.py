@@ -1,11 +1,15 @@
 import os
 import re
+import sqlite3
+import tempfile
 from html.parser import HTMLParser
 from pathlib import Path
+from unittest import mock
 
 import pytest
 from fastapi.testclient import TestClient
 
+from cairn import app as app_module
 from cairn.app import create_app
 from cairn.web.i18n import CATALOGUES, COOKIE
 
@@ -110,11 +114,22 @@ def open_toggle(html: str) -> str:
     return opened
 
 
+BROKEN_STATES = {"step6_broken", "step7_broken", "step7_mismatch"}
+
+
 def rendered_state(name: str, lang: str | None = None) -> str:
     # Step 2 states always replay the real-shape fixtures, whatever the cwd or the environment say.
     saved = os.environ.get("CAIRN_RECORDINGS")
     os.environ["CAIRN_RECORDINGS"] = str(REAL_RECORDINGS)
     try:
+        if name in BROKEN_STATES:
+            with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+                db = Path(tmp) / "threads.db"
+                os.environ["CAIRN_THREADS_DB"] = str(db)
+                try:
+                    return _rendered_state(name, lang, db)
+                finally:
+                    del os.environ["CAIRN_THREADS_DB"]
         return _rendered_state(name, lang)
     finally:
         if saved is None:
@@ -123,7 +138,7 @@ def rendered_state(name: str, lang: str | None = None) -> str:
             os.environ["CAIRN_RECORDINGS"] = saved
 
 
-def _rendered_state(name: str, lang: str | None = None) -> str:
+def _rendered_state(name: str, lang: str | None = None, db: Path | None = None) -> str:
     with TestClient(create_app()) as client:
         if lang:
             client.cookies.set(COOKIE, lang)
@@ -132,7 +147,7 @@ def _rendered_state(name: str, lang: str | None = None) -> str:
         if name == "step3":
             return client.get("/step/3").text
         if name.startswith(("step4", "step5", "step6", "step7")):
-            return _people_state(client, name)
+            return _people_state(client, name, db)
         if name.startswith("step2_"):
             page = client.get("/step/2").text
             if name == "step2_before":
@@ -155,7 +170,7 @@ def _rendered_state(name: str, lang: str | None = None) -> str:
         return with_result(page, client.post("/step/1/run", data=data).text)
 
 
-def _people_state(client: TestClient, name: str) -> str:
+def _people_state(client: TestClient, name: str, db: Path | None = None) -> str:
     """Steps 4 and 5 as a visitor sees them: empty, with the example filled, and after the 403."""
     thread = client.post("/api/threads").json()["thread_id"]
     if name == "step4_empty":
@@ -168,9 +183,22 @@ def _people_state(client: TestClient, name: str) -> str:
         return client.get(f"/step/5?thread={thread}").text
     if name == "step6":
         return client.get(f"/step/6?thread={thread}").text
-    if name == "step7":
+    if name == "step6_broken":
+        assert db is not None
+        with sqlite3.connect(db) as conn:
+            conn.execute("UPDATE audit SET actor = 'X' WHERE thread_id = ? AND seq = 3", (thread,))
+        return client.get(f"/step/6?thread={thread}").text
+    if name == "step7_broken":
+        assert db is not None
+        with sqlite3.connect(db) as conn:
+            conn.execute("UPDATE audit SET actor = 'X' WHERE thread_id = ? AND seq = 3", (thread,))
         client.post("/step/5/approve", data={"thread": thread, "actor": "R. Reviewer"})
         return client.get(f"/step/7?thread={thread}").text
+    if name == "step7_mismatch":
+        client.post("/step/5/approve", data={"thread": thread, "actor": "R. Reviewer"})
+        other = {"content_sha256": "x" * 64}
+        with mock.patch.object(app_module, "call_tool", lambda tool, args: other):
+            return client.get(f"/step/7?thread={thread}").text
     refused = client.post("/step/5/approve", data={"thread": thread, "actor": "A. Author"})
     assert "Authors cannot approve their own draft" in refused.text
     return refused.text
@@ -240,7 +268,10 @@ def test_result_fragment_lands_inside_the_result_element() -> None:
         "step5",
         "step5_refused",
         "step6",
+        "step6_broken",
         "step7",
+        "step7_broken",
+        "step7_mismatch",
     ],
 )
 def test_word_cap_rendered(state: str) -> None:
@@ -268,7 +299,10 @@ def test_word_cap_rendered(state: str) -> None:
         "step5",
         "step5_refused",
         "step6",
+        "step6_broken",
         "step7",
+        "step7_broken",
+        "step7_mismatch",
     ],
 )
 def test_steps_1_to_7_are_within_the_cap_in_both_locales(state: str, lang: str) -> None:
