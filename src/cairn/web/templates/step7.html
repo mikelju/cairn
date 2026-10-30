@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% import "_components.html" as a with context %}
+{% block main %}
+{% call a.step(7, "Review", "REAL", "Code placed every number, people decided, and the same tool answers over MCP and REST.", "two-col") %}
+<div class="col-left">
+<h2>Session</h2>
+{{ a.data_table(["Item", "Value"], session) }}
+</div>
+<div class="col-right card">
+<h2>One tool, two doors</h2>
+{{ a.data_table(["Door", "Hash"], doors) }}
+{% if same %}{% call a.callout("rules") %}<p>Same hash, same Observation.</p>{% endcall %}
+{% else %}{% call a.callout("blocked") %}<p>The hashes differ.</p>{% endcall %}{% endif %}
+<p>{% for text, href in links %}<a href="{{ href }}">{{ text }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</p>
+{% call a.disclosure("Production table") %}{{ a.data_table(["Piece", "Demo", "Production"], production) }}{% endcall %}
+</div>
+{% endcall %}
+{% endblock %}

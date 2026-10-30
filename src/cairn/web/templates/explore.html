@@ -6,6 +6,13 @@
 {% for id, text in questions.items() %}<button type="button" hx-post="/explore/run" hx-vals='{"question": "{{ id }}"}' hx-target="#result" title="{{ text }}">{{ id }}</button>{% endfor %}
 </div>
 {% call a.disclosure("Questions") %}<ul class="questions">{% for id, text in questions.items() %}<li>{{ id }}: {{ text }}</li>{% endfor %}</ul>{% endcall %}
+{% if live %}
+<form class="live" hx-post="/explore/live" hx-target="#result" autocomplete="off">
+<label>Your own question <input type="text" name="question" maxlength="500" required></label>
+<label>Access code <input type="password" name="code" autocomplete="off"></label>
+<button type="submit">Ask live</button>
+</form>
+{% endif %}
 <div id="result"></div>
 <div class="col-prod">{{ a.in_production("live model calls.") }}</div>
 {% endcall %}

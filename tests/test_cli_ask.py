@@ -168,7 +168,8 @@ def test_no_web_module_imports_the_live_client() -> None:
     web = [*(root / "web").rglob("*.py"), root / "app.py"]
     for path in web:
         text = path.read_text(encoding="utf-8")
-        assert "cairn.live" not in text and "from cairn import live" not in text, path
+        if path.name != "explore_live.py":  # the one gated live route (phase 06, O1)
+            assert "cairn.live" not in text and "from cairn import live" not in text, path
         assert "build_client" not in text and "AnthropicBedrock" not in text, path
 
 

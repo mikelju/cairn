@@ -9,7 +9,7 @@
   <nav class="steps" aria-label="Steps">
     {% for name in steps %}
       {% set n = loop.index %}
-      {% if n <= 6 %}
+      {% if n <= 7 %}
         <a href="/step/{{ n }}"{% if current == n %} aria-current="step"{% endif %}>{{ n }} {{ name }}</a>
       {% else %}
         <span class="locked" aria-disabled="true">{{ n }} {{ name }}</span>

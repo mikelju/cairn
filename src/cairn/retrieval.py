@@ -8,6 +8,7 @@ so the order does not depend on array layout or platform.
 
 import json
 import platform
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -141,6 +142,9 @@ def decide(query: str, hits: list[RankedHit], threshold: float | None = None) ->
     )
 
 
+_reranker_lock = threading.Lock()
+
+
 @dataclass
 class Index:
     ids: list[str]
@@ -154,8 +158,9 @@ class Index:
     def rerank(self, query: str) -> list[RankedHit]:
         """The RRF top 20 rescored by the cross-encoder; the best `TOP` by reranker score."""
         candidates = self.search(query, CANDIDATES)
-        if self.reranker is None:
-            self.reranker = _load_reranker(self.models)
+        with _reranker_lock:  # SEC-003: concurrent first requests load the reranker once
+            if self.reranker is None:
+                self.reranker = _load_reranker(self.models)
         scores = list(
             self.reranker.rerank(
                 query, [self.texts[h.passage_id] for h in candidates], batch_size=RERANK_BATCH

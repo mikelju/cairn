@@ -95,7 +95,7 @@ def test_offline_check_passes_against_the_app(
     assert "/step/3 200" in out
     assert "PNG" in out
     assert "POST /step/2/run 200 RECORDED" in out
-    assert "steps 4-6: reviewer approves ok" in out
+    assert "steps 4-7: reviewer approves ok" in out
 
 
 def test_offline_check_fails_without_a_highlight_link(run_check: Callable[..., int]) -> None:

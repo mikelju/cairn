@@ -1,0 +1,598 @@
+[
+  {
+    "name": "good",
+    "expect_rules": [],
+    "sections": {
+      "design": [
+        {
+          "parts": [
+            {
+              "type": "text",
+              "text": "The study "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O1",
+              "field": "study_id"
+            },
+            {
+              "type": "text",
+              "text": " used "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O1",
+              "field": "n_examined"
+            },
+            {
+              "type": "text",
+              "text": " animals of species "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O1",
+              "field": "species"
+            },
+            {
+              "type": "text",
+              "text": " given by "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O1",
+              "field": "route"
+            }
+          ]
+        }
+      ],
+      "screen": [
+        {
+          "parts": [
+            {
+              "type": "text",
+              "text": "The incidence screen examined "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O2",
+              "field": "n_examined"
+            },
+            {
+              "type": "text",
+              "text": " animals and flagged "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O2",
+              "field": "n_findings"
+            },
+            {
+              "type": "text",
+              "text": " findings"
+            }
+          ]
+        }
+      ],
+      "tk": [
+        {
+          "parts": [
+            {
+              "type": "text",
+              "text": "The mean of "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O3",
+              "field": "test"
+            },
+            {
+              "type": "text",
+              "text": " was "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O3",
+              "field": "with_quarantined.mean"
+            },
+            {
+              "type": "text",
+              "text": " with and "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O3",
+              "field": "without_quarantined.mean"
+            },
+            {
+              "type": "text",
+              "text": " without the quarantined value"
+            }
+          ]
+        },
+        {
+          "parts": [
+            {
+              "type": "text",
+              "text": "Data quality note: the value of animal "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O3",
+              "field": "quarantined_rows.0.usubjid"
+            },
+            {
+              "type": "text",
+              "text": " was quarantined by validation as not physically possible; the mean is shown with and without it."
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "digit in model text",
+    "expect_rules": [
+      3
+    ],
+    "sections": {
+      "design": [
+        {
+          "parts": [
+            {
+              "type": "text",
+              "text": "The study "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O1",
+              "field": "study_id"
+            },
+            {
+              "type": "text",
+              "text": " used "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O1",
+              "field": "n_examined"
+            },
+            {
+              "type": "text",
+              "text": " animals of species "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O1",
+              "field": "species"
+            },
+            {
+              "type": "text",
+              "text": " given by "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O1",
+              "field": "route"
+            }
+          ]
+        }
+      ],
+      "screen": [
+        {
+          "parts": [
+            {
+              "type": "text",
+              "text": "The incidence screen flagged about 5 findings among "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O2",
+              "field": "n_examined"
+            },
+            {
+              "type": "text",
+              "text": " animals"
+            }
+          ]
+        }
+      ],
+      "tk": [
+        {
+          "parts": [
+            {
+              "type": "text",
+              "text": "The mean of "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O3",
+              "field": "test"
+            },
+            {
+              "type": "text",
+              "text": " was "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O3",
+              "field": "with_quarantined.mean"
+            },
+            {
+              "type": "text",
+              "text": " with and "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O3",
+              "field": "without_quarantined.mean"
+            },
+            {
+              "type": "text",
+              "text": " without the quarantined value"
+            }
+          ]
+        },
+        {
+          "parts": [
+            {
+              "type": "text",
+              "text": "Data quality note: the value of animal "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O3",
+              "field": "quarantined_rows.0.usubjid"
+            },
+            {
+              "type": "text",
+              "text": " was quarantined by validation as not physically possible; the mean is shown with and without it."
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "tk without the quality note",
+    "expect_rules": [
+      5
+    ],
+    "sections": {
+      "design": [
+        {
+          "parts": [
+            {
+              "type": "text",
+              "text": "The study "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O1",
+              "field": "study_id"
+            },
+            {
+              "type": "text",
+              "text": " used "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O1",
+              "field": "n_examined"
+            },
+            {
+              "type": "text",
+              "text": " animals of species "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O1",
+              "field": "species"
+            },
+            {
+              "type": "text",
+              "text": " given by "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O1",
+              "field": "route"
+            }
+          ]
+        }
+      ],
+      "screen": [
+        {
+          "parts": [
+            {
+              "type": "text",
+              "text": "The incidence screen examined "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O2",
+              "field": "n_examined"
+            },
+            {
+              "type": "text",
+              "text": " animals and flagged "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O2",
+              "field": "n_findings"
+            },
+            {
+              "type": "text",
+              "text": " findings"
+            }
+          ]
+        }
+      ],
+      "tk": [
+        {
+          "parts": [
+            {
+              "type": "text",
+              "text": "The mean of "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O3",
+              "field": "test"
+            },
+            {
+              "type": "text",
+              "text": " was "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O3",
+              "field": "with_quarantined.mean"
+            },
+            {
+              "type": "text",
+              "text": " with and "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O3",
+              "field": "without_quarantined.mean"
+            },
+            {
+              "type": "text",
+              "text": " without the quarantined value"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "safety claim",
+    "expect_rules": [
+      6
+    ],
+    "sections": {
+      "design": [
+        {
+          "parts": [
+            {
+              "type": "text",
+              "text": "The study "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O1",
+              "field": "study_id"
+            },
+            {
+              "type": "text",
+              "text": " used "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O1",
+              "field": "n_examined"
+            },
+            {
+              "type": "text",
+              "text": " animals of species "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O1",
+              "field": "species"
+            },
+            {
+              "type": "text",
+              "text": " given by "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O1",
+              "field": "route"
+            }
+          ]
+        }
+      ],
+      "screen": [
+        {
+          "parts": [
+            {
+              "type": "text",
+              "text": "The incidence screen of "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O2",
+              "field": "n_examined"
+            },
+            {
+              "type": "text",
+              "text": " animals shows the compound is safe"
+            }
+          ]
+        }
+      ],
+      "tk": [
+        {
+          "parts": [
+            {
+              "type": "text",
+              "text": "The mean of "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O3",
+              "field": "test"
+            },
+            {
+              "type": "text",
+              "text": " was "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O3",
+              "field": "with_quarantined.mean"
+            },
+            {
+              "type": "text",
+              "text": " with and "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O3",
+              "field": "without_quarantined.mean"
+            },
+            {
+              "type": "text",
+              "text": " without the quarantined value"
+            }
+          ]
+        },
+        {
+          "parts": [
+            {
+              "type": "text",
+              "text": "Data quality note: the value of animal "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O3",
+              "field": "quarantined_rows.0.usubjid"
+            },
+            {
+              "type": "text",
+              "text": " was quarantined by validation as not physically possible; the mean is shown with and without it."
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "name": "species written by hand",
+    "expect_rules": [
+      7
+    ],
+    "sections": {
+      "design": [
+        {
+          "parts": [
+            {
+              "type": "text",
+              "text": "The study used a rat given doses of "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O1",
+              "field": "n_examined"
+            }
+          ]
+        }
+      ],
+      "screen": [
+        {
+          "parts": [
+            {
+              "type": "text",
+              "text": "The incidence screen examined "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O2",
+              "field": "n_examined"
+            },
+            {
+              "type": "text",
+              "text": " animals and flagged "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O2",
+              "field": "n_findings"
+            },
+            {
+              "type": "text",
+              "text": " findings"
+            }
+          ]
+        }
+      ],
+      "tk": [
+        {
+          "parts": [
+            {
+              "type": "text",
+              "text": "The mean of "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O3",
+              "field": "test"
+            },
+            {
+              "type": "text",
+              "text": " was "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O3",
+              "field": "with_quarantined.mean"
+            },
+            {
+              "type": "text",
+              "text": " with and "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O3",
+              "field": "without_quarantined.mean"
+            },
+            {
+              "type": "text",
+              "text": " without the quarantined value"
+            }
+          ]
+        },
+        {
+          "parts": [
+            {
+              "type": "text",
+              "text": "Data quality note: the value of animal "
+            },
+            {
+              "type": "ref",
+              "obs_id": "O3",
+              "field": "quarantined_rows.0.usubjid"
+            },
+            {
+              "type": "text",
+              "text": " was quarantined by validation as not physically possible; the mean is shown with and without it."
+            }
+          ]
+        }
+      ]
+    }
+  }
+]

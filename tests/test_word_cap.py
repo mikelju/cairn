@@ -126,7 +126,7 @@ def _rendered_state(name: str) -> str:
             return client.get("/").text
         if name == "step3":
             return client.get("/step/3").text
-        if name.startswith(("step4", "step5", "step6")):
+        if name.startswith(("step4", "step5", "step6", "step7")):
             return _people_state(client, name)
         if name.startswith("step2_"):
             page = client.get("/step/2").text
@@ -141,7 +141,12 @@ def _rendered_state(name: str) -> str:
         page = client.get("/step/1").text
         if name == "step1_before":
             return page
-        data = {"inject": "on"} if name == "step1_injected" else None
+        switches = {
+            "step1_injected": "negative",
+            "step1_duplicate": "duplicate",
+            "step1_dose": "dose",
+        }
+        data = {"switch": switches[name]} if name in switches else None
         return with_result(page, client.post("/step/1/run", data=data).text)
 
 
@@ -158,6 +163,9 @@ def _people_state(client: TestClient, name: str) -> str:
         return client.get(f"/step/5?thread={thread}").text
     if name == "step6":
         return client.get(f"/step/6?thread={thread}").text
+    if name == "step7":
+        client.post("/step/5/approve", data={"thread": thread, "actor": "R. Reviewer"})
+        return client.get(f"/step/7?thread={thread}").text
     refused = client.post("/step/5/approve", data={"thread": thread, "actor": "A. Author"})
     assert "Authors cannot approve their own draft" in refused.text
     return refused.text
@@ -215,6 +223,8 @@ def test_result_fragment_lands_inside_the_result_element() -> None:
         "step1_before",
         "step1_after",
         "step1_injected",
+        "step1_duplicate",
+        "step1_dose",
         "step2_before",
         "step2_q2",
         "step2_q2_open",
@@ -225,6 +235,7 @@ def test_result_fragment_lands_inside_the_result_element() -> None:
         "step5",
         "step5_refused",
         "step6",
+        "step7",
     ],
 )
 def test_word_cap_rendered(state: str) -> None:

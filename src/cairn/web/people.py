@@ -4,10 +4,13 @@ import json
 import re
 from typing import Annotated, Any
 
+import httpx
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from fastmcp import Client
 from markupsafe import Markup, escape
 
+from cairn.content import QuoteRef, Text, ValueRef
 from cairn.decisions import EXAMPLE, Decision, apply_decisions
 from cairn.gateway import DEFAULT_MODEL
 from cairn.judge import (
@@ -291,6 +294,85 @@ async def step6(request: Request, thread: str | None = None, actor: str = REVIEW
             else f"Audit chain: broken at entry {chain['first_broken']}."
         ),
         chain_ok=chain["ok"],
+    )
+
+
+REPO = "https://github.com/mikelju/cairn"
+STEP7_LINKS = [
+    (
+        "Data-quality memo commit (no .py files; its evals check is green on the phase PR)",
+        f"{REPO}/commit/7897d079c8665301821fe0e0faffdfd988b6ce82",
+    ),
+    ("Blocked bad PR", f"{REPO}/pull/6"),
+    ("REST docs", "/docs"),
+    ("MCP endpoint", "/mcp"),
+]
+PRODUCTION = [
+    ["Identity", "Role picker", "SSO and roles"],
+    ["Audit log", "Hash chain in the app", "External append-only log"],
+    ["Draft model", "Recorded call", "Bedrock with Guardrails and WAF"],
+    ["Sign-off", "Approval in step 5", "Electronic signatures"],
+]
+
+
+async def _two_doors(request: Request) -> tuple[str, str]:
+    """The same tool called over MCP and over REST: the content hash of each Observation.
+
+    REST goes through the app's own HTTP route, in process, so a broken route shows as a failure.
+    """
+    async with Client(request.app.state.mcp) as client:
+        over_mcp = (await client.call_tool("study_design", {})).structured_content or {}
+    transport = httpx.ASGITransport(app=request.app, raise_app_exceptions=False)
+    async with httpx.AsyncClient(transport=transport, base_url="http://cairn") as http:
+        reply = await http.post("/api/tools/study_design", json={})
+    over_rest = reply.json().get("content_sha256") if reply.status_code == 200 else None
+    return str(over_mcp["content_sha256"]), str(over_rest or f"HTTP {reply.status_code}")
+
+
+@people.get("/step/7", response_class=HTMLResponse)
+async def step7(request: Request, thread: str | None = None, actor: str = REVIEWER) -> Response:
+    if thread is None:
+        return RedirectResponse("/step/4", status_code=303)
+    state, waiting, view = await load_view(request, thread)
+    if waiting == "await_decisions":
+        return RedirectResponse(f"/step/4?thread={thread}", status_code=303)
+    parts = [p for s in sections_of(state) for p in s.parts]
+    by_model = sum(c.isdigit() for p in parts if isinstance(p, Text) for c in p.text)
+    model = recorded_model(RECORDINGS_DIR, "DRAFT", DEFAULT_MODEL)
+    recording = ReplayClient.load(RECORDINGS_DIR, draft_key(model)).recording
+    cost = total_cost(recording)
+    latency = sum(float(call.get("latency_s", 0.0)) for call in recording["calls"])
+    chain = await verify_audit(request, thread)
+    failed = len(verify_final(state).failures)
+    over_mcp, over_rest = await _two_doors(request)
+    session = [
+        [
+            "Numbers",
+            f"{sum(isinstance(p, ValueRef) for p in parts)} by code, {by_model} by the model",
+        ],
+        ["Quotations", f"{sum(isinstance(p, QuoteRef) for p in parts)} copied verbatim"],
+        [
+            "Decisions",
+            f"{len(view['decisions'])} by people, {len(view['confirmed'])} NOAEL confirmed",
+        ],
+        [
+            "Recorded draft",
+            f"{latency:.1f} s, " + ("cost n/a" if cost is None else f"{cost:.2f} USD"),
+        ],
+        ["Rules", f"{len(RULE_REASONS) - failed} of {len(RULE_REASONS)} passed"],
+        ["Chain", f"{chain['count']} entries, " + ("verified" if chain["ok"] else "broken")],
+        ["Approval", view["approved_by"] or "not yet"],
+    ]
+    return page(
+        request,
+        "step7.html",
+        current=7,
+        actor=_actor(actor),
+        session=session,
+        doors=[["MCP", over_mcp[:16]], ["REST", over_rest[:16]]],
+        same=over_mcp == over_rest,
+        links=STEP7_LINKS,
+        production=PRODUCTION,
     )
 
 

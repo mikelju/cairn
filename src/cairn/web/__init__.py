@@ -72,14 +72,18 @@ def _page(request: Request, name: str, **context: Any) -> HTMLResponse:
     return templates.TemplateResponse(request, name, base)
 
 
-def _result(report: dict[str, Any], injected: bool) -> dict[str, Any]:
+def _result(
+    report: dict[str, Any], injected: bool, extra: list[dict[str, Any]] | None = None
+) -> dict[str, Any]:
     naive = report["naive_mean_auctau"]
     rows = report["quarantine"]["rows"]
+    extra = extra or []
     return {
         "injected": injected,
+        "reported": bool(extra),
         "total": report["quarantine"]["total"],
         "rows": [r for r in rows if r["rule"] == RULE_AUC],
-        "fired": [r for r in rows if r["rule"] == RULE_CONC],
+        "fired": [r for r in rows if r["rule"] == RULE_CONC] + extra,
         "with_bad": _number(naive["with_quarantined"]["mean"]),
         "n_with": naive["with_quarantined"]["n"],
         "without_bad": _number(naive["without_quarantined"]["mean"]),
@@ -96,10 +100,56 @@ def _inject(frames: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
     return {**frames, "PC": pd.concat([pc, row])}
 
 
-def _revalidate_injected() -> dict[str, Any]:
+RULE_UNIQUE = "dm_usubjid_unique"
+RULE_SET = "dm_setcd_in_tx"
+UNKNOWN_SET = "99"
+
+
+def _duplicate_id(frames: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
+    """Copy the frames and repeat the first animal of DM; the source files stay untouched."""
+    dm = frames["DM"]
+    row = dm.iloc[[0]].copy()
+    row.index = pd.Index([int(str(dm.index.max())) + 1])
+    return {**frames, "DM": pd.concat([dm, row])}
+
+
+def _unknown_dose(frames: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
+    """Copy the frames and move the first animal to a treatment set that TX does not define."""
+    dm = frames["DM"].copy()
+    dm.loc[dm.index[0], "SETCD"] = UNKNOWN_SET
+    return {**frames, "DM": dm}
+
+
+SWITCHES = {"negative": _inject, "duplicate": _duplicate_id, "dose": _unknown_dose}
+
+
+def _integrity_rows(
+    report: dict[str, Any], frames: dict[str, pd.DataFrame]
+) -> list[dict[str, Any]]:
+    """The DM integrity rules that fired in the report, as quarantine rows (never corrected)."""
+    dm, integrity = frames["DM"], report["integrity"]
+    rows = []
+    if integrity["duplicate_usubjid"]:
+        animal = str(dm.loc[dm["USUBJID"].duplicated(keep="first"), "USUBJID"].iloc[0])
+        rows.append({"rule": RULE_UNIQUE, "usubjid": animal, "test": "DM", "value": "repeated"})
+    if integrity["dm_setcd_missing_in_tx"]:
+        bad = dm[~dm["SETCD"].isin(frames["TX"]["SETCD"])]
+        rows.append(
+            {
+                "rule": RULE_SET,
+                "usubjid": str(bad["USUBJID"].iloc[0]),
+                "test": "SETCD",
+                "value": str(bad["SETCD"].iloc[0]),
+            }
+        )
+    return rows
+
+
+def _revalidate(switch: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     frames, zeros, snapshot = load_study()
-    frames = _inject(frames)
-    return build_report(frames, validate_study(frames, zeros), snapshot)
+    frames = SWITCHES[switch](frames)
+    report = build_report(frames, validate_study(frames, zeros), snapshot)
+    return report, _integrity_rows(report, frames)
 
 
 @router.get("/healthz")
@@ -118,17 +168,19 @@ async def step1(request: Request) -> HTMLResponse:
 
 
 @router.post("/step/1/run", response_class=HTMLResponse)
-async def step1_run(request: Request, inject: Annotated[str | None, Form()] = None) -> HTMLResponse:
-    injected = inject == "on"
-    if injected:
-        report = _revalidate_injected()
+async def step1_run(request: Request, switch: Annotated[str, Form()] = "none") -> HTMLResponse:
+    extra: list[dict[str, Any]] = []
+    if switch not in (*SWITCHES, "none"):
+        raise HTTPException(status_code=422, detail="unknown switch")
+    if switch != "none":
+        report, extra = _revalidate(switch)
     else:
         runner: JobRunner = request.app.state.runner
         job = runner.submit("validate_study", {})
         await runner.tasks[job.job_id]
         report = (runner.jobs[job.job_id].outputs or {})["report"]
     return templates.TemplateResponse(
-        request, "step1_result.html", {"r": _result(report, injected)}
+        request, "step1_result.html", {"r": _result(report, switch == "negative", extra)}
     )
 
 
@@ -232,18 +284,24 @@ def _step2_context(question_id: str, directory: Path) -> dict[str, Any]:
     client = ReplayClient.load(directory, key)
     recording = client.recording
     result = ask(QUESTIONS[question_id], LLMGateway(Mode.REPLAY, client=client), model)
-    verdict = result.verdict
     cost = total_cost(recording)
     latency = sum(float(call.get("latency_s", 0.0)) for call in recording["calls"])
     fixture = recording.get("source") == "fixture"
+    meta = (
+        f"{recording['date']} | {recording['region']} | {recording['model']} | "
+        f"{latency:.1f} s | " + ("cost n/a" if cost is None else f"{cost:.2f} USD")
+    )
+    return result_context(result, "FIXTURE" if fixture else "RECORDED", meta)
+
+
+def result_context(result: LoopResult, badge: str, meta: str) -> dict[str, Any]:
+    """The template data of one answered, declined or rejected question, recorded or live."""
+    verdict = result.verdict
     doses, rows = _screen(result)
     trace = " -> ".join(step.tool for step in result.steps if step.tool in STUDY_TOOLS)
     return {
-        "badge": "FIXTURE" if fixture else "RECORDED",
-        "meta": (
-            f"{recording['date']} | {recording['region']} | {recording['model']} | "
-            f"{latency:.1f} s | " + ("cost n/a" if cost is None else f"{cost:.2f} USD")
-        ),
+        "badge": badge,
+        "meta": meta,
         "trace": trace,
         "status": result.status.value,
         "message": result.message,
@@ -372,7 +430,10 @@ async def highlight_image(name: str) -> FileResponse:
 @router.get("/explore", response_class=HTMLResponse)
 async def explore(request: Request) -> HTMLResponse:
     badge = _step2_badge(_recordings_dir())
-    return _page(request, "explore.html", current=0, questions=QUESTIONS, page_badge=badge)
+    live = bool(os.environ.get("CAIRN_ACCESS_CODE"))
+    return _page(
+        request, "explore.html", current=0, questions=QUESTIONS, page_badge=badge, live=live
+    )
 
 
 @router.post("/explore/run", response_class=HTMLResponse)
@@ -387,6 +448,7 @@ def explore_run(request: Request, question: Annotated[str, Form()]) -> HTMLRespo
 
 
 def mount_web(app: FastAPI) -> None:
+    from cairn.web.explore_live import explore_live
     from cairn.web.people import people  # imports this module's helpers, so it loads late
 
     app.state.commit = _commit()
@@ -394,4 +456,5 @@ def mount_web(app: FastAPI) -> None:
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
     app.include_router(router)
     app.include_router(people)
+    app.include_router(explore_live)
     app.include_router(threads)

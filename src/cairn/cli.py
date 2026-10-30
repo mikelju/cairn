@@ -15,6 +15,7 @@ from cairn.judge_cases import CASES_PATH
 from cairn.recording import RECORDINGS_DIR, StaleRecording, recorded_model, total_cost
 from cairn.tools import argument_problems, result_sha256
 from cairn.tools import call_tool as registry_call
+from cairn.workflow import NONCLINICAL_SUMMARY, Workflow, load_workflow
 
 app = typer.Typer(help="Cairn: traceable agentic demo for drug safety science.")
 guidance_app = typer.Typer(help="Guideline passages for guidance retrieval.")
@@ -181,14 +182,13 @@ def record_command(
         raise typer.Exit(1)
 
 
-@app.command("record-draft")
-def record_draft_command(model: str = DEFAULT_MODEL, recordings: Path = RECORDINGS_DIR) -> None:
-    """Record the nonclinical draft against Bedrock (laptop only): one call, 2 USD ceiling."""
+def _record_workflow(workflow: Workflow, model: str, recordings: Path) -> None:
+    """Record a workflow's draft: ceiling first, spend after, one call within the 2 USD budget."""
     _known_model(model)
     ceiling = live.call_ceiling(model)
     typer.echo(f"ceiling: {ceiling:.2f} USD of {live.DRAFT_BUDGET_USD:.2f}")
     try:
-        path = live.record_draft(recordings, model)
+        path = live.record_draft(recordings, model, workflow)
     except Exception as error:  # SDK errors and a failing draft end as a plain message
         typer.echo(f"error: {type(error).__name__}: {error}", err=True)
         raise typer.Exit(1) from error
@@ -198,6 +198,18 @@ def record_draft_command(model: str = DEFAULT_MODEL, recordings: Path = RECORDIN
     if spent > ceiling:
         typer.echo(f"error: cost passes the ceiling of {ceiling:.2f} USD", err=True)
         raise typer.Exit(1)
+
+
+@app.command("record-draft")
+def record_draft_command(model: str = DEFAULT_MODEL, recordings: Path = RECORDINGS_DIR) -> None:
+    """Record the nonclinical draft against Bedrock (laptop only): one call, 2 USD ceiling."""
+    _record_workflow(NONCLINICAL_SUMMARY, model, recordings)
+
+
+@app.command("record-memo")
+def record_memo_command(model: str = DEFAULT_MODEL, recordings: Path = RECORDINGS_DIR) -> None:
+    """Record the data-quality memo draft against Bedrock (laptop only): one call, 2 USD ceiling."""
+    _record_workflow(load_workflow("data-quality-memo"), model, recordings)
 
 
 @app.command("smoke")

@@ -1,6 +1,6 @@
 # Phase 05 - Audit and judge: plan and results
 
-Status: ready locally
+Status: integrated
 Spec: `spec.md` (approved by the user on 2026-10-28, see U1 and U2)
 Base: branch `claude/jolly-knuth-g8jdjq` from `main` at 3a92dd4 (phase 04 merged, PR https://github.com/mikelju/cairn/pull/12)
 
