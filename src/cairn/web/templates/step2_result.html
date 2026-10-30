@@ -1,4 +1,4 @@
-{% import "_components.html" as a %}
+{% import "_components.html" as a with context %}
 {% if stale %}
 <div class="col-left">
 {% call a.callout("stale") %}<p>{{ stale }}</p>{% endcall %}
@@ -8,10 +8,10 @@
 {{ a.badge_meta(r.badge, r.meta) }}
 {% if r.text %}
 <div class="card answer"><p><strong>{{ r.text }}</strong></p>
-{% call a.disclosure("What the model wrote") %}<p>{{ r.written }}</p>{% endcall %}</div>
+{% call a.disclosure("model_text", r.written.split()|length, "words") %}<p>{{ r.written }}</p>{% endcall %}</div>
 {% elif r.written %}
 <div class="card answer">
-{% call a.disclosure("What the model wrote") %}<p>{{ r.written }}</p>{% endcall %}</div>
+{% call a.disclosure("model_text", r.written.split()|length, "words") %}<p>{{ r.written }}</p>{% endcall %}</div>
 {% endif %}
 {{ a.trace(r.trace) }}
 {% if r.message or r.failures %}
@@ -29,7 +29,7 @@
 <blockquote class="quote"><p>{{ q.text }}</p><p class="meta">{{ q.citation }}{% if q.highlight %} · <a href="{{ q.highlight }}">highlighted page</a>{% endif %} · <a href="{{ q.link }}">official page</a></p></blockquote>
 {% endfor %}
 
-{% if r.rows %}{% call a.disclosure("Screening rule") %}<p>{{ r.rule }}</p>{% endcall %}
+{% if r.rows %}{% call a.disclosure("screening_rule", r.rule.split()|length, "words") %}<p>{{ r.rule }}</p>{% endcall %}
 {% set screen = namespace(rows=[]) %}
 {% for row in r.rows %}{% set screen.rows = screen.rows + [[row.sex, row.tissue, row.finding] + row.cells] %}{% endfor %}
 {{ a.data_table(["Sex", "Tissue", "Finding"] + r.doses, screen.rows) }}

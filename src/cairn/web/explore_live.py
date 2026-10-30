@@ -20,7 +20,7 @@ from cairn.loop import LoopStatus
 from cairn.pricing import call_cost
 from cairn.questions import QUESTIONS
 from cairn.tools import LIVE_SEARCH
-from cairn.web import result_context, templates
+from cairn.web import i18n, result_context, templates
 
 explore_live = APIRouter()
 MAX_QUESTION_CHARS = 500
@@ -102,4 +102,6 @@ def explore_ask_live(
     context = result_context(result, "REAL", meta)
     if result.status is not LoopStatus.ANSWERED:  # shown as is, never as an answer
         context["text"] = None
-    return templates.TemplateResponse(request, "step2_result.html", {"r": context})
+    return templates.TemplateResponse(
+        request, "step2_result.html", {**i18n.context(request), "r": context}
+    )

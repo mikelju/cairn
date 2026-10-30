@@ -25,7 +25,7 @@ from cairn.recording import RECORDINGS_DIR, ReplayClient, recorded_model, total_
 from cairn.render import render
 from cairn.verify import RULE_REASONS
 from cairn.web import _page as page
-from cairn.web import templates
+from cairn.web import i18n, templates
 from cairn.web.threads import (
     AUTHOR,
     REVIEWER,
@@ -162,7 +162,10 @@ async def step4_decide(request: Request) -> HTMLResponse:
         return HTMLResponse(
             status_code=204, headers={"HX-Redirect": _current(thread, AUTHOR).headers["location"]}
         )
-    return templates.TemplateResponse(request, "step4_result.html", await _fragment(request, view))
+    fragment = await _fragment(request, view)
+    return templates.TemplateResponse(
+        request, "step4_result.html", {**i18n.context(request), **fragment}
+    )
 
 
 @people.post("/step/4/example")

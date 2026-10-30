@@ -2,8 +2,8 @@
 <p class="meta">Model calls for these decisions: 0</p>
 {% for sex, n in noael.items() %}
 <p class="meta"><strong>NOAEL {{ sex }}:</strong> {% if n.dose is none %}not established{% else %}{{ "%g"|format(n.dose) }} mg/kg/day{% endif %}</p>
-{% if n.flags %}{% call a.disclosure("Not fully examined (" ~ sex ~ ")") %}{% for f in n.flags %}<p class="meta">{{ f }}</p>{% endfor %}{% endcall %}{% endif %}
+{% if n.flags %}{% call a.disclosure("flags", n.flags|length, "items", sex) %}{% for f in n.flags %}<p class="meta">{{ f }}</p>{% endfor %}{% endcall %}{% endif %}
 {% endfor %}
 <p class="meta">Rule: highest dose below the lowest adverse dose, the <a href="/step/3">step 3</a> definition.</p>
-{% call a.disclosure("Draft with empty slots") %}<p class="answer">{{ draft }}</p>{% endcall %}
+{% call a.disclosure("draft_slots", draft.split()|length, "words") %}<p class="answer">{{ draft }}</p>{% endcall %}
 <form method="post" action="/step/4/confirm"><input type="hidden" name="thread" value="{{ thread }}"><input type="hidden" name="actor" value="R. Reviewer"><button type="submit"{% if not complete %} disabled{% endif %}>Confirm NOAEL as R. Reviewer</button></form>

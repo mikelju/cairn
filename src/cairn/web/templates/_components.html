@@ -61,17 +61,23 @@
 {% macro trace(steps) %}<p class="trace">Trace: {{ steps }}</p>{% endmacro %}
 
 {% macro evidence_panel(items) %}
-<div class="evidence">
+{% call disclosure("evidence", items|length, "items") %}<div class="evidence">
 {% for e in items %}
 <p>{{ e.tool }}, {{ e.population }}, n={{ e.n }}, {{ e.sources }}</p>
 {% endfor %}
-</div>
+</div>{% endcall %}
 {% endmacro %}
 
 {# kind: rules, blocked, stale or note. #}
 {% macro callout(kind) %}<div class="callout {{ kind }}">{{ caller() }}</div>{% endmacro %}
 
-{% macro disclosure(summary) %}<details><summary>{{ summary }}</summary>{{ caller() }}</details>{% endmacro %}
+{# A disclosure pill: key names the catalogue label, n and unit give the size ("Show passage ranking · 3 rows"), tag tells repeats apart. #}
+{% macro disclosure(key, n, unit, tag=none) %}{% set forms = t["unit_" ~ unit].split("|") %}<details class="pill"><summary class="pill">{{ t["disc_" ~ key] }}{% if tag %} ({{ tag }}){% endif %} · {{ n }} {{ forms[0] if n == 1 else forms[1] }}</summary>{{ caller() }}</details>{% endmacro %}
+
+{# Reading cues: a numbered path for the page header and matching number badges on the parts it names. #}
+{% macro reading_path(labels, label) %}<ol class="path" aria-label="{{ label }}">{% for text in labels %}<li><span class="cue solid" aria-hidden="true">{{ loop.index }}</span>{{ text }}</li>{% endfor %}</ol>{% endmacro %}
+
+{% macro cue(number) %}<span class="cue" aria-hidden="true">{{ number }}</span>{% endmacro %}
 
 {% macro in_production(text, kind=none, lead=none) %}
 <p class="prod">{% if kind %}{{ badge(kind) }} {{ lead }} <strong>In production →</strong>{% else %}In production →{% endif %} {{ text }}</p>

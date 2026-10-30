@@ -229,6 +229,17 @@ td.not-examined { background: repeating-linear-gradient(45deg, var(--color-not-e
 .answer p { margin: var(--space-1) 0; }
 details { margin: var(--space-1) 0; }
 summary { cursor: pointer; color: var(--color-accent); font-size: var(--text-sm); }
+details.pill { margin: var(--space-3) 0 0; }
+summary.pill { list-style: none; display: inline-flex; align-items: center; gap: var(--space-2); font-weight: var(--weight-semibold); color: var(--color-ink); background: var(--color-surface-2); border: var(--border-1) solid var(--color-control-border); border-radius: var(--radius-pill); padding: 6px var(--space-4) 6px var(--space-2); }
+summary.pill::-webkit-details-marker { display: none; }
+summary.pill::before { content: "+"; display: inline-flex; width: 20px; height: 20px; align-items: center; justify-content: center; border-radius: var(--radius-pill); background: var(--color-accent-tint); color: var(--color-accent); font-family: var(--font-mono); font-weight: var(--weight-bold); }
+details[open] > summary.pill::before { content: "-"; }
+details.pill[open] > summary.pill { margin-bottom: var(--space-2); }
+.path { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); margin: 0; padding: 0; list-style: none; font-size: var(--text-sm); color: var(--color-muted); }
+.path li { display: inline-flex; align-items: center; gap: var(--space-2); }
+.path li + li::before { content: ""; width: 18px; height: 1px; background: var(--color-control-border); margin-right: var(--space-2); }
+.cue { display: inline-flex; flex: none; width: 20px; height: 20px; align-items: center; justify-content: center; border-radius: var(--radius-pill); border: var(--border-1) solid var(--color-accent); color: var(--color-accent); font-family: var(--font-mono); font-size: var(--text-2xs); font-weight: var(--weight-bold); line-height: 1; }
+.cue.solid { background: var(--color-accent); color: var(--color-on-accent); }
 h2 { font-size: var(--text-md); line-height: 1.2; margin: 0 0 var(--space-2); }
 .stamp { display: inline-block; margin: 0 0 var(--space-2); padding: var(--space-1) var(--space-2); border: var(--border-badge) dashed var(--color-simulated); border-radius: var(--radius-sm); background: var(--color-warning-tint); color: var(--color-ink); font-size: var(--text-xs); font-weight: var(--weight-bold); }
 @media (max-width: 900px) {

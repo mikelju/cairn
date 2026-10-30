@@ -153,11 +153,11 @@ def test_step2_toggle_shows_markers_and_no_digits(
     monkeypatch: pytest.MonkeyPatch, folder: Path, marker: str
 ) -> None:
     result = _ask("Q2", monkeypatch, folder)
-    toggle = re.search(r"<details>.*?</details>", result, flags=re.S)
+    toggle = re.search(r"<details class=\"pill\">.*?</details>", result, flags=re.S)
     assert toggle is not None
-    assert "What the model wrote" in toggle.group(0)
+    assert "Ver texto del modelo" in toggle.group(0)
     assert marker in toggle.group(0)
-    assert not re.search(r"\d", toggle.group(0))
+    assert not re.search(r"\d", toggle.group(0).split("</summary>")[1])
 
 
 def test_q6_blocked(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -284,8 +284,9 @@ def test_q2_prose_counts_the_screened_findings_by_reference(
     rows = result.count("<tr><td>")
     assert re.match(rf"{rows} screened findings", text), text
     assert rows == incidence().values["n_findings"]
-    toggle = re.search(r"<details>.*?</details>", result, flags=re.S)
-    assert toggle and "[n_findings]" in toggle.group(0) and not re.search(r"\d", toggle.group(0))
+    toggle = re.search(r"<details class=\"pill\">.*?</details>", result, flags=re.S)
+    assert toggle and "[n_findings]" in toggle.group(0)
+    assert not re.search(r"\d", toggle.group(0).split("</summary>")[1])
 
 
 def _explore(question: str) -> str:
@@ -338,16 +339,17 @@ def test_step3_shows_the_two_fixed_queries_with_ranks_and_the_build_badge() -> N
         assert f"<td>{top.fused_rank}</td>" in page
     assert page.count("<tr>") >= 2 * (1 + 3)  # a header row and three passages per query
     assert 'class="badge computed-at-build"' in page and "COMPUTED AT BUILD" in page
-    assert "Lower ranks" in page and "In production" in page
+    assert "Ver puestos inferiores" in page and "In production" in page
     assert "<th>Lex</th>" in page and "<th>Sem</th>" in page and "<th>Fused</th>" in page
 
 
 def test_step3_counts_quotes_verbatim_on_the_cited_page() -> None:
     with TestClient(create_app()) as client:
         page = client.get("/step/3").text
-    match = re.search(r"Quotes: (\d+) · verbatim on the cited page: (\d+)/(\d+)", page)
+    match = re.search(r"Verbatim: (\d+)/(\d+)", page)
     assert match, "no quotes line"
-    total, verbatim, of = map(int, match.groups())
+    verbatim, total = map(int, match.groups())
+    of = int(re.search(r"Ver frases citadas · (\d+) citas", page).group(1))  # type: ignore[union-attr]
     assert total == of == 6
     assert verbatim == total
 
@@ -476,10 +478,10 @@ def test_steps_4_and_5_people_decide_and_the_author_cannot_approve() -> None:
         thread = re.search(r'name="thread" value="([0-9a-f]+)"', step4)
         assert thread and "Acting as: A. Author" in step4 and "disabled" in step4
         id_ = thread.group(1)
-        assert "Draft with empty slots" in step4 and "no decision yet" in step4
+        assert "Show draft with gaps" in step4 and "no decision yet" in step4
         client.post("/step/4/example", data={"thread": id_})
         confirmed = client.post("/step/4/confirm", data={"thread": id_, "actor": "R. Reviewer"})
-        assert "Acting as: R. Reviewer" in confirmed.text and "Final text" in confirmed.text
+        assert "Acting as: R. Reviewer" in confirmed.text and "Show final text" in confirmed.text
         refused = client.post("/step/5/approve", data={"thread": id_, "actor": "A. Author"})
         assert "403 · Authors cannot approve their own draft. Enforced by the API" in refused.text
         done = client.post("/step/5/approve", data={"thread": id_, "actor": "R. Reviewer"})
@@ -563,7 +565,7 @@ def test_step5_with_the_real_recordings_shows_real_verdicts(
     with TestClient(create_app()) as client:
         id_ = _step5_thread(client)
         page = client.get(f"/step/5?thread={id_}&actor=R.%20Reviewer").text
-        assert "16 of 16 sentences judged" in page and "sonnet-4-6" in page
+        assert "16 of 16 judged" in page and "sonnet-4-6" in page
         assert "n=24" in page and "kappa 1.00" in page and "EXAMPLE" in page
 
 
@@ -641,7 +643,7 @@ def test_step7_closes_the_session_with_one_tool_over_mcp_and_rest() -> None:
             and "R. Reviewer" in page
             and "8 of 8 passed" in page
         )
-        assert "<details><summary>Production table" in page
+        assert "Ver tabla de producción" in page
         hashes = re.findall(r"<td>(?:MCP|REST)</td><td>([0-9a-f]{16})</td>", page)
         assert len(hashes) == 2 and hashes[0] == hashes[1]
         assert client.get("/docs").status_code == 200

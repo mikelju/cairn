@@ -36,7 +36,7 @@ Current authorisation and limits: E5 produces mockups v3; E6 records the user de
 ## Plan
 Each increment fits one Sonnet executor with limited context.
 - [x] 1. Tokens and shell with locale: dark `:root` values, floating pill header bar with the ES/EN toggle, mono footer, badges as pills keeping glyphs and border styles; a string catalogue (one EN and one ES table of our own UI text), locale from query parameter and cookie, every shell string read from it; update `test_design_tokens_*`; catalogue key-parity test (C2, C5, C7, C8, C14).
-- [ ] 2. Components: a disclosure macro (`<details>` with a pill `<summary>` taking content label and count) and in-page reading cues (ordered path or section labels) for every page, from the catalogue; remove the help button and any help panel; tests for C1 and C11 in both locales (C1, C5, C11).
+- [x] 2. Components: a disclosure macro (`<details>` with a pill `<summary>` taking content label and count) and in-page reading cues (ordered path or section labels) for every page, from the catalogue; remove the help button and any help panel; tests for C1 and C11 in both locales (C1, C5, C11).
 - [ ] 3. Landing: one-line message, `h1`, four-stage journey diagram with icons, one primary CTA to step 1, badge legend inline as a reading cue; within the cap in both locales (C3, C4, C13, C14).
 - [ ] 4. Explore guided sequence: three numbered stages (study, limits and trick questions, guidelines), cards with the question text, answer inside its stage under its card, format line on every answer (step 2 too), vanilla JS scroll reveal that degrades to fully visible; tests in both locales (C3, C10, C12, C14, C15).
 - [ ] 5. Steps 1 to 7 hierarchy pass in both locales: one highlighted key number or state per step, traces, rows and JSON behind the disclosure component, prose trimmed, every string from the catalogue; word-cap test parametrised by locale (C3, C11, C13, C14).
@@ -55,7 +55,7 @@ Found while taking the before set: Explore after Q1 measures `scrollHeight` 985 
 
 ### Visual direction
 - Type: IBM Plex Sans 700 for display, tracking -0.025em, h1 30px on steps and 52px on the landing; IBM Plex Sans 400 for body at 15px, line height 1.5; IBM Plex Mono 11px uppercase with 0.14em tracking for eyebrows, stage numbers, table headers, badges, step numbers and footer.
-- Palette (dark): paper `#0e1316`, surface `#151c20`, surface-2 `#1b242a`, line `#27323a`, control border `#4a5862`, ink `#e6ecee`, muted `#9aa7ad`, accent `#6cbcf5` with on-accent `#071019`, teal `#7fd0c6` (REAL), recorded `#8fc3f2`, simulated `#e9b25d`, block `#ff8f86`.
+- Palette (dark): paper `#0e1316`, surface `#151c20`, surface-2 `#1b242a`, line `#27323a`, control border `#5f6f79`, ink `#e6ecee`, muted `#9aa7ad`, accent `#6cbcf5` with on-accent `#071019`, teal `#7fd0c6` (REAL), recorded `#8fc3f2`, simulated `#e9b25d`, block `#ff8f86`.
 - Spacing 4, 8, 12, 16, 24, 32, 48, 64 px; content width 1248px, gutters 48px; cards 10px radius, 1px line, no shadow; buttons, badges, disclosures, the language toggle and the header bar as pills.
 - Hierarchy: each page leads with one highlighted number or state (for example "12 filas en cuarentena", "NOAEL 30 mg/kg/día") in display size, then at most two short lines, then pill disclosures for detail.
 - Mockups v3 (E5), the reference for implementation: `docs/changes/003-evidence/mockup3-landing.png`, `mockup3-step3.png`, `mockup3-explore-1.png`, `mockup3-explore-2.png`, `mockup3-explore-3.png`, `mockup3-explore-full.png`.
@@ -85,6 +85,7 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | E5 | ejecutor | Mockups v3: landing, step 3 and the Explore guided sequence with the ES/EN toggle and in-page cues | in progress | |
 | E6 | ejecutor | Record the user answers to U4 to U8 and the help removal; rework criteria and plan | done | This record |
 | E7 | ejecutor | Increment 1: dark tokens, pill shell with ES/EN toggle, string catalogue and parity test | done | See plan item 1 and Evidence |
+| E8 | ejecutor | Increment 2: disclosure pill macro, reading-cue macros, C1 and C11 tests | done | See plan item 2 and Evidence |
 
 ## User decisions
 Questions the supervisor raises with the user. Statuses: open, answered, deferred; each closes with the user's literal answer.
@@ -111,6 +112,7 @@ Questions the supervisor raises with the user. Statuses: open, answered, deferre
 - Word counts before (`tests/test_word_cap.py`, cap 93): landing 41, step1 before 45, after 71, injected 80, duplicate 89, dose 89, step2 before 20, Q2 80, Q2 open 92, Q6 39, step3 93, step4 empty 75, filled 79, step5 77, refused 92, step6 46, step7 60.
 
 - Increment 1 (E7): dark `:root` in `src/cairn/web/static/cairn.css` (C2); pill shell in `_components.html` and `base.html`; catalogue `src/cairn/web/i18n.py` (EN and ES dicts, `?lang=` query parameter remembered by the `cairn_lang` cookie through an ASGI middleware, default ES); `tests/test_i18n.py` checks key parity, the default, the toggle, persistence and toggle links; `tests/test_design.py` pins the new tokens. Deviation: `--color-control-border` is `#5f6f79`, not `#4a5862`, because the specified value gave 2.55:1 on paper and C5 needs 3:1 (now 3.59:1 on paper, 3.31:1 on surface). Existing tests that read English shell strings now request `?lang=en`. Body strings are not translated yet (increments 2 to 5).
+- Increment 2 (E8): macros `disclosure(key, n, unit, tag)`, `reading_path(labels, label)` and `cue(number)` in `src/cairn/web/templates/_components.html`, pill CSS in `cairn.css` (focus outline from the shared `summary:focus-visible` rule); labels `disc_*` and units `unit_*` ("singular|plural") in `src/cairn/web/i18n.py`; every `<details>` in the templates goes through the macro and the HTMX fragments now receive the catalogue. `tests/test_disclosures.py` (both locales): every rendered summary has class `pill` and matches `<verb> <content> · <n> <unit>` with a non-generic content; no `aside`, `class="explain"` or help label in templates, CSS or rendered pages; the path and cue macros render. The path and cue are components only: pages adopt them in increments 3 to 5. Word cap kept without touching the counter: evidence line of step 2 and Explore moved behind a pill (`disc_evidence`), step 3 and step 5 wording trimmed ("Verbatim: n/m", "Recorded questions", "The judge never blocks."). Counts in ES (default): step2 Q2 81, Q2 open 93, step3 92.
 
 ## Delivery
 Not started.

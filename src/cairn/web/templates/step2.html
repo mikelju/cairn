@@ -6,7 +6,7 @@
   <select name="question" aria-label="Question">{% for id in questions %}<option value="{{ id }}">{{ id }}</option>{% endfor %}</select>
   <button type="submit">Ask</button>
 </form>
-{% call a.disclosure("Questions") %}<ul class="questions">{% for id, text in questions.items() %}<li>{{ id }}: {{ text }}</li>{% endfor %}</ul>{% endcall %}
+{% call a.disclosure("questions", questions|length, "questions") %}<ul class="questions">{% for id, text in questions.items() %}<li>{{ id }}: {{ text }}</li>{% endfor %}</ul>{% endcall %}
 <div id="result"></div>
 <div class="col-prod">{{ a.in_production("live model calls.") }}</div>
 {% endcall %}

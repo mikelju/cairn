@@ -5,7 +5,7 @@
 <div class="controls" role="group" aria-label="Questions">
 {% for id, text in questions.items() %}<button type="button" hx-post="/explore/run" hx-vals='{"question": "{{ id }}"}' hx-target="#result" title="{{ text }}">{{ id }}</button>{% endfor %}
 </div>
-{% call a.disclosure("Questions") %}<ul class="questions">{% for id, text in questions.items() %}<li>{{ id }}: {{ text }}</li>{% endfor %}</ul>{% endcall %}
+{% call a.disclosure("questions", questions|length, "questions") %}<ul class="questions">{% for id, text in questions.items() %}<li>{{ id }}: {{ text }}</li>{% endfor %}</ul>{% endcall %}
 {% if live %}
 <form class="live" hx-post="/explore/live" hx-target="#result" autocomplete="off">
 <label>Your own question <input type="text" name="question" maxlength="500" required></label>

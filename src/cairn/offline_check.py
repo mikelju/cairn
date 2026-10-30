@@ -13,6 +13,7 @@ from urllib.error import HTTPError
 from urllib.parse import urlencode
 
 from cairn.judge import KAPPA_PATH
+from cairn.web.i18n import CATALOGUES
 
 BASE = "http://127.0.0.1:8000"
 
@@ -39,8 +40,8 @@ def _calibration() -> str:
 
 
 def _judged(page: str) -> bool:
-    """Step 5 says "N of N sentences judged" with N above zero."""
-    found = re.search(r"(\d+) of (\d+) sentences judged", page)
+    """Step 5 says "N of N judged" with N above zero."""
+    found = re.search(r"(\d+) of (\d+) judged", page)
     return found is not None and found.group(1) == found.group(2) and int(found.group(1)) > 0
 
 
@@ -60,7 +61,8 @@ def people_decide() -> bool:
     step6 = get(f"/step/6?thread={thread}")[1].decode()
     step7 = get(f"/step/7?thread={thread}")[1].decode()
     checks = {
-        "step 5 has the final text": "Final text" in final and "RECORDED" in final,
+        "step 5 has the final text": any(c["disc_final_text"] in final for c in CATALOGUES.values())
+        and "RECORDED" in final,
         "step 5 has the judge panel": "Judge panel" in final and "see step 6" in final,
         "step 5 panel shows the recorded n and kappa": bool(calibration) and calibration in final,
         "step 5 judged every sentence": _judged(final),

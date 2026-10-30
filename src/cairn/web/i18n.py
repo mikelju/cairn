@@ -31,6 +31,21 @@ EN: dict[str, str] = {
     "footer_note": "Public sample data · fictional compound · not GxP-validated",
     "footer_build": "commit",
     "footer_snapshot": "snapshot",
+    "disc_questions": "Show questions",
+    "disc_model_text": "Show model text",
+    "disc_screening_rule": "Show rule",
+    "disc_lower_ranks": "Show lower ranks",
+    "disc_quotes": "Show quoted sentences",
+    "disc_flags": "Show unexamined tissues",
+    "disc_draft_slots": "Show draft with gaps",
+    "disc_final_text": "Show final text",
+    "disc_production": "Show production table",
+    "disc_evidence": "Show evidence",
+    "unit_questions": "question|questions",
+    "unit_words": "word|words",
+    "unit_rows": "row|rows",
+    "unit_quotes": "quote|quotes",
+    "unit_items": "item|items",
 }
 
 ES: dict[str, str] = {
@@ -50,6 +65,21 @@ ES: dict[str, str] = {
     "footer_note": "Datos públicos de ejemplo · compuesto ficticio · no validado GxP",
     "footer_build": "commit",
     "footer_snapshot": "instantánea",
+    "disc_questions": "Ver preguntas",
+    "disc_model_text": "Ver texto del modelo",
+    "disc_screening_rule": "Ver regla",
+    "disc_lower_ranks": "Ver puestos inferiores",
+    "disc_quotes": "Ver frases citadas",
+    "disc_flags": "Ver tejidos sin examinar",
+    "disc_draft_slots": "Ver borrador con huecos",
+    "disc_final_text": "Ver texto final",
+    "disc_production": "Ver tabla de producción",
+    "disc_evidence": "Ver evidencia",
+    "unit_questions": "pregunta|preguntas",
+    "unit_words": "palabra|palabras",
+    "unit_rows": "fila|filas",
+    "unit_quotes": "cita|citas",
+    "unit_items": "elemento|elementos",
 }
 
 CATALOGUES: dict[str, dict[str, str]] = {"en": EN, "es": ES}

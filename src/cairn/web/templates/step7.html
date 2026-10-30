@@ -12,7 +12,7 @@
 {% if same %}{% call a.callout("rules") %}<p>Same hash, same Observation.</p>{% endcall %}
 {% else %}{% call a.callout("blocked") %}<p>The hashes differ.</p>{% endcall %}{% endif %}
 <p>{% for text, href in links %}<a href="{{ href }}">{{ text }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</p>
-{% call a.disclosure("Production table") %}{{ a.data_table(["Piece", "Demo", "Production"], production) }}{% endcall %}
+{% call a.disclosure("production", production|length, "rows") %}{{ a.data_table(["Piece", "Demo", "Production"], production) }}{% endcall %}
 </div>
 {% endcall %}
 {% endblock %}

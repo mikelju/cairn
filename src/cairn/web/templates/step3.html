@@ -7,15 +7,15 @@
 {% for q in r.queries %}
 <p class="meta"><strong>{{ q.id }}</strong> {{ q.query }}</p>
 {{ a.data_table(headers, q.rows) }}
-{% if q.folded %}{% call a.disclosure("Lower ranks") %}{{ a.data_table(headers, q.folded) }}{% endcall %}{% endif %}
+{% if q.folded %}{% call a.disclosure("lower_ranks", q.folded|length, "rows") %}{{ a.data_table(headers, q.folded) }}{% endcall %}{% endif %}
 {% endfor %}
-<p class="meta"><a href="/explore">Ask the recorded questions</a></p>
-<div class="col-prod">{{ a.in_production("live questions behind an access code.") }}</div>
+<p class="meta"><a href="/explore">Recorded questions</a></p>
+<div class="col-prod">{{ a.in_production("live questions.") }}</div>
 </div>
 <div class="col-right card">
 <h2>Quotations</h2>
-<p class="meta">Quotes: {{ r.quotes|length }} · verbatim on the cited page: {{ r.verbatim }}/{{ r.quotes|length }}</p>
-{% call a.disclosure("Quoted sentences") %}
+<p class="meta">Verbatim: {{ r.verbatim }}/{{ r.quotes|length }}</p>
+{% call a.disclosure("quotes", r.quotes|length, "quotes") %}
 {% for q in r.quotes %}<blockquote class="quote"><p>{{ q.text }}</p><p class="meta">{{ q.id }} · {{ q.cite }}{% if q.highlight %} · <a href="{{ q.highlight }}">highlighted page</a>{% endif %} · <a href="{{ q.link }}">official page</a></p></blockquote>{% endfor %}
 {% endcall %}
 </div>

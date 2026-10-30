@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from cairn.app import create_app
+from cairn.web.i18n import CATALOGUES
 
 STEP_WORD_CAP = 93
 REAL_RECORDINGS = Path(__file__).resolve().parent / "fixtures" / "recordings_real_shape"
@@ -101,10 +102,12 @@ def with_result(page: str, fragment: str) -> str:
 
 
 def open_toggle(html: str) -> str:
-    """Mark the "What the model wrote" disclosure open, as a visitor does."""
-    closed = "<details><summary>What the model wrote"
-    assert closed in html, "no closed 'What the model wrote' toggle to open"
-    return html.replace(closed, closed.replace("<details>", "<details open>"))
+    """Mark the model-text disclosure open, as a visitor does."""
+    labels = "|".join(re.escape(c["disc_model_text"]) for c in CATALOGUES.values())
+    closed = re.compile(rf'<details class="pill">(?=<summary class="pill">(?:{labels}))')
+    opened, count = closed.subn('<details class="pill" open>', html, count=1)
+    assert count == 1, "no closed model-text toggle to open"
+    return opened
 
 
 def rendered_state(name: str) -> str:
@@ -252,8 +255,8 @@ def test_with_result_fails_when_there_is_no_result_element() -> None:
 def test_open_toggle_fails_when_there_is_no_closed_toggle() -> None:
     with pytest.raises(AssertionError):
         open_toggle("<p>stale recording: run make record</p>")
-    assert "<details open><summary>What the model wrote" in open_toggle(
-        "<details><summary>What the model wrote</summary></details>"
+    assert '<details class="pill" open>' in open_toggle(
+        '<details class="pill"><summary class="pill">Show model text · 2 words</summary></details>'
     )
 
 

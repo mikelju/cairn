@@ -337,8 +337,12 @@ def step2_run(request: Request, question: Annotated[str, Form()]) -> HTMLRespons
     try:
         context = _step2_context(question, _recordings_dir())
     except StaleRecording as error:
-        return templates.TemplateResponse(request, "step2_result.html", {"stale": str(error)})
-    return templates.TemplateResponse(request, "step2_result.html", {"r": context})
+        return templates.TemplateResponse(
+            request, "step2_result.html", {**i18n.context(request), "stale": str(error)}
+        )
+    return templates.TemplateResponse(
+        request, "step2_result.html", {**i18n.context(request), "r": context}
+    )
 
 
 SHOWN_HITS = 3
@@ -444,8 +448,12 @@ def explore_run(request: Request, question: Annotated[str, Form()]) -> HTMLRespo
     try:
         context = _step2_context(question, _recordings_dir())
     except StaleRecording as error:
-        return templates.TemplateResponse(request, "step2_result.html", {"stale": str(error)})
-    return templates.TemplateResponse(request, "step2_result.html", {"r": context})
+        return templates.TemplateResponse(
+            request, "step2_result.html", {**i18n.context(request), "stale": str(error)}
+        )
+    return templates.TemplateResponse(
+        request, "step2_result.html", {**i18n.context(request), "r": context}
+    )
 
 
 def mount_web(app: FastAPI) -> None:

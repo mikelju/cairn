@@ -4,7 +4,7 @@
 {% call a.step(5, "Draft", "RECORDED", "The model drafts the summary; code places every value and every quotation.", "two-col") %}
 <div class="col-left">
 {{ a.badge_meta("RECORDED", meta) }}
-{% call a.disclosure("Final text") %}<div class="card answer"><p>{{ text }}</p></div>{% endcall %}
+{% call a.disclosure("final_text", text.split()|length, "words") %}<div class="card answer"><p>{{ text }}</p></div>{% endcall %}
 {% if error %}{% call a.callout("blocked") %}<p>{{ error }}</p>{% endcall %}{% endif %}
 {% if approved_by %}{% call a.callout("rules") %}<p>Approved by {{ approved_by }}.</p>{% endcall %}
 {% else %}
@@ -17,7 +17,7 @@
 <div class="col-right card">
 <h2>Judge panel</h2>
 <p class="meta">{{ a.badge("RECORDED") }} {{ judge_meta }}</p>
-{% call a.callout("stale") %}<p>The judge warns and never blocks. {{ judged }} of {{ total }} sentences judged.</p>{% endcall %}
+{% call a.callout("stale") %}<p>The judge never blocks. {{ judged }} of {{ total }} judged.</p>{% endcall %}
 {{ a.data_table(["Sentence", "Judge", "Reason"], judge_rows) }}
 <p><a href="/step/6?thread={{ thread }}&amp;actor={{ actor }}">{{ rules }}</a></p>
 </div>
