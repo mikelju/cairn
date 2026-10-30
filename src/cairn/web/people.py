@@ -82,8 +82,8 @@ async def _draft(request: Request, thread: str) -> Markup:
     return Markup(EMPTY_SLOT.sub(r'<span class="slot">\1</span>', text))
 
 
-def _select(name: str, label: str, doses: list[str], chosen: str) -> Markup:
-    options = [("", "choose"), ("none", "none"), *[(d, d) for d in doses]]
+def _select(name: str, label: str, doses: list[str], chosen: str, t: dict[str, str]) -> Markup:
+    options = [("", t["s4_choose"]), ("none", t["s4_none"]), *[(d, d) for d in doses]]
     body = "".join(
         Markup('<option value="{}"{}>{}</option>').format(
             v, Markup(" selected" if v == chosen else ""), t
@@ -105,18 +105,24 @@ async def _fragment(request: Request, view: dict[str, Any]) -> dict[str, Any]:
         }
         for s in view["slots"]
     ]
+    t = i18n.context(request)["t"]
     table = [
         [
             r["finding"],
             r["sex"],
             _select(
                 "t_" + r["slot"],
-                f"Treatment-related from {r['finding']} {r['sex']}",
+                f"{t['s4_th_related']} {r['finding']} {r['sex']}",
                 r["doses"],
                 r["t"],
+                t,
             ),
             _select(
-                "a_" + r["slot"], f"Adverse from {r['finding']} {r['sex']}", r["doses"], r["a"]
+                "a_" + r["slot"],
+                f"{t['s4_th_adverse']} {r['finding']} {r['sex']}",
+                r["doses"],
+                r["a"],
+                t,
             ),
         ]
         for r in rows
@@ -206,6 +212,7 @@ async def _step5(request: Request, thread: str, actor: str, error: str = "") -> 
     state, waiting, view = await load_view(request, thread)
     if waiting == "await_decisions":
         return RedirectResponse(f"/step/4?thread={thread}", status_code=303)
+    t = i18n.context(request)["t"]
     model = recorded_model(RECORDINGS_DIR, "DRAFT", DEFAULT_MODEL)
     recording = ReplayClient.load(RECORDINGS_DIR, draft_key(model)).recording
     cost = total_cost(recording)
@@ -222,11 +229,12 @@ async def _step5(request: Request, thread: str, actor: str, error: str = "") -> 
         approved_by=view["approved_by"],
         meta=(
             f"{recording['date']} | {recording['region']} | {recording['model']} | "
-            f"{latency:.1f} s | " + ("cost n/a" if cost is None else f"{cost:.2f} USD")
+            f"{latency:.1f} s | " + (t["s5_cost_na"] if cost is None else f"{cost:.2f} USD")
         ),
-        rules=f"Rules: {len(RULE_REASONS) - len(failed)} of {len(RULE_REASONS)} passed, see step 6",
+        passed=len(RULE_REASONS) - len(failed),
+        rule_total=len(RULE_REASONS),
         judge_meta=_judge_meta(),
-        judge_rows=_judge_rows(view["judge"], state),
+        judge_rows=_judge_rows(view["judge"], state, t),
         judged=sum(r["verdict"] != NOT_JUDGED for r in view["judge"]),
         total=len(view["judge"]),
     )
@@ -242,21 +250,21 @@ def _judge_meta() -> str:
     return f"{JUDGE_MODEL} | {calibration}"
 
 
-def _judge_rows(results: list[dict[str, str]], state: Any) -> list[list[Any]]:
+def _judge_rows(results: list[dict[str, str]], state: Any, t: dict[str, str]) -> list[list[Any]]:
     """Each warning, one row for the sentences not judged, then the EXAMPLE overstated sentence."""
     example = replay_judge(
         RECORDINGS_DIR, EXAMPLE_SENTENCE, shown_facts(build_ledger(state), EXAMPLE_OBS)
     )
     rows: list[list[Any]] = [
-        [r["sentence"], f"warning: {r['category']}", r["reason"]]
+        [r["sentence"], f"{t['s5_warning']} {r['category']}", r["reason"]]
         for r in results
         if r["verdict"] == "overstated"
     ]
     unjudged = sum(r["verdict"] == NOT_JUDGED for r in results)
     if unjudged:  # one row, so the panel stays on one screen whatever the decisions
-        rows.append([f"{unjudged} sentences of the final text", NOT_JUDGED, "No recording."])
+        rows.append([f"{unjudged} {t['s5_unjudged']}", NOT_JUDGED, t["s5_no_recording"]])
     verdict = (
-        f"warning: {example['category']}"
+        f"{t['s5_warning']} {example['category']}"
         if example["verdict"] == "overstated"
         else example["verdict"]
     )
@@ -392,5 +400,6 @@ async def step5_approve(
             return _current(thread, who)
         if refusal.status_code != 403:
             raise
-        error = f"403 · {refusal.detail} Enforced by the API, not the UI"
+        t = i18n.context(request)["t"]
+        error = f"403 · {refusal.detail} {t['s5_enforced']}"
     return await _step5(request, thread, who, error)

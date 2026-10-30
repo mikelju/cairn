@@ -332,3 +332,12 @@ h2 { font-size: var(--text-md); line-height: 1.2; margin: 0 0 var(--space-2); }
 .verb { float: right; margin-left: var(--space-3); font-family: var(--font-mono); font-size: var(--text-2xs); padding: 1px var(--space-2); border: var(--border-1) solid var(--color-real); border-radius: var(--radius-pill); color: var(--color-real); }
 .btn-row { margin: var(--space-4) 0 0; }
 @media (max-width: 900px) { .tiles, .guides { grid-template-columns: minmax(0, 1fr); } }
+.two-col > .path { grid-column: 1 / -1; grid-row: 3; margin-bottom: var(--space-4); }
+.two-col > .path ~ .col-right { grid-row: 4 / span 4; }
+.two-col .col-right a, .two-col .col-left a { color: var(--color-accent); }
+.col-left .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3); margin-top: var(--space-4); }
+.col-left .tile { padding: var(--space-3); gap: var(--space-2); }
+.col-right .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: var(--space-2); }
+.col-right h2 { display: flex; gap: var(--space-2); align-items: center; }
+.col-left .detail { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.col-left form button .cue { margin-right: var(--space-2); }

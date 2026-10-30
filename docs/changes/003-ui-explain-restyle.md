@@ -39,7 +39,7 @@ Each increment fits one Sonnet executor with limited context.
 - [x] 2. Components: a disclosure macro (`<details>` with a pill `<summary>` taking content label and count) and in-page reading cues (ordered path or section labels) for every page, from the catalogue; remove the help button and any help panel; tests for C1 and C11 in both locales (C1, C5, C11).
 - [x] 3. Landing: one-line message, `h1`, four-stage journey diagram with icons, one primary CTA to step 1, badge legend inline as a reading cue; within the cap in both locales (C3, C4, C13, C14).
 - [x] 4. Explore guided sequence: three numbered stages (study, limits and trick questions, guidelines), cards with the question text, answer inside its stage under its card, format line on every answer (step 2 too), vanilla JS scroll reveal that degrades to fully visible; tests in both locales (C3, C10, C12, C14, C15).
-- [ ] 5. (part A, steps 1 to 3, done in E12; part B, steps 4 to 7, open) Steps 1 to 7 hierarchy pass in both locales: one highlighted key number or state per step, traces, rows and JSON behind the disclosure component, prose trimmed, every string from the catalogue; word-cap test parametrised by locale (C3, C11, C13, C14).
+- [ ] 5. (part A, steps 1 to 3, done in E12; part B: steps 4 and 5 done in E13, steps 6 and 7 open) Steps 1 to 7 hierarchy pass in both locales: one highlighted key number or state per step, traces, rows and JSON behind the disclosure component, prose trimmed, every string from the catalogue; word-cap test parametrised by locale (C3, C11, C13, C14).
 - [ ] 6. Walkthrough at 1440x900 in both locales, after screenshots (both locales for landing and Explore), scroll heights recorded, `npm run check` and `make demo-offline-check`, update this record (C3, C6, C9).
 
 ## Decisions
@@ -89,6 +89,7 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | E9 | ejecutor | Increment 3: landing rebuilt (journey, CTA, legend, reading cue) in ES and EN | done | See plan item 3 and Evidence |
 | E10 | ejecutor | Increment 4: Explore guided sequence in ES and EN | done | See plan item 4 and Evidence |
 | E12 | ejecutor | Increment 5 part A: steps 1 to 3 in ES and EN (tiles, reading path, format line, quotes behind pills) | done | See plan item 5 (part A) and Evidence |
+| E13 | ejecutor | Increment 5 part B, first half: steps 4 and 5 in ES and EN (tiles, reading path, pills, catalogue strings) | done | See plan item 5 (part B) and Evidence |
 
 ## User decisions
 Questions the supervisor raises with the user. Statuses: open, answered, deferred; each closes with the user's literal answer.
