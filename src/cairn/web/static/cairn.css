@@ -314,3 +314,21 @@ h2 { font-size: var(--text-md); line-height: 1.2; margin: 0 0 var(--space-2); }
 @media (prefers-reduced-motion: reduce) { .stage.reveal, .stage.reveal:not(.in) { opacity: 1; transform: none; transition: none; } }
 @media (max-width: 900px) { .explore section.stage { grid-template-columns: minmax(0, 1fr); } .qgrid { grid-template-columns: minmax(0, 1fr); } }
 .explore a:not(.stagebar a) { color: var(--color-accent); }
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); margin: var(--space-4) 0; }
+.tile { position: relative; display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-5); background: var(--color-surface); border: var(--border-1) solid var(--color-line); border-radius: var(--radius-md); }
+.tile .cue { position: absolute; top: calc(-1 * var(--space-2)); left: calc(-1 * var(--space-2)); background: var(--color-paper); }
+.tile .num { display: inline; width: auto; height: auto; border-radius: 0; background: none; font-size: var(--text-2xl); font-weight: var(--weight-bold); line-height: 1; letter-spacing: var(--tracking-display); font-variant-numeric: tabular-nums; color: var(--color-ink); }
+.tile .lbl { font-size: var(--text-sm); color: var(--color-muted); }
+.tile.ok .num { color: var(--color-real); }
+.tile.warn .num { color: var(--color-simulated); }
+.result .tiles { margin-top: var(--space-2); }
+.controls .cue, .qhead .cue { margin-right: var(--space-1); }
+.guide-col h2 { font-size: var(--text-lg); line-height: 1.25; margin: 0 0 var(--space-3); display: flex; gap: var(--space-2); align-items: flex-start; }
+.guide-col h2 .cue { }
+.guides { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-6); align-items: start; margin: var(--space-5) 0 var(--space-4); }
+.guide-col .detail { display: flex; align-items: center; gap: var(--space-1); }
+.guide-col .quote { margin: 0 0 var(--space-2); }
+.guide-col details { margin: var(--space-2) var(--space-2) 0 0; display: inline-block; vertical-align: top; }
+.verb { float: right; margin-left: var(--space-3); font-family: var(--font-mono); font-size: var(--text-2xs); padding: 1px var(--space-2); border: var(--border-1) solid var(--color-real); border-radius: var(--radius-pill); color: var(--color-real); }
+.btn-row { margin: var(--space-4) 0 0; }
+@media (max-width: 900px) { .tiles, .guides { grid-template-columns: minmax(0, 1fr); } }

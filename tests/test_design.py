@@ -303,6 +303,7 @@ def test_badge_recorded_keeps_its_metadata_and_simulated_its_production_line(
     monkeypatch.setenv("CAIRN_RECORDINGS", str(served))
     recorded = json.loads((served / "q2.json").read_text(encoding="utf-8"))
     with TestClient(create_app()) as client:
+        client.cookies.set("cairn_lang", "en")
         result = client.post("/step/2/run", data={"question": "Q2"}).text
         step1 = client.get("/step/1").text
     meta = re.search(r'<p class="meta">(.*?)</p>', result, flags=re.S)

@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from cairn.app import create_app
-from cairn.web.i18n import CATALOGUES
+from cairn.web.i18n import CATALOGUES, COOKIE
 
 STEP_WORD_CAP = 93
 REAL_RECORDINGS = Path(__file__).resolve().parent / "fixtures" / "recordings_real_shape"
@@ -110,12 +110,12 @@ def open_toggle(html: str) -> str:
     return opened
 
 
-def rendered_state(name: str) -> str:
+def rendered_state(name: str, lang: str | None = None) -> str:
     # Step 2 states always replay the real-shape fixtures, whatever the cwd or the environment say.
     saved = os.environ.get("CAIRN_RECORDINGS")
     os.environ["CAIRN_RECORDINGS"] = str(REAL_RECORDINGS)
     try:
-        return _rendered_state(name)
+        return _rendered_state(name, lang)
     finally:
         if saved is None:
             del os.environ["CAIRN_RECORDINGS"]
@@ -123,8 +123,10 @@ def rendered_state(name: str) -> str:
             os.environ["CAIRN_RECORDINGS"] = saved
 
 
-def _rendered_state(name: str) -> str:
+def _rendered_state(name: str, lang: str | None = None) -> str:
     with TestClient(create_app()) as client:
+        if lang:
+            client.cookies.set(COOKIE, lang)
         if name == "landing":
             return client.get("/").text
         if name == "step3":
@@ -247,6 +249,29 @@ def test_word_cap_rendered(state: str) -> None:
     assert rendered_problems(html) == [], state
 
 
+@pytest.mark.parametrize("lang", ["es", "en"])
+@pytest.mark.parametrize(
+    "state",
+    [
+        "step1_before",
+        "step1_after",
+        "step1_injected",
+        "step1_duplicate",
+        "step1_dose",
+        "step2_before",
+        "step2_q2",
+        "step2_q2_open",
+        "step2_q6",
+        "step3",
+    ],
+)
+def test_steps_1_to_3_are_within_the_cap_in_both_locales(state: str, lang: str) -> None:
+    html = rendered_state(state, lang)
+    print(state, lang, rendered_words(html))
+    assert f'<html lang="{lang}"' in html
+    assert rendered_problems(html) == [], (state, lang)
+
+
 def test_with_result_fails_when_there_is_no_result_element() -> None:
     with pytest.raises(AssertionError):
         with_result(_page("<p>no result here</p>"), "<p>a b</p>")
@@ -266,7 +291,7 @@ def test_step2_states_replay_the_real_recordings_whatever_the_environment_says(
 ) -> None:
     monkeypatch.setenv("CAIRN_RECORDINGS", str(tmp_path))  # an empty folder: would be stale
     monkeypatch.chdir(tmp_path)  # and no relative "recordings" folder here either
-    html = rendered_state(state)
+    html = rendered_state(state, "en")
     assert STALE_NOTICE not in html
     assert os.environ["CAIRN_RECORDINGS"] == str(tmp_path)  # restored afterwards
     assert "Rules fired:" in html

@@ -79,6 +79,12 @@
 
 {% macro cue(number) %}<span class="cue" aria-hidden="true">{{ number }}</span>{% endmacro %}
 
+{# A highlighted figure: number big, label small, an optional cue that the reading path names. #}
+{% macro tile(number, label, n=none, tone="") %}<div class="tile {{ tone }}">{% if n %}{{ cue(n) }}{% endif %}<span class="num">{{ number }}</span><span class="lbl">{{ label }}</span></div>{% endmacro %}
+
+{# How the answer is shaped, explained in one line; kind: table, text, refusal or quotes. #}
+{% macro format_line(kind, n=none) %}<p class="format-line {{ kind }}">{% if n %}{{ cue(n) }}{% endif %}<span><b>{{ t["fmt_" ~ kind ~ "_h"] }}</b> {{ t["fmt_" ~ kind] }}</span></p>{% endmacro %}
+
 {% macro in_production(text, kind=none, lead=none, label="In production →") %}
 <p class="prod">{% if kind %}{{ badge(kind) }} {{ lead }} <strong>{{ label }}</strong>{% else %}{{ label }}{% endif %} {{ text }}</p>
 {% endmacro %}

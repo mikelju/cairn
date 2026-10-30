@@ -1,12 +1,16 @@
-{% import "_components.html" as a %}
-<p class="figure"><strong>{{ r.total }}</strong> quarantined{% if r.injected %}, including the injected row{% endif %}.</p>
-{% if r.reported %}<p class="figure">The rule below fired and is reported; the validator does not quarantine it.</p>{% endif %}
+{% import "_components.html" as a with context %}
+<div class="tiles">
+  {{ a.tile(r.total, t.s1_tile_q ~ (" · " ~ t.s1_tile_inj if r.injected else ""), 2, "warn") }}
+  {{ a.tile(r.with_bad, t.s1_tile_with.format(n=r.n_with)) }}
+  {{ a.tile(r.without_bad, t.s1_tile_without.format(n=r.n_without), tone="ok") }}
+</div>
+{% set heads = [t.s1_th_rule, t.s1_th_animal, t.s1_th_test] %}
 {% if r.fired %}
+{% if r.reported %}<p class="figure">{{ t.s1_reported }}</p>{% endif %}
 {% set fired = namespace(rows=[]) %}
 {% for f in r.fired %}{% set fired.rows = fired.rows + [[f.rule, f.usubjid, f.test, f.value]] %}{% endfor %}
-{{ a.data_table(["Rule", "Animal", "Test", "Value"], fired.rows, new=true) }}
+{{ a.data_table(heads + [t.s1_th_value], fired.rows, new=true) }}
 {% endif %}
 {% set held = namespace(rows=[]) %}
 {% for q in r.rows %}{% set held.rows = held.rows + [[q.rule, q.usubjid, q.test, q.visit_day|int, q.value]] %}{% endfor %}
-{{ a.data_table(["Rule", "Animal", "Test", "Day", "Value"], held.rows) }}
-{% call a.callout("note") %}<p>Naive mean AUCtau, males 20 mg/kg/day, day 1: {{ r.with_bad }} with the bad value (n={{ r.n_with }}), {{ r.without_bad }} without it (n={{ r.n_without }}).</p>{% endcall %}
+<div class="detail">{{ a.cue(3) }}{% call a.disclosure("quarantined", r.rows|length, "rows") %}{{ a.data_table(heads + [t.s1_th_day, t.s1_th_value], held.rows) }}{% endcall %}</div>

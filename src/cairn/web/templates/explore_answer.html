@@ -4,7 +4,7 @@
 {% else %}
 <article class="answer-panel">
 {{ a.badge_meta(r.badge, r.meta) }}
-<p class="format-line {{ r.kind }}">{{ a.cue(2) }}<span><b>{{ t["fmt_" ~ r.kind ~ "_h"] }}</b> {{ t["fmt_" ~ r.kind] }}</span></p>
+{{ a.format_line(r.kind, 2) }}
 {% if r.text %}
 <div class="card answer">{{ a.cue(3) }}
 <p class="lang-tag">{{ t.exp_en_rec if r.badge == "RECORDED" else t.exp_en_live }}</p>

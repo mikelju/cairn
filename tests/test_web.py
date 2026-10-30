@@ -16,6 +16,7 @@ from cairn.app import create_app
 from cairn.fetch import VENDORED_DIR
 from cairn.ingest import DEFAULT_DB, ingest
 from cairn.web import HERE
+from cairn.web.i18n import COOKIE
 
 
 def test_healthz_and_landing_page() -> None:
@@ -39,15 +40,21 @@ def test_static_htmx_is_the_pinned_file() -> None:
     assert hashlib.sha256(body).hexdigest() in notice
 
 
+def _english(client: TestClient) -> TestClient:
+    client.cookies.set(COOKIE, "en")
+    return client
+
+
 def test_step1_run_shows_quarantine_and_computed_means() -> None:
     with TestClient(create_app()) as client:
+        _english(client)
         assert "In production" in client.get("/step/1").text
         assert 'class="badge simulated"' in client.get("/step/1").text
         result = client.post("/step/1/run").text
-    assert "<strong>12</strong> quarantined" in result
+    assert 'class="num">12<' in result and "quarantined" in result
     assert result.count("pp_auc_positive") == 12
-    assert "2,821 with the bad value (n=3)" in result
-    assert "15,956 without it (n=2)" in result
+    assert 'class="num">2,821<' in result and "with the bad value, n=3" in result
+    assert 'class="num">15,956<' in result and "without it, n=2" in result
 
 
 def test_step1_switches_fire_their_rule_without_touching_the_sources(tmp_path: Path) -> None:
@@ -62,19 +69,20 @@ def test_step1_switches_fire_their_rule_without_touching_the_sources(tmp_path: P
         "dose": ("dm_setcd_in_tx", "99"),
     }
     with TestClient(create_app()) as client:
+        _english(client)
         plain = client.post("/step/1/run", data={"switch": "none"}).text
         for switch, (rule, shown) in expected.items():
             result = client.post("/step/1/run", data={"switch": switch}).text
             if switch == "negative":
-                assert "<strong>13</strong> quarantined, including the injected row" in result
+                assert 'class="num">13<' in result and "with the injected row" in result
             else:  # the validator reports these rules and does not quarantine them
-                assert "<strong>12</strong> quarantined." in result
-                assert "does not quarantine it" in result and "injected row" not in result
+                assert 'class="num">12<' in result and "Reported, not quarantined" in result
+                assert "injected row" not in result
             assert 'class="new"' in result and rule in result and shown in result
             assert all(other not in result for other, _ in expected.values() if other != rule)
             assert rule not in plain
         assert client.post("/step/1/run", data={"switch": "bogus"}).status_code == 422
-    assert "<strong>12</strong>" in plain
+    assert 'class="num">12<' in plain
     assert [hashlib.sha256(p.read_bytes()).hexdigest() for p in watched] == before
 
 
@@ -94,15 +102,18 @@ def test_footer_uses_baked_commit(monkeypatch: pytest.MonkeyPatch) -> None:
 FIXTURES = Path(__file__).parent / "fixtures" / "recordings"
 
 
-def _ask(question: str, monkeypatch: pytest.MonkeyPatch, folder: Path = FIXTURES) -> str:
+def _ask(
+    question: str, monkeypatch: pytest.MonkeyPatch, folder: Path = FIXTURES, lang: str = "en"
+) -> str:
     monkeypatch.setenv("CAIRN_RECORDINGS", str(folder))
     with TestClient(create_app()) as client:
+        client.cookies.set(COOKIE, lang)
         return client.post("/step/2/run", data={"question": question}).text
 
 
 def test_step2_page_lists_the_questions_with_the_recorded_badge() -> None:
     with TestClient(create_app()) as client:
-        page = client.get("/step/2").text
+        page = _english(client).get("/step/2").text
     assert 'class="badge recorded"' in page
     assert "In production" in page
     assert 'value="Q2"' in page and 'value="Q6"' in page
@@ -153,7 +164,7 @@ def test_q2_replay_fixture(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_step2_toggle_shows_markers_and_no_digits(
     monkeypatch: pytest.MonkeyPatch, folder: Path, marker: str
 ) -> None:
-    result = _ask("Q2", monkeypatch, folder)
+    result = _ask("Q2", monkeypatch, folder, lang="es")
     toggle = re.search(r"<details class=\"pill\">.*?</details>", result, flags=re.S)
     assert toggle is not None
     assert "Ver texto del modelo" in toggle.group(0)
@@ -258,7 +269,7 @@ def test_q2_prose_names_the_screened_findings_by_sex_and_places_no_table_positio
     from cairn.incidence import incidence
 
     result = _ask("Q2", monkeypatch, REAL)
-    prose = re.search(r'<div class="card answer"><p><strong>(.*?)</strong></p>', result, re.S)
+    prose = re.search(r'<p class="prose"><strong>(.*?)</strong></p>', result, re.S)
     assert prose, "no rendered answer"
     text = prose.group(1)
     findings = incidence().values["findings"]
@@ -281,7 +292,7 @@ def test_q2_prose_counts_the_screened_findings_by_reference(
     from cairn.incidence import incidence
 
     result = _ask("Q2", monkeypatch, REAL)
-    text = re.search(r'<div class="card answer"><p><strong>(.*?)</strong>', result, re.S).group(1)  # type: ignore[union-attr]
+    text = re.search(r'<p class="prose"><strong>(.*?)</strong>', result, re.S).group(1)  # type: ignore[union-attr]
     rows = result.count("<tr><td>")
     assert re.match(rf"{rows} screened findings", text), text
     assert rows == incidence().values["n_findings"]
@@ -331,7 +342,7 @@ def test_step3_shows_the_two_fixed_queries_with_ranks_and_the_build_badge() -> N
     from cairn import retrieval
 
     with TestClient(create_app()) as client:
-        page = client.get("/step/3").text
+        page = client.get("/step/3?lang=en").text
     fixed = [q for q in retrieval.load_fixed_queries() if q["used_by"] == "nonclinical-summary"]
     assert len(fixed) == 2
     for query in fixed:
@@ -340,17 +351,17 @@ def test_step3_shows_the_two_fixed_queries_with_ranks_and_the_build_badge() -> N
         assert f"<td>{top.fused_rank}</td>" in page
     assert page.count("<tr>") >= 2 * (1 + 3)  # a header row and three passages per query
     assert 'class="badge computed-at-build"' in page and "COMPUTED AT BUILD" in page
-    assert "Ver puestos inferiores" in page and "In production" in page
+    assert "Show lower ranks" in page and "In production" in page
     assert "<th>Lex</th>" in page and "<th>Sem</th>" in page and "<th>Fused</th>" in page
 
 
 def test_step3_counts_quotes_verbatim_on_the_cited_page() -> None:
     with TestClient(create_app()) as client:
-        page = client.get("/step/3").text
-    match = re.search(r"Verbatim: (\d+)/(\d+)", page)
-    assert match, "no quotes line"
+        page = client.get("/step/3?lang=en").text
+    match = re.search(r'class="num">(\d+)/(\d+)<', page)
+    assert match, "no verbatim tile"
     verbatim, total = map(int, match.groups())
-    of = int(re.search(r"Ver frases citadas · (\d+) citas", page).group(1))  # type: ignore[union-attr]
+    of = sum(map(int, re.findall(r"Show quoted sentences · (\d+) quotes", page)))
     assert total == of == 6
     assert verbatim == total
 
@@ -390,7 +401,7 @@ def test_highlight_route_page_shows_the_image_and_the_official_link() -> None:
 
 def test_highlight_route_links_every_step3_quotation() -> None:
     with TestClient(create_app()) as client:
-        page = client.get("/step/3").text
+        page = client.get("/step/3?lang=en").text
         links = re.findall(r'href="(/highlight/[^"]+)">highlighted page', page)
         assert len(links) == 6
         for link in links:

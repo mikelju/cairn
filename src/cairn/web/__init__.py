@@ -182,7 +182,9 @@ async def step1_run(request: Request, switch: Annotated[str, Form()] = "none") -
         await runner.tasks[job.job_id]
         report = (runner.jobs[job.job_id].outputs or {})["report"]
     return templates.TemplateResponse(
-        request, "step1_result.html", {"r": _result(report, switch == "negative", extra)}
+        request,
+        "step1_result.html",
+        {**i18n.context(request, 1), "r": _result(report, switch == "negative", extra)},
     )
 
 
@@ -379,6 +381,7 @@ def _step3_context() -> dict[str, Any]:
             continue
         rows: list[list[str]] = []
         folded: list[list[str]] = []
+        own: list[dict[str, Any]] = []
         for number, hit in enumerate(retrieval.cached_guidance(fixed["query"]).hits, start=1):
             passage = passages[hit.passage_id]
             title = guidelines[passage.doc]["title"]
@@ -397,23 +400,37 @@ def _step3_context() -> dict[str, Any]:
             page = cited_page(passage, sentence.sentence_id)
             base = guidelines[passage.doc]["page_link_base"]
             marks = _highlighted(sentence.sentence_id)
-            if any(
+            literal = any(
                 normalize_whitespace(m["text"]) == normalize_whitespace(sentence.text)
                 and passage.page_start <= m["page"] <= passage.page_end
                 for m in marks
-            ):
-                verbatim += 1
-            quotes.append(
-                {
-                    "id": fixed["id"],
-                    "text": sentence.text,
-                    "cite": " ".join([*row[:2], str(page)]),
-                    "highlight": f"/highlight/{sentence.sentence_id}" if marks else "",
-                    "link": f"{base}#page={page}",
-                }
             )
-        queries.append({"id": fixed["id"], "query": fixed["query"], "rows": rows, "folded": folded})
-    return {"queries": queries, "quotes": quotes, "verbatim": verbatim}
+            verbatim += literal
+            quote = {
+                "id": fixed["id"],
+                "verbatim": literal,
+                "text": sentence.text,
+                "cite": " ".join([*row[:2], str(page)]),
+                "highlight": f"/highlight/{sentence.sentence_id}" if marks else "",
+                "link": f"{base}#page={page}",
+            }
+            quotes.append(quote)
+            own.append(quote)
+        queries.append(
+            {
+                "id": fixed["id"],
+                "query": fixed["query"],
+                "rows": rows,
+                "folded": folded,
+                "quotes": own,
+            }
+        )
+    return {
+        "queries": queries,
+        "quotes": quotes,
+        "verbatim": verbatim,
+        "guidelines": len(guidelines),
+    }
 
 
 @router.get("/step/3", response_class=HTMLResponse)
