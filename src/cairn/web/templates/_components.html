@@ -58,7 +58,7 @@
 </table>
 {% endmacro %}
 
-{% macro trace(steps) %}<p class="trace">Trace: {{ steps }}</p>{% endmacro %}
+{% macro trace(steps, label="Trace") %}<p class="trace">{{ label }}: {{ steps }}</p>{% endmacro %}
 
 {% macro evidence_panel(items) %}
 {% call disclosure("evidence", items|length, "items") %}<div class="evidence">
@@ -79,6 +79,6 @@
 
 {% macro cue(number) %}<span class="cue" aria-hidden="true">{{ number }}</span>{% endmacro %}
 
-{% macro in_production(text, kind=none, lead=none) %}
-<p class="prod">{% if kind %}{{ badge(kind) }} {{ lead }} <strong>In production →</strong>{% else %}In production →{% endif %} {{ text }}</p>
+{% macro in_production(text, kind=none, lead=none, label="In production →") %}
+<p class="prod">{% if kind %}{{ badge(kind) }} {{ lead }} <strong>{{ label }}</strong>{% else %}{{ label }}{% endif %} {{ text }}</p>
 {% endmacro %}

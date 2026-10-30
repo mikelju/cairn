@@ -63,13 +63,13 @@ def live_box(monkeypatch: pytest.MonkeyPatch) -> LiveFake:
 
 def ask_box(code: str, question: str = "How many animals?") -> str:
     with TestClient(create_app()) as client:
-        return client.post("/explore/live", data={"question": question, "code": code}).text
+        return client.post("/explore/live?lang=en", data={"question": question, "code": code}).text
 
 
 def test_explore_live_refuses_without_code_wrong_code_or_long_question(live_box: LiveFake) -> None:
     for code, question in (("", "q"), ("wrong", "q"), ("s3cret", "x" * 501), ("s3cret", " ")):
         page = ask_box(code, question)
-        assert "Recorded questions" in page and "s3cret" not in page
+        assert "callout blocked" in page and "s3cret" not in page
     assert live_box.calls == 0
 
 
@@ -77,7 +77,7 @@ def test_explore_live_is_off_without_a_configured_code(
     live_box: LiveFake, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.delenv("CAIRN_ACCESS_CODE")
-    assert "Recorded questions" in ask_box("")
+    assert "callout blocked" in ask_box("")
     assert live_box.calls == 0
 
 

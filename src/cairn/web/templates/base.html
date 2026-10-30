@@ -12,5 +12,6 @@
 {{ shell.shell_header(steps, current, t, locale, lang_links, actor|default(none)) }}
 <main>{% block main %}{% endblock %}</main>
 {{ shell.shell_footer(footer, t) }}
+{% block scripts %}{% endblock %}
 </body>
 </html>

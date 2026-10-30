@@ -1,4 +1,5 @@
 import hashlib
+import html
 import importlib
 import json
 import re
@@ -289,16 +290,16 @@ def test_q2_prose_counts_the_screened_findings_by_reference(
     assert not re.search(r"\d", toggle.group(0).split("</summary>")[1])
 
 
-def _explore(question: str) -> str:
+def _explore(question: str, lang: str = "en") -> str:
     with TestClient(create_app()) as client:
-        return client.post("/explore/run", data={"question": question}).text
+        return client.post(f"/explore/run?lang={lang}", data={"question": question}).text
 
 
 def test_explore_page_has_a_button_for_every_question() -> None:
     from cairn.questions import QUESTIONS
 
     with TestClient(create_app()) as client:
-        page = client.get("/explore").text
+        page = client.get("/explore?lang=en").text
     for question_id in QUESTIONS:
         assert f'"question": "{question_id}"' in page
     assert len(QUESTIONS) == 11
@@ -403,11 +404,10 @@ def test_explore_quotations_link_the_highlighted_page() -> None:
     assert "official page" in result and "#page=" in result
 
 
-def test_explore_guideline_quotations_sit_in_the_right_column() -> None:
+def test_explore_guideline_quotations_sit_inside_the_answer_card() -> None:
     result = _explore("G1")
-    right = result.split('<div class="col-right card">', 1)[1]
-    assert right.count("<blockquote") >= 1
-    assert "<blockquote" not in result.split('<div class="col-right card">', 1)[0]
+    assert result.count("<blockquote") >= 1 and "col-right" not in result
+    assert result.index('class="card answer"') < result.index("<blockquote")
 
 
 def test_step3_quote_link_and_nav_follow_the_cited_sentence_page() -> None:
@@ -708,3 +708,87 @@ def test_landing_has_one_h1_a_four_stage_journey_and_one_primary_action(lang: st
     assert 'class="path"' in page and 'class="cue' in page
     for badge in ("real", "recorded", "simulated"):
         assert f'class="badge {badge}"' in page
+
+
+STAGES = (("Q1", "Q2", "Q3", "Q5"), ("Q4", "Q6", "Q7", "Q8"), ("G1", "G2", "G3"))
+
+
+def _stage_sections(page: str) -> list[str]:
+    return re.findall(r'<section class="stage".*?</section>', page, flags=re.S)
+
+
+@pytest.mark.parametrize("lang", ["es", "en"])
+def test_explore_has_three_ordered_stages_with_cards_labelled_by_their_text(lang: str) -> None:
+    from cairn.questions import QUESTIONS
+    from cairn.web.i18n import CATALOGUES
+
+    with TestClient(create_app()) as client:
+        page = client.get(f"/explore?lang={lang}").text
+    sections = _stage_sections(page)
+    assert len(sections) == 3
+    for number, (section, group) in enumerate(zip(sections, STAGES, strict=True), start=1):
+        assert f'id="stage-{number}"' in section and f">0{number}</p>" in section
+        labels = re.findall(r'<span class="q">(.*?)</span>', section)
+        assert len(labels) == len(group)
+        for question_id, label in zip(group, labels, strict=True):
+            assert html.unescape(label) == CATALOGUES[lang][f"q_{question_id}"]
+            assert not re.fullmatch(r"[QG]\d+", label)
+            if lang == "en":
+                assert html.unescape(label) == QUESTIONS[question_id]
+    assert "<script" in page and "/static/explore.js" in page
+
+
+@pytest.mark.parametrize("lang", ["es", "en"])
+def test_explore_answers_sit_in_their_stage_with_a_format_line(lang: str) -> None:
+    from cairn.web.i18n import CATALOGUES
+
+    t = CATALOGUES[lang]
+    for group in STAGES:
+        for question in group:
+            body = _explore(question, lang)
+            assert body.count('class="format-line') == 1
+            assert re.search(r'class="format-line[^"]*"[^>]*>.*?<b>[^<]+</b> [^<]+', body, re.S)
+            assert t["exp_en_rec"] in body or "callout blocked" in body
+    with TestClient(create_app()) as client:
+        page = client.get(f"/explore?lang={lang}").text
+    for number, stage_group in enumerate(STAGES, start=1):
+        slot = f'hx-target="#answer-{number}"'
+        for question in stage_group:
+            card = re.search(rf'<button[^>]*"question": "{question}"[^>]*>', page)
+            assert card and slot in card.group(0)
+        assert page.count(f'id="answer-{number}"') == 1
+
+
+def test_explore_format_line_follows_the_answer_content() -> None:
+    from cairn.web.i18n import EN
+
+    assert EN["fmt_refusal_h"] in _explore("Q6")
+    assert EN["fmt_quotes_h"] in _explore("G2")
+    assert EN["fmt_table_h"] in _explore("Q2")
+    assert EN["fmt_text_h"] in _explore("Q1")
+
+
+@pytest.mark.parametrize("lang", ["es", "en"])
+def test_explore_strings_come_from_the_active_catalogue(lang: str) -> None:
+    from cairn.web.i18n import CATALOGUES
+
+    other = CATALOGUES["en" if lang == "es" else "es"]
+    own = CATALOGUES[lang]
+    with TestClient(create_app()) as client:
+        page = client.get(f"/explore?lang={lang}").text
+    answer = _explore("Q2", lang)
+    for key in ("exp_title", "exp_s1_title", "exp_s3_intro", "exp_card_go", "tag_table"):
+        assert own[key] in page
+        assert other[key] not in page
+    for key in ("exp_en_rec", "exp_rules", "fmt_table"):
+        assert own[key] in answer and other[key] not in answer
+    assert f"<th>{own['exp_th_sex']}</th>" in answer
+
+
+def test_explore_recorded_prose_is_identical_in_both_locales() -> None:
+    def prose(html: str) -> str:
+        found = re.search(r'<p class="prose">(.*?)</p>', html, re.S)
+        assert found
+        return found.group(1)
+
+    assert prose(_explore("Q1", "es")) == prose(_explore("Q1", "en"))

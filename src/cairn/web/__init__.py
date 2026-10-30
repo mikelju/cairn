@@ -3,6 +3,7 @@
 import json
 import os
 import subprocess
+from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -295,6 +296,15 @@ def _step2_context(question_id: str, directory: Path) -> dict[str, Any]:
     return result_context(result, "FIXTURE" if fixture else "RECORDED", meta)
 
 
+def _answer_kind(result: LoopResult, has_table: bool) -> str:
+    """Why the answer looks as it does: refusal, quotations, table with text, or text only."""
+    if result.status is not LoopStatus.ANSWERED:
+        return "refusal"
+    if quotations(result.sentences):
+        return "quotes"
+    return "table" if has_table else "text"
+
+
 def result_context(result: LoopResult, badge: str, meta: str) -> dict[str, Any]:
     """The template data of one answered, declined or rejected question, recorded or live."""
     verdict = result.verdict
@@ -303,7 +313,9 @@ def result_context(result: LoopResult, badge: str, meta: str) -> dict[str, Any]:
     return {
         "badge": badge,
         "meta": meta,
+        "kind": _answer_kind(result, bool(rows)),
         "trace": trace,
+        "calls": len(trace.split(" -> ")) if trace else 0,
         "status": result.status.value,
         "message": result.message,
         "answered": result.status is LoopStatus.ANSWERED,
@@ -432,13 +444,29 @@ async def highlight_image(name: str) -> FileResponse:
     return FileResponse(IMAGES_DIR / name, media_type="image/png")
 
 
+EXPLORE_STAGES = (("Q1", "Q2", "Q3", "Q5"), ("Q4", "Q6", "Q7", "Q8"), ("G1", "G2", "G3"))
+
+
+@lru_cache(maxsize=4)
+def _card_kinds(directory: Path) -> dict[str, str]:
+    """The answer format of every recorded question, read from the recordings themselves."""
+    kinds: dict[str, str] = {}
+    for question_id in QUESTIONS:
+        try:
+            kinds[question_id] = _step2_context(question_id, directory)["kind"]
+        except StaleRecording:
+            kinds[question_id] = "text"
+    return kinds
+
+
 @router.get("/explore", response_class=HTMLResponse)
 async def explore(request: Request) -> HTMLResponse:
-    badge = _step2_badge(_recordings_dir())
+    directory = _recordings_dir()
+    badge = _step2_badge(directory)
     live = bool(os.environ.get("CAIRN_ACCESS_CODE"))
-    return _page(
-        request, "explore.html", current=0, questions=QUESTIONS, page_badge=badge, live=live
-    )
+    kinds = _card_kinds(directory)
+    stages = [[(q, kinds[q]) for q in group] for group in EXPLORE_STAGES]
+    return _page(request, "explore.html", current=0, stages=stages, page_badge=badge, live=live)
 
 
 @router.post("/explore/run", response_class=HTMLResponse)
@@ -449,10 +477,10 @@ def explore_run(request: Request, question: Annotated[str, Form()]) -> HTMLRespo
         context = _step2_context(question, _recordings_dir())
     except StaleRecording as error:
         return templates.TemplateResponse(
-            request, "step2_result.html", {**i18n.context(request), "stale": str(error)}
+            request, "explore_answer.html", {**i18n.context(request), "stale": str(error)}
         )
     return templates.TemplateResponse(
-        request, "step2_result.html", {**i18n.context(request), "r": context}
+        request, "explore_answer.html", {**i18n.context(request), "r": context}
     )
 
 

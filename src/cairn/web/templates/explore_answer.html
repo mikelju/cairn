@@ -1,0 +1,38 @@
+{% import "_components.html" as a with context %}
+{% if stale %}
+{% call a.callout("stale") %}<p>{{ stale }}</p>{% endcall %}
+{% else %}
+<article class="answer-panel">
+{{ a.badge_meta(r.badge, r.meta) }}
+<p class="format-line {{ r.kind }}">{{ a.cue(2) }}<span><b>{{ t["fmt_" ~ r.kind ~ "_h"] }}</b> {{ t["fmt_" ~ r.kind] }}</span></p>
+{% if r.text %}
+<div class="card answer">{{ a.cue(3) }}
+<p class="lang-tag">{{ t.exp_en_rec if r.badge == "RECORDED" else t.exp_en_live }}</p>
+<p class="prose"><strong>{{ r.text }}</strong></p>
+{% for q in r.quotes %}
+<blockquote class="quote"><p>{{ q.text }}</p><p class="meta">{{ q.citation }}{% if q.highlight %} · <a href="{{ q.highlight }}">{{ t.exp_hl }}</a>{% endif %} · <a href="{{ q.link }}">{{ t.exp_official }}</a></p></blockquote>
+{% endfor %}
+</div>
+{% endif %}
+{% if r.message or r.failures %}
+{% call a.callout("blocked" if (not r.answered or r.failures) else "note") %}
+{% if r.message %}<p>{{ r.message }}</p>{% endif %}
+{% if r.failures %}<ul>{% for f in r.failures %}<li>{{ f }}</li>{% endfor %}</ul>{% endif %}
+{% endcall %}
+{% endif %}
+<div class="detail">{{ a.cue(4) }}
+{% if r.rows %}{% call a.disclosure("table", r.rows|length, "rows") %}
+<p class="meta">{{ r.rule }}</p>
+{% set screen = namespace(rows=[]) %}
+{% for row in r.rows %}{% set screen.rows = screen.rows + [[row.sex, row.tissue, row.finding] + row.cells] %}{% endfor %}
+{{ a.data_table([t.exp_th_sex, t.exp_th_tissue, t.exp_th_finding] + r.doses, screen.rows) }}
+{% endcall %}{% endif %}
+{% if r.written %}{% call a.disclosure("model_text", r.written.split()|length, "words") %}<p>{{ r.written }}</p>{% endcall %}{% endif %}
+{% call a.disclosure("trace", r.calls, "calls") %}
+{{ a.trace(r.trace, t.exp_trace) }}
+{% call a.callout("rules") %}<p>{{ t.exp_rules }} {{ r.rules }}</p>{% endcall %}
+{% endcall %}
+{{ a.evidence_panel(r.evidence) }}
+</div>
+</article>
+{% endif %}
