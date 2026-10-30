@@ -1,6 +1,6 @@
 # 003 - Demo redesign: a landing that sells, visual hierarchy, in-page reading cues and an ES/EN toggle
 
-Status: in progress
+Status: ready locally
 
 ## Contract
 Goal and reason: the user did not approve proposal 1 (explanation drawer plus restyle) and widened the scope.
@@ -94,6 +94,7 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | E15 | ejecutor | Increment 6: walkthrough of all states in ES and EN, word-cap and scroll measurements, offline check fixed for the new locale, final `npm run check` | done | See plan item 6 and Evidence |
 | E16 | ejecutor | Corrections from adversarial review (C4, C9, C11, C14) | done | See Adversarial review |
 | E17 | ejecutor | Close review gaps in tests and evidence (C1, C3, C6, C9, C11, C12, C13, C14) | done | See Adversarial review and Evidence |
+| E18 | ejecutor | Delivery: name check, push and PR | done | See Delivery |
 
 ## User decisions
 Questions the supervisor raises with the user. Statuses: open, answered, deferred; each closes with the user's literal answer.
@@ -151,4 +152,4 @@ Known gaps:
 - Increment 6 correction (E17): Explore screenshots re-captured at 1440 wide after Q2, Q6 and G2 with all three stages revealed: `scrollHeight` 2812 (ES) and 2753 (EN), `scrollWidth` 1440 in both; `after-landing-es.png` and `after-landing-en.png` refreshed (`scrollHeight` 900, `scrollWidth` 1440; 88 and 81 words in `<main>`). `uv run python -m cairn.offline_check` exited 0 on the host without Docker network isolation, so `make demo-offline-check` (C9) stays unverified here.
 
 ## Delivery
-Not started.
+Branch `claude/ui-redesign-b81e12` pushed to `origin`, PR to `main` (not merged). Name check on `git diff ceb0f17..HEAD` against the private PRD and the explainer recipient: clean. Full `npm run check` on cc48685: 819 passed, 97.32% coverage. Known gaps: C9 `make demo-offline-check` not run without Docker, C5 keyboard pass, C2 computed styles, C15 JS-off checked once.
