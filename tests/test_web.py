@@ -693,3 +693,18 @@ def test_step6_says_where_the_chain_is_broken(
             conn.execute("UPDATE audit SET actor = 'X' WHERE thread_id = ? AND seq = 3", (id_,))
         page = client.get(f"/step/6?thread={id_}").text
         assert "Audit chain: broken at entry 3." in page and "verified" not in page
+
+
+@pytest.mark.parametrize("lang", ["es", "en"])
+def test_landing_has_one_h1_a_four_stage_journey_and_one_primary_action(lang: str) -> None:
+    with TestClient(create_app()) as client:
+        page = client.get(f"/?lang={lang}").text
+    assert page.count("<h1") == 1
+    assert len(re.findall(r'<ol class="journey"[^>]*>', page)) == 1
+    journey = re.search(r'<ol class="journey".*?</ol>', page, re.S)
+    assert journey and len(re.findall(r"<li\b", journey.group(0))) == 4
+    assert len(re.findall(r'class="btn-primary"', page)) == 1
+    assert 'class="btn-primary" href="/step/1"' in page
+    assert 'class="path"' in page and 'class="cue' in page
+    for badge in ("real", "recorded", "simulated"):
+        assert f'class="badge {badge}"' in page

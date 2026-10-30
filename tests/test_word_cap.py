@@ -270,3 +270,11 @@ def test_step2_states_replay_the_real_recordings_whatever_the_environment_says(
     assert STALE_NOTICE not in html
     assert os.environ["CAIRN_RECORDINGS"] == str(tmp_path)  # restored afterwards
     assert "Rules fired:" in html
+
+
+@pytest.mark.parametrize("lang", ["es", "en"])
+def test_landing_is_within_the_cap_in_both_locales(lang: str) -> None:
+    with TestClient(create_app()) as client:
+        html = client.get(f"/?lang={lang}").text
+    print("landing", lang, rendered_words(html))
+    assert rendered_problems(html) == [], lang
