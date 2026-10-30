@@ -42,9 +42,14 @@ def run_check(monkeypatch: pytest.MonkeyPatch) -> Iterator[Callable[..., int]]:
             def urlopen(target: Any) -> Iterator[SimpleNamespace]:
                 if isinstance(target, str):
                     path, data = target.removeprefix(offline_check.BASE), None
+                    sent: dict[str, str] = {}
                 else:
                     path = target.full_url.removeprefix(offline_check.BASE)
                     data = target.data
+                    sent = target.headers or {}
+                    if "Cookie" in sent:  # the client's own jar wins over a raw Cookie header
+                        name, _, value = sent["Cookie"].partition("=")
+                        client.cookies.set(name, value)
                 forced = override(path)
                 if forced is not None and forced[0] >= 400:  # urllib raises on 4xx and 5xx
                     raise _http_error(path, forced[0], forced[1])
@@ -52,12 +57,12 @@ def run_check(monkeypatch: pytest.MonkeyPatch) -> Iterator[Callable[..., int]]:
                     yield SimpleNamespace(status=forced[0], read=lambda: forced[1])
                     return
                 response = (
-                    client.get(path)
+                    client.get(path, headers=sent)
                     if data is None
                     else client.post(
                         path,
                         content=data,
-                        headers={"content-type": "application/x-www-form-urlencoded"},
+                        headers={"content-type": "application/x-www-form-urlencoded", **sent},
                     )
                 )
                 if response.status_code >= 400:
@@ -69,7 +74,9 @@ def run_check(monkeypatch: pytest.MonkeyPatch) -> Iterator[Callable[..., int]]:
                 "http",
                 SimpleNamespace(
                     urlopen=urlopen,
-                    Request=lambda url, data: SimpleNamespace(full_url=url, data=data),
+                    Request=lambda url, data=None, headers=None: SimpleNamespace(
+                        full_url=url, data=data, headers=headers
+                    ),
                 ),
             )
             monkeypatch.setattr(

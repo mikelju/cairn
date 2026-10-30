@@ -1,18 +1,23 @@
 {% extends "base.html" %}
 {% import "_components.html" as a with context %}
 {% block main %}
-{% call a.step(7, "Review", "REAL", "Code placed every number, people decided, and the same tool answers over MCP and REST.", "two-col") %}
+{% call a.step(7, t.step_7, "REAL", t.s7_lede, "two-col") %}
+{{ a.reading_path([t.s7_path_1, t.s7_path_2], t.s_path_label) }}
 <div class="col-left">
-<h2>Session</h2>
-{{ a.data_table(["Item", "Value"], session) }}
+<div class="tiles">
+{{ a.tile(numbers, t.s7_tile_numbers ~ " (" ~ t.s7_by_model.format(n=by_model) ~ ")", 1, tone="ok") }}
+{{ a.tile(quotes, t.s7_tile_quotes) }}
+{{ a.tile(decisions, t.s7_tile_decisions) }}
+</div>
+{{ a.data_table([t.s7_th_item, t.s7_th_value], session) }}
 </div>
 <div class="col-right card">
-<h2>One tool, two doors</h2>
-{{ a.data_table(["Door", "Hash"], doors) }}
-{% if same %}{% call a.callout("rules") %}<p>Same hash, same Observation.</p>{% endcall %}
-{% else %}{% call a.callout("blocked") %}<p>The hashes differ.</p>{% endcall %}{% endif %}
+<h2>{{ a.cue(2) }}{{ t.s7_doors_h }}</h2>
+{{ a.data_table([t.s7_th_door, t.s7_th_hash], doors) }}
+{% if same %}{% call a.callout("rules") %}<p>{{ t.s7_same }}</p>{% endcall %}
+{% else %}{% call a.callout("blocked") %}<p>{{ t.s7_differ }}</p>{% endcall %}{% endif %}
 <p>{% for text, href in links %}<a href="{{ href }}">{{ text }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</p>
-{% call a.disclosure("Production table") %}{{ a.data_table(["Piece", "Demo", "Production"], production) }}{% endcall %}
+{% call a.disclosure("production", production|length, "rows") %}{{ a.data_table([t.s7_th_piece, t.s7_th_demo, t.s7_th_prod], production) }}{% endcall %}
 </div>
 {% endcall %}
 {% endblock %}

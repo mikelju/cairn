@@ -3,6 +3,7 @@
 import json
 import os
 import subprocess
+from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -32,13 +33,13 @@ from cairn.recording import (
 )
 from cairn.render import quotations
 from cairn.validate import RULE_AUC, RULE_CONC, validate_study
+from cairn.web import i18n
 from cairn.web.threads import threads
 
 HERE = Path(__file__).parent
 templates = Jinja2Templates(directory=HERE / "templates")
 router = APIRouter()
-ROLE = "Study toxicologist"
-STEPS = ["Validate", "Ask", "Explore", "Analyse", "Draft", "Check", "Review"]
+STEP_COUNT = 7
 
 
 def _commit() -> str:
@@ -68,7 +69,9 @@ def _page(request: Request, name: str, **context: Any) -> HTMLResponse:
         "commit": request.app.state.commit,
         "snapshot": request.app.state.snapshot,
     }
-    base = {"role": ROLE, "steps": STEPS, "footer": footer, **context}
+    keep = {k: str(context[k]) for k in ("thread", "actor") if context.get(k)}
+    shell = i18n.context(request, context.get("current"), keep)
+    base = {"steps": range(1, STEP_COUNT + 1), "footer": footer, **shell, **context}
     return templates.TemplateResponse(request, name, base)
 
 
@@ -180,7 +183,9 @@ async def step1_run(request: Request, switch: Annotated[str, Form()] = "none") -
         await runner.tasks[job.job_id]
         report = (runner.jobs[job.job_id].outputs or {})["report"]
     return templates.TemplateResponse(
-        request, "step1_result.html", {"r": _result(report, switch == "negative", extra)}
+        request,
+        "step1_result.html",
+        {**i18n.context(request, 1), "r": _result(report, switch == "negative", extra)},
     )
 
 
@@ -247,18 +252,20 @@ def _screen(result: LoopResult) -> tuple[list[str], list[dict[str, Any]]]:
     return [], []
 
 
-def _evidence(result: LoopResult) -> list[dict[str, str]]:
+def _evidence(result: LoopResult) -> list[dict[str, object]]:
     evidence = []
     for o in result.ledger.observations:
         ids = sorted({str(row["usubjid"]) for row in o.source_rows if "usubjid" in row})
         # Incidence source rows are the affected animals; n is the examined count.
-        label = "affected" if o.kind.startswith("incidence") else "animals"
+        label = "ev_affected" if o.kind.startswith("incidence") else "ev_animals"
         evidence.append(
             {
                 "tool": o.tool.name,
                 "population": o.population,
                 "n": "n/a" if o.n_examined is None else str(o.n_examined),
-                "sources": f"{len(ids)} {label}, from {ids[0]}" if ids else "none",
+                "count": len(ids),
+                "label": label,
+                "first": ids[0] if ids else "",
             }
         )
     return evidence
@@ -278,7 +285,9 @@ def _with_highlight(quote: dict[str, Any]) -> dict[str, Any]:
     return {**quote, "highlight": f"/highlight/{first}" if _highlighted(first) else ""}
 
 
-def _step2_context(question_id: str, directory: Path) -> dict[str, Any]:
+def _step2_context(
+    question_id: str, directory: Path, t: dict[str, str] | None = None
+) -> dict[str, Any]:
     model = recorded_model(directory, question_id, DEFAULT_MODEL)
     key = RecordingKey(question_id, PROMPT_VERSION, schema_hash(), model)
     client = ReplayClient.load(directory, key)
@@ -289,9 +298,19 @@ def _step2_context(question_id: str, directory: Path) -> dict[str, Any]:
     fixture = recording.get("source") == "fixture"
     meta = (
         f"{recording['date']} | {recording['region']} | {recording['model']} | "
-        f"{latency:.1f} s | " + ("cost n/a" if cost is None else f"{cost:.2f} USD")
+        f"{latency:.1f} s | "
+        + ((t or i18n.CATALOGUES["en"])["s5_cost_na"] if cost is None else f"{cost:.2f} USD")
     )
     return result_context(result, "FIXTURE" if fixture else "RECORDED", meta)
+
+
+def _answer_kind(result: LoopResult, has_table: bool) -> str:
+    """Why the answer looks as it does: refusal, quotations, table with text, or text only."""
+    if result.status is not LoopStatus.ANSWERED:
+        return "refusal"
+    if quotations(result.sentences):
+        return "quotes"
+    return "table" if has_table else "text"
 
 
 def result_context(result: LoopResult, badge: str, meta: str) -> dict[str, Any]:
@@ -302,13 +321,16 @@ def result_context(result: LoopResult, badge: str, meta: str) -> dict[str, Any]:
     return {
         "badge": badge,
         "meta": meta,
+        "kind": _answer_kind(result, bool(rows)),
         "trace": trace,
+        "calls": len(trace.split(" -> ")) if trace else 0,
         "status": result.status.value,
         "message": result.message,
         "answered": result.status is LoopStatus.ANSWERED,
         "text": result.rendered,
         "failures": [str(f) for f in verdict.failures] if verdict else [],
-        "rules": ", ".join(str(r) for r in verdict.rules) if verdict and verdict.rules else "none",
+        "rules": ", ".join(str(r) for r in verdict.rules) if verdict and verdict.rules else "",
+        "message_key": "exp_declined" if result.message == "the model declined" else "",
         "written": _written(result),
         "doses": doses,
         "rows": rows,
@@ -334,10 +356,14 @@ def step2_run(request: Request, question: Annotated[str, Form()]) -> HTMLRespons
     if question not in QUESTIONS:
         raise HTTPException(status_code=422, detail="unknown question")
     try:
-        context = _step2_context(question, _recordings_dir())
+        context = _step2_context(question, _recordings_dir(), i18n.context(request)["t"])
     except StaleRecording as error:
-        return templates.TemplateResponse(request, "step2_result.html", {"stale": str(error)})
-    return templates.TemplateResponse(request, "step2_result.html", {"r": context})
+        return templates.TemplateResponse(
+            request, "step2_result.html", {**i18n.context(request), "stale": str(error)}
+        )
+    return templates.TemplateResponse(
+        request, "step2_result.html", {**i18n.context(request), "r": context}
+    )
 
 
 SHOWN_HITS = 3
@@ -362,6 +388,7 @@ def _step3_context() -> dict[str, Any]:
             continue
         rows: list[list[str]] = []
         folded: list[list[str]] = []
+        own: list[dict[str, Any]] = []
         for number, hit in enumerate(retrieval.cached_guidance(fixed["query"]).hits, start=1):
             passage = passages[hit.passage_id]
             title = guidelines[passage.doc]["title"]
@@ -380,23 +407,37 @@ def _step3_context() -> dict[str, Any]:
             page = cited_page(passage, sentence.sentence_id)
             base = guidelines[passage.doc]["page_link_base"]
             marks = _highlighted(sentence.sentence_id)
-            if any(
+            literal = any(
                 normalize_whitespace(m["text"]) == normalize_whitespace(sentence.text)
                 and passage.page_start <= m["page"] <= passage.page_end
                 for m in marks
-            ):
-                verbatim += 1
-            quotes.append(
-                {
-                    "id": fixed["id"],
-                    "text": sentence.text,
-                    "cite": " ".join([*row[:2], str(page)]),
-                    "highlight": f"/highlight/{sentence.sentence_id}" if marks else "",
-                    "link": f"{base}#page={page}",
-                }
             )
-        queries.append({"id": fixed["id"], "query": fixed["query"], "rows": rows, "folded": folded})
-    return {"queries": queries, "quotes": quotes, "verbatim": verbatim}
+            verbatim += literal
+            quote = {
+                "id": fixed["id"],
+                "verbatim": literal,
+                "text": sentence.text,
+                "cite": " ".join([*row[:2], str(page)]),
+                "highlight": f"/highlight/{sentence.sentence_id}" if marks else "",
+                "link": f"{base}#page={page}",
+            }
+            quotes.append(quote)
+            own.append(quote)
+        queries.append(
+            {
+                "id": fixed["id"],
+                "query": fixed["query"],
+                "rows": rows,
+                "folded": folded,
+                "quotes": own,
+            }
+        )
+    return {
+        "queries": queries,
+        "quotes": quotes,
+        "verbatim": verbatim,
+        "guidelines": len(guidelines),
+    }
 
 
 @router.get("/step/3", response_class=HTMLResponse)
@@ -427,13 +468,29 @@ async def highlight_image(name: str) -> FileResponse:
     return FileResponse(IMAGES_DIR / name, media_type="image/png")
 
 
+EXPLORE_STAGES = (("Q1", "Q2", "Q3", "Q5"), ("Q4", "Q6", "Q7", "Q8"), ("G1", "G2", "G3"))
+
+
+@lru_cache(maxsize=4)
+def _card_kinds(directory: Path) -> dict[str, str]:
+    """The answer format of every recorded question, read from the recordings themselves."""
+    kinds: dict[str, str] = {}
+    for question_id in QUESTIONS:
+        try:
+            kinds[question_id] = _step2_context(question_id, directory)["kind"]
+        except (StaleRecording, ValueError):
+            kinds[question_id] = "text"
+    return kinds
+
+
 @router.get("/explore", response_class=HTMLResponse)
 async def explore(request: Request) -> HTMLResponse:
-    badge = _step2_badge(_recordings_dir())
+    directory = _recordings_dir()
+    badge = _step2_badge(directory)
     live = bool(os.environ.get("CAIRN_ACCESS_CODE"))
-    return _page(
-        request, "explore.html", current=0, questions=QUESTIONS, page_badge=badge, live=live
-    )
+    kinds = _card_kinds(directory)
+    stages = [[(q, kinds[q]) for q in group] for group in EXPLORE_STAGES]
+    return _page(request, "explore.html", current=0, stages=stages, page_badge=badge, live=live)
 
 
 @router.post("/explore/run", response_class=HTMLResponse)
@@ -441,16 +498,21 @@ def explore_run(request: Request, question: Annotated[str, Form()]) -> HTMLRespo
     if question not in QUESTIONS:
         raise HTTPException(status_code=422, detail="unknown question")
     try:
-        context = _step2_context(question, _recordings_dir())
+        context = _step2_context(question, _recordings_dir(), i18n.context(request)["t"])
     except StaleRecording as error:
-        return templates.TemplateResponse(request, "step2_result.html", {"stale": str(error)})
-    return templates.TemplateResponse(request, "step2_result.html", {"r": context})
+        return templates.TemplateResponse(
+            request, "explore_answer.html", {**i18n.context(request), "stale": str(error)}
+        )
+    return templates.TemplateResponse(
+        request, "explore_answer.html", {**i18n.context(request), "r": context}
+    )
 
 
 def mount_web(app: FastAPI) -> None:
     from cairn.web.explore_live import explore_live
     from cairn.web.people import people  # imports this module's helpers, so it loads late
 
+    app.add_middleware(i18n.LocaleCookie)
     app.state.commit = _commit()
     app.state.snapshot = load_study()[2]
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")

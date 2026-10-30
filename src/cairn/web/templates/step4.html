@@ -1,17 +1,18 @@
 {% extends "base.html" %}
 {% import "_components.html" as a with context %}
 {% block main %}
-{% call a.step(4, "Analyse", "REAL", "People decide treatment relatedness and the dose level; the model does not.", "two-col") %}
+{% call a.step(4, t.step_4, "REAL", t.s4_lede, "two-col") %}
+{{ a.reading_path([t.s4_path_1, t.s4_path_2, t.s4_path_3], t.s_path_label) }}
 <div class="col-left">
-<p class="meta">TK note: inherited from step 1.</p>
-<form method="post" action="/step/4/example"><input type="hidden" name="thread" value="{{ thread }}"><button type="submit">Fill example decisions (example)</button></form>
+<form method="post" action="/step/4/example"><input type="hidden" name="thread" value="{{ thread }}"><button type="submit">{{ t.s4_example }}</button></form>
 <div id="recompute">{% include "step4_result.html" %}</div>
-{{ a.in_production("named reviewers and signed records.") }}
+{{ a.in_production(t.s4_prod, label=t.exp_prod_label) }}
 </div>
 <div class="col-right card">
 <form hx-post="/step/4/decide" hx-trigger="change" hx-target="#recompute">
 <input type="hidden" name="thread" value="{{ thread }}">
-{{ a.data_table(["Finding", "Sex", "Treatment-related from", "Adverse from"], rows) }}
+<h2>{{ a.cue(1) }}{{ t.s4_table_h }}</h2>
+{{ a.data_table([t.s4_th_finding, t.s4_th_sex, t.s4_th_related, t.s4_th_adverse], rows) }}
 </form>
 </div>
 {% endcall %}

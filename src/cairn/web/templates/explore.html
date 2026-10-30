@@ -1,19 +1,44 @@
 {% extends "base.html" %}
 {% import "_components.html" as a with context %}
 {% block main %}
-{% call a.step(3, "Explore", "RECORDED", "Ask a question and read quotations from public guidelines, each with its page.", "two-col") %}
-<div class="controls" role="group" aria-label="Questions">
-{% for id, text in questions.items() %}<button type="button" hx-post="/explore/run" hx-vals='{"question": "{{ id }}"}' hx-target="#result" title="{{ text }}">{{ id }}</button>{% endfor %}
+<div class="explore">
+  <h1>{{ t.exp_title }} {{ a.badge(page_badge) }}</h1>
+  <p class="lede">{{ t.exp_sub }}</p>
+  {{ a.reading_path([t.exp_path_1, t.exp_path_2, t.exp_path_3, t.exp_path_4], t.exp_path_label) }}
+  <nav class="stagebar" aria-label="{{ t.exp_stagebar }}"><ol>
+    {% for cards in stages %}{% set n = loop.index %}
+    <li><a href="#stage-{{ n }}" data-stage="{{ n }}"><span class="cue" aria-hidden="true">{{ n }}</span>{{ t["exp_s" ~ n ~ "_title"] }}</a></li>
+    {% endfor %}
+  </ol></nav>
+  {% for cards in stages %}{% set n = loop.index %}
+  <section class="stage" id="stage-{{ n }}" aria-labelledby="stage-{{ n }}-title">
+    <p class="stage-num" aria-hidden="true">{{ "%02d"|format(n) }}</p>
+    <div class="stage-body">
+      <p class="eyebrow">{{ t.exp_stage_word }} {{ n }} {{ t.exp_of }} {{ stages|length }}</p>
+      <h2 id="stage-{{ n }}-title">{{ t["exp_s" ~ n ~ "_title"] }}</h2>
+      <p class="intro">{{ a.cue(1) }}{{ t["exp_s" ~ n ~ "_intro"] }}</p>
+      <div class="qgrid" role="group" aria-label="{{ t['exp_s' ~ n ~ '_title'] }}">
+        {% for id, kind in cards %}
+        <button type="button" class="qcard" id="card-{{ id }}" aria-controls="answer-{{ n }}" hx-post="/explore/run" hx-vals='{"question": "{{ id }}"}' hx-target="#answer-{{ n }}">
+          <span class="q">{{ t["q_" ~ id] }}</span>
+          <span class="row"><span class="fmt-tag {{ kind }}">{{ t["tag_" ~ kind] }}</span><span class="go">{{ t.exp_card_go }} &darr;</span></span>
+        </button>
+        {% endfor %}
+      </div>
+      <div class="slot" id="answer-{{ n }}" aria-live="polite"></div>
+      <p class="next">{% if not loop.last %}&darr; {{ t.exp_next }} <a href="#stage-{{ n + 1 }}">{{ t.exp_stage_word }} {{ n + 1 }} · {{ t["exp_s" ~ (n + 1) ~ "_title"] }}</a>{% else %}&rarr; {{ t.exp_next_step }} <a href="/step/4">04 {{ t.step_4 }}</a>{% endif %}</p>
+    </div>
+  </section>
+  {% endfor %}
+  {% if live %}
+  <form class="live card" hx-post="/explore/live" hx-target="#answer-live" autocomplete="off" aria-label="{{ t.exp_live_label }}">
+    <label>{{ t.exp_live_q }} <input type="text" name="question" maxlength="500" required></label>
+    <label>{{ t.exp_live_code }} <input type="password" name="code" autocomplete="off"></label>
+    <button type="submit">{{ t.exp_live_go }}</button>
+  </form>
+  <div class="slot" id="answer-live" aria-live="polite"></div>
+  {% endif %}
+  {{ a.in_production(t.exp_prod, label=t.exp_prod_label) }}
 </div>
-{% call a.disclosure("Questions") %}<ul class="questions">{% for id, text in questions.items() %}<li>{{ id }}: {{ text }}</li>{% endfor %}</ul>{% endcall %}
-{% if live %}
-<form class="live" hx-post="/explore/live" hx-target="#result" autocomplete="off">
-<label>Your own question <input type="text" name="question" maxlength="500" required></label>
-<label>Access code <input type="password" name="code" autocomplete="off"></label>
-<button type="submit">Ask live</button>
-</form>
-{% endif %}
-<div id="result"></div>
-<div class="col-prod">{{ a.in_production("live model calls.") }}</div>
-{% endcall %}
 {% endblock %}
+{% block scripts %}<script src="/static/explore.js" defer></script>{% endblock %}

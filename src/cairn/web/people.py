@@ -25,7 +25,7 @@ from cairn.recording import RECORDINGS_DIR, ReplayClient, recorded_model, total_
 from cairn.render import render
 from cairn.verify import RULE_REASONS
 from cairn.web import _page as page
-from cairn.web import templates
+from cairn.web import i18n, templates
 from cairn.web.threads import (
     AUTHOR,
     REVIEWER,
@@ -82,8 +82,8 @@ async def _draft(request: Request, thread: str) -> Markup:
     return Markup(EMPTY_SLOT.sub(r'<span class="slot">\1</span>', text))
 
 
-def _select(name: str, label: str, doses: list[str], chosen: str) -> Markup:
-    options = [("", "choose"), ("none", "none"), *[(d, d) for d in doses]]
+def _select(name: str, label: str, doses: list[str], chosen: str, t: dict[str, str]) -> Markup:
+    options = [("", t["s4_choose"]), ("none", t["s4_none"]), *[(d, d) for d in doses]]
     body = "".join(
         Markup('<option value="{}"{}>{}</option>').format(
             v, Markup(" selected" if v == chosen else ""), t
@@ -105,18 +105,24 @@ async def _fragment(request: Request, view: dict[str, Any]) -> dict[str, Any]:
         }
         for s in view["slots"]
     ]
+    t = i18n.context(request)["t"]
     table = [
         [
             r["finding"],
             r["sex"],
             _select(
                 "t_" + r["slot"],
-                f"Treatment-related from {r['finding']} {r['sex']}",
+                f"{t['s4_th_related']} {r['finding']} {r['sex']}",
                 r["doses"],
                 r["t"],
+                t,
             ),
             _select(
-                "a_" + r["slot"], f"Adverse from {r['finding']} {r['sex']}", r["doses"], r["a"]
+                "a_" + r["slot"],
+                f"{t['s4_th_adverse']} {r['finding']} {r['sex']}",
+                r["doses"],
+                r["a"],
+                t,
             ),
         ]
         for r in rows
@@ -162,7 +168,10 @@ async def step4_decide(request: Request) -> HTMLResponse:
         return HTMLResponse(
             status_code=204, headers={"HX-Redirect": _current(thread, AUTHOR).headers["location"]}
         )
-    return templates.TemplateResponse(request, "step4_result.html", await _fragment(request, view))
+    fragment = await _fragment(request, view)
+    return templates.TemplateResponse(
+        request, "step4_result.html", {**i18n.context(request), **fragment}
+    )
 
 
 @people.post("/step/4/example")
@@ -203,6 +212,7 @@ async def _step5(request: Request, thread: str, actor: str, error: str = "") -> 
     state, waiting, view = await load_view(request, thread)
     if waiting == "await_decisions":
         return RedirectResponse(f"/step/4?thread={thread}", status_code=303)
+    t = i18n.context(request)["t"]
     model = recorded_model(RECORDINGS_DIR, "DRAFT", DEFAULT_MODEL)
     recording = ReplayClient.load(RECORDINGS_DIR, draft_key(model)).recording
     cost = total_cost(recording)
@@ -219,11 +229,12 @@ async def _step5(request: Request, thread: str, actor: str, error: str = "") -> 
         approved_by=view["approved_by"],
         meta=(
             f"{recording['date']} | {recording['region']} | {recording['model']} | "
-            f"{latency:.1f} s | " + ("cost n/a" if cost is None else f"{cost:.2f} USD")
+            f"{latency:.1f} s | " + (t["s5_cost_na"] if cost is None else f"{cost:.2f} USD")
         ),
-        rules=f"Rules: {len(RULE_REASONS) - len(failed)} of {len(RULE_REASONS)} passed, see step 6",
+        passed=len(RULE_REASONS) - len(failed),
+        rule_total=len(RULE_REASONS),
         judge_meta=_judge_meta(),
-        judge_rows=_judge_rows(view["judge"], state),
+        judge_rows=_judge_rows(view["judge"], state, t),
         judged=sum(r["verdict"] != NOT_JUDGED for r in view["judge"]),
         total=len(view["judge"]),
     )
@@ -239,21 +250,21 @@ def _judge_meta() -> str:
     return f"{JUDGE_MODEL} | {calibration}"
 
 
-def _judge_rows(results: list[dict[str, str]], state: Any) -> list[list[Any]]:
+def _judge_rows(results: list[dict[str, str]], state: Any, t: dict[str, str]) -> list[list[Any]]:
     """Each warning, one row for the sentences not judged, then the EXAMPLE overstated sentence."""
     example = replay_judge(
         RECORDINGS_DIR, EXAMPLE_SENTENCE, shown_facts(build_ledger(state), EXAMPLE_OBS)
     )
     rows: list[list[Any]] = [
-        [r["sentence"], f"warning: {r['category']}", r["reason"]]
+        [r["sentence"], f"{t['s5_warning']} {r['category']}", r["reason"]]
         for r in results
         if r["verdict"] == "overstated"
     ]
     unjudged = sum(r["verdict"] == NOT_JUDGED for r in results)
     if unjudged:  # one row, so the panel stays on one screen whatever the decisions
-        rows.append([f"{unjudged} sentences of the final text", NOT_JUDGED, "No recording."])
+        rows.append([f"{unjudged} {t['s5_unjudged']}", NOT_JUDGED, t["s5_no_recording"]])
     verdict = (
-        f"warning: {example['category']}"
+        f"{t['s5_warning']} {example['category']}"
         if example["verdict"] == "overstated"
         else example["verdict"]
     )
@@ -276,6 +287,7 @@ async def step6(request: Request, thread: str | None = None, actor: str = REVIEW
     state, waiting, _ = await load_view(request, thread)
     if waiting == "await_decisions":
         return RedirectResponse(f"/step/4?thread={thread}", status_code=303)
+    t = i18n.context(request)["t"]
     failed = {f.rule: f.reason for f in verify_final(state).failures}
     chain = await verify_audit(request, thread)
     return page(
@@ -284,14 +296,17 @@ async def step6(request: Request, thread: str | None = None, actor: str = REVIEW
         current=6,
         actor=_actor(actor),
         rules=[
-            [n, "fired" if n in failed else "passed", failed.get(n, reason)]
+            [n, t["s6_fired"] if n in failed else t["s6_passed"], failed.get(n, reason)]
             for n, reason in RULE_REASONS.items()
         ],
         fired=len(failed),
+        passed=len(RULE_REASONS) - len(failed),
+        rule_total=len(RULE_REASONS),
+        entries=chain["count"],
         chain=(
-            f"Audit chain: {chain['count']} entries, verified."
+            t["s6_chain_ok"]
             if chain["ok"]
-            else f"Audit chain: broken at entry {chain['first_broken']}."
+            else t["s6_chain_broken"].format(n=chain["first_broken"])
         ),
         chain_ok=chain["ok"],
     )
@@ -299,20 +314,12 @@ async def step6(request: Request, thread: str | None = None, actor: str = REVIEW
 
 REPO = "https://github.com/mikelju/cairn"
 STEP7_LINKS = [
-    (
-        "Data-quality memo commit (no .py files; its evals check is green on the phase PR)",
-        f"{REPO}/commit/7897d079c8665301821fe0e0faffdfd988b6ce82",
-    ),
-    ("Blocked bad PR", f"{REPO}/pull/6"),
-    ("REST docs", "/docs"),
-    ("MCP endpoint", "/mcp"),
+    ("s7_link_memo", f"{REPO}/commit/7897d079c8665301821fe0e0faffdfd988b6ce82"),
+    ("s7_link_pr", f"{REPO}/pull/6"),
+    ("s7_link_rest", "/docs"),
+    ("s7_link_mcp", "/mcp"),
 ]
-PRODUCTION = [
-    ["Identity", "Role picker", "SSO and roles"],
-    ["Audit log", "Hash chain in the app", "External append-only log"],
-    ["Draft model", "Recorded call", "Bedrock with Guardrails and WAF"],
-    ["Sign-off", "Approval in step 5", "Electronic signatures"],
-]
+PRODUCTION_KEYS = ["identity", "audit", "model", "sign"]
 
 
 async def _two_doors(request: Request) -> tuple[str, str]:
@@ -345,23 +352,24 @@ async def step7(request: Request, thread: str | None = None, actor: str = REVIEW
     chain = await verify_audit(request, thread)
     failed = len(verify_final(state).failures)
     over_mcp, over_rest = await _two_doors(request)
+    t = i18n.context(request)["t"]
+    code_numbers = sum(isinstance(p, ValueRef) for p in parts)
     session = [
         [
-            "Numbers",
-            f"{sum(isinstance(p, ValueRef) for p in parts)} by code, {by_model} by the model",
-        ],
-        ["Quotations", f"{sum(isinstance(p, QuoteRef) for p in parts)} copied verbatim"],
-        [
-            "Decisions",
-            f"{len(view['decisions'])} by people, {len(view['confirmed'])} NOAEL confirmed",
+            t["s7_draft"],
+            f"{latency:.1f} s, " + (t["s5_cost_na"] if cost is None else f"{cost:.2f} USD"),
         ],
         [
-            "Recorded draft",
-            f"{latency:.1f} s, " + ("cost n/a" if cost is None else f"{cost:.2f} USD"),
+            t["s7_rules"],
+            t["s7_rules_value"].format(a=len(RULE_REASONS) - failed, b=len(RULE_REASONS)),
         ],
-        ["Rules", f"{len(RULE_REASONS) - failed} of {len(RULE_REASONS)} passed"],
-        ["Chain", f"{chain['count']} entries, " + ("verified" if chain["ok"] else "broken")],
-        ["Approval", view["approved_by"] or "not yet"],
+        [
+            t["s7_chain"],
+            t["s7_chain_value"].format(
+                n=chain["count"], state=t["s7_verified"] if chain["ok"] else t["s7_broken"]
+            ),
+        ],
+        [t["s7_approval"], view["approved_by"] or t["s7_not_yet"]],
     ]
     return page(
         request,
@@ -369,10 +377,17 @@ async def step7(request: Request, thread: str | None = None, actor: str = REVIEW
         current=7,
         actor=_actor(actor),
         session=session,
+        numbers=code_numbers,
+        by_model=by_model,
+        quotes=sum(isinstance(p, QuoteRef) for p in parts),
+        decisions=len(view["decisions"]),
+        confirmed=len(view["confirmed"]),
         doors=[["MCP", over_mcp[:16]], ["REST", over_rest[:16]]],
         same=over_mcp == over_rest,
-        links=STEP7_LINKS,
-        production=PRODUCTION,
+        links=[(t[key], href) for key, href in STEP7_LINKS],
+        production=[
+            [t[f"s7_p_{k}"], t[f"s7_p_{k}_demo"], t[f"s7_p_{k}_prod"]] for k in PRODUCTION_KEYS
+        ],
     )
 
 
@@ -389,5 +404,6 @@ async def step5_approve(
             return _current(thread, who)
         if refusal.status_code != 403:
             raise
-        error = f"403 · {refusal.detail} Enforced by the API, not the UI"
+        t = i18n.context(request)["t"]
+        error = t["s5_refused"].format(detail=refusal.detail)
     return await _step5(request, thread, who, error)

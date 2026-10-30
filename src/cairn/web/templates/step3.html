@@ -1,23 +1,28 @@
 {% extends "base.html" %}
 {% import "_components.html" as a with context %}
+{% macro quote(q) %}<blockquote class="quote">{% if q.verbatim %}<span class="verb">{{ t.s3_literal }}</span>{% endif %}<p>{{ q.text }}</p><p class="meta">{{ q.cite }}{% if q.highlight %} · <a href="{{ q.highlight }}">{{ t.exp_hl }}</a>{% endif %} · <a href="{{ q.link }}">{{ t.exp_official }}</a></p></blockquote>{% endmacro %}
 {% block main %}
-{% call a.step(3, "Explore", "COMPUTED AT BUILD", "Guidance is retrieved and ranked at build, then quoted by page.", "two-col") %}
-<div class="col-left">
-{% set headers = ["Guideline", "Section", "Page", "Lex", "Sem", "Fused"] %}
+{% call a.step(3, t.step_3, "COMPUTED AT BUILD", t.s3_lede) %}
+{{ a.reading_path([t.s3_path_1, t.s3_path_2, t.s3_path_3], t.s_path_label) }}
+<div class="tiles">
+  {{ a.tile(r.guidelines, t.s3_tile_guides, 1) }}
+  {{ a.tile(r.quotes|length, t.s3_tile_quotes) }}
+  {{ a.tile(r.verbatim ~ "/" ~ r.quotes|length, t.s3_tile_verb, tone="ok") }}
+</div>
+<div class="guides">
+{% set headers = [t.s3_th_guideline, t.s3_th_section, t.s3_th_page, "Lex", "Sem", "Fused"] %}
 {% for q in r.queries %}
-<p class="meta"><strong>{{ q.id }}</strong> {{ q.query }}</p>
+<div class="guide-col">
+<h2>{{ a.cue(2) if loop.first }}{{ t["s3_q_" ~ q.id] }}</h2>
+{% call a.disclosure("quotes", q.quotes|length, "quotes") %}<p class="meta">{{ q.query }}</p>{% for x in q.quotes %}{{ quote(x) }}{% endfor %}{% endcall %}
+<div class="detail">{{ a.cue(3) if loop.first }}{% call a.disclosure("ranking", q.rows|length + q.folded|length, "rows") %}
 {{ a.data_table(headers, q.rows) }}
-{% if q.folded %}{% call a.disclosure("Lower ranks") %}{{ a.data_table(headers, q.folded) }}{% endcall %}{% endif %}
+{% if q.folded %}{% call a.disclosure("lower_ranks", q.folded|length, "rows") %}{{ a.data_table(headers, q.folded) }}{% endcall %}{% endif %}
+{% endcall %}</div>
+</div>
 {% endfor %}
-<p class="meta"><a href="/explore">Ask the recorded questions</a></p>
-<div class="col-prod">{{ a.in_production("live questions behind an access code.") }}</div>
 </div>
-<div class="col-right card">
-<h2>Quotations</h2>
-<p class="meta">Quotes: {{ r.quotes|length }} · verbatim on the cited page: {{ r.verbatim }}/{{ r.quotes|length }}</p>
-{% call a.disclosure("Quoted sentences") %}
-{% for q in r.quotes %}<blockquote class="quote"><p>{{ q.text }}</p><p class="meta">{{ q.id }} · {{ q.cite }}{% if q.highlight %} · <a href="{{ q.highlight }}">highlighted page</a>{% endif %} · <a href="{{ q.link }}">official page</a></p></blockquote>{% endfor %}
-{% endcall %}
-</div>
+<p class="btn-row"><a class="btn-primary" href="/explore">{{ t.s3_cta }} &rarr;</a></p>
+{{ a.in_production(t.s3_prod, label=t.exp_prod_label) }}
 {% endcall %}
 {% endblock %}

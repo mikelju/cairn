@@ -3,27 +3,29 @@
 
 {% macro badge_meta(kind, meta) %}<p class="meta">{{ badge(kind) }} {{ meta }}</p>{% endmacro %}
 
-{% macro shell_header(steps, current, role, actor=none) %}
+{% macro shell_header(steps, current, t, locale, lang_links, actor=none) %}
 <header>
-  <a class="brand" href="/">Cairn</a>
-  <nav class="steps" aria-label="Steps">
-    {% for name in steps %}
-      {% set n = loop.index %}
-      {% if n <= 7 %}
-        <a href="/step/{{ n }}"{% if current == n %} aria-current="step"{% endif %}>{{ n }} {{ name }}</a>
-      {% else %}
-        <span class="locked" aria-disabled="true">{{ n }} {{ name }}</span>
-      {% endif %}
-    {% endfor %}
-  </nav>
-  <span class="role">{% if actor %}Acting as: {{ actor }} {{ badge("SIMULATED") }}{% else %}Role: {{ role }} (simulated){% endif %}</span>
+  <div class="bar">
+    <a class="brand" href="/">{{ t.brand }}</a>
+    <nav class="steps" aria-label="{{ t.nav_steps }}">
+      {% for n in steps %}
+        <a href="/step/{{ n }}"{% if current == n %} aria-current="step"{% endif %}><span class="n">{{ "%02d"|format(n) }}</span>{{ t["step_" ~ n] }}</a>
+      {% endfor %}
+    </nav>
+    <span class="role">{% if actor %}{{ t.acting_as }} {{ actor }} {{ badge("SIMULATED") }}{% else %}{{ t.role }}{% endif %}</span>
+    <div class="lang" role="group" aria-label="{{ t.lang_label }}">
+      {% for code in ("es", "en") %}
+      <a href="{{ lang_links[code] }}" hreflang="{{ code }}" lang="{{ code }}"{% if locale == code %} aria-current="true"{% endif %}>{{ code|upper }}</a>
+      {% endfor %}
+    </div>
+  </div>
 </header>
 {% endmacro %}
 
-{% macro shell_footer(footer) %}
+{% macro shell_footer(footer, t) %}
 <footer>
-  <span>Public sample data · fictional compound · not GxP-validated</span>
-  <span>v{{ footer.version }} · commit {{ footer.commit }} · snapshot {{ footer.snapshot[:12] }}</span>
+  <span>{{ t.footer_note }}</span>
+  <span>v{{ footer.version }} · {{ t.footer_build }} {{ footer.commit }} · {{ t.footer_snapshot }} {{ footer.snapshot[:12] }}</span>
 </footer>
 {% endmacro %}
 
@@ -56,21 +58,33 @@
 </table>
 {% endmacro %}
 
-{% macro trace(steps) %}<p class="trace">Trace: {{ steps }}</p>{% endmacro %}
+{% macro trace(steps, label="Trace") %}<p class="trace">{{ label }}: {{ steps }}</p>{% endmacro %}
 
 {% macro evidence_panel(items) %}
-<div class="evidence">
+{% if items %}{% call disclosure("evidence", items|length, "items") %}<div class="evidence">
 {% for e in items %}
-<p>{{ e.tool }}, {{ e.population }}, n={{ e.n }}, {{ e.sources }}</p>
+<p>{{ e.tool }}, {{ e.population }}, n={{ e.n }}, {% if e.count %}{{ e.count }} {{ t[e.label] }}, {{ t.ev_from }} {{ e.first }}{% else %}{{ t.exp_none }}{% endif %}</p>
 {% endfor %}
-</div>
+</div>{% endcall %}{% endif %}
 {% endmacro %}
 
 {# kind: rules, blocked, stale or note. #}
 {% macro callout(kind) %}<div class="callout {{ kind }}">{{ caller() }}</div>{% endmacro %}
 
-{% macro disclosure(summary) %}<details><summary>{{ summary }}</summary>{{ caller() }}</details>{% endmacro %}
+{# A disclosure pill: key names the catalogue label, n and unit give the size ("Show passage ranking · 3 rows"), tag tells repeats apart. #}
+{% macro disclosure(key, n, unit, tag=none) %}{% set forms = t["unit_" ~ unit].split("|") %}<details class="pill"><summary class="pill">{{ t["disc_" ~ key] }}{% if tag %} ({{ tag }}){% endif %} · {{ n }} {{ forms[0] if n == 1 else forms[1] }}</summary>{{ caller() }}</details>{% endmacro %}
 
-{% macro in_production(text, kind=none, lead=none) %}
-<p class="prod">{% if kind %}{{ badge(kind) }} {{ lead }} <strong>In production →</strong>{% else %}In production →{% endif %} {{ text }}</p>
+{# Reading cues: a numbered path for the page header and matching number badges on the parts it names. #}
+{% macro reading_path(labels, label) %}<ol class="path" aria-label="{{ label }}">{% for text in labels %}<li><span class="cue solid" aria-hidden="true">{{ loop.index }}</span>{{ text }}</li>{% endfor %}</ol>{% endmacro %}
+
+{% macro cue(number) %}<span class="cue" aria-hidden="true">{{ number }}</span>{% endmacro %}
+
+{# A highlighted figure: number big, label small, an optional cue that the reading path names. #}
+{% macro tile(number, label, n=none, tone="") %}<div class="tile {{ tone }}">{% if n %}{{ cue(n) }}{% endif %}<span class="num">{{ number }}</span><span class="lbl">{{ label }}</span></div>{% endmacro %}
+
+{# How the answer is shaped, explained in one line; kind: table, text, refusal or quotes. #}
+{% macro format_line(kind, n=none) %}<p class="format-line {{ kind }}">{% if n %}{{ cue(n) }}{% endif %}<span><b>{{ t["fmt_" ~ kind ~ "_h"] }}</b> {{ t["fmt_" ~ kind] }}</span></p>{% endmacro %}
+
+{% macro in_production(text, kind=none, lead=none, label="In production →") %}
+<p class="prod">{% if kind %}{{ badge(kind) }} {{ lead }} <strong>{{ label }}</strong>{% else %}{{ label }}{% endif %} {{ text }}</p>
 {% endmacro %}

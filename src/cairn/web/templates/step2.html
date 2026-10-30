@@ -1,13 +1,14 @@
 {% extends "base.html" %}
 {% import "_components.html" as a with context %}
 {% block main %}
-{% call a.step(2, "Ask", "RECORDED", "The model drafts; code places every number.", "two-col") %}
+{% call a.step(2, t.step_2, "RECORDED", t.s2_lede, "two-col") %}
+{{ a.reading_path([t.s2_path_1, t.s2_path_2, t.s2_path_3], t.s_path_label) }}
 <form class="controls" hx-post="/step/2/run" hx-target="#result">
-  <select name="question" aria-label="Question">{% for id in questions %}<option value="{{ id }}">{{ id }}</option>{% endfor %}</select>
-  <button type="submit">Ask</button>
+  {{ a.cue(1) }}<select name="question" aria-label="{{ t.s2_q_label }}">{% for id in questions %}<option value="{{ id }}">{{ id }}</option>{% endfor %}</select>
+  <button type="submit">{{ t.s2_ask }}</button>
 </form>
-{% call a.disclosure("Questions") %}<ul class="questions">{% for id, text in questions.items() %}<li>{{ id }}: {{ text }}</li>{% endfor %}</ul>{% endcall %}
+{% call a.disclosure("questions", questions|length, "questions") %}<ul class="questions">{% for id in questions %}<li>{{ id }}: {{ t["q_" ~ id] }}</li>{% endfor %}</ul>{% endcall %}
 <div id="result"></div>
-<div class="col-prod">{{ a.in_production("live model calls.") }}</div>
+<div class="col-prod">{{ a.in_production(t.exp_prod, label=t.exp_prod_label) }}</div>
 {% endcall %}
 {% endblock %}

@@ -1,16 +1,16 @@
 {% extends "base.html" %}
-{% import "_components.html" as a %}
+{% import "_components.html" as a with context %}
 {% block main %}
-{% call a.step(1, "Validate", "REAL", "Bad data stops at the door: negative values are quarantined, never corrected.") %}
+{% call a.step(1, t.step_1, "REAL", t.s1_lede) %}
+{{ a.reading_path([t.s1_path_1, t.s1_path_2, t.s1_path_3], t.s_path_label) }}
 <form class="controls card" hx-post="/step/1/run" hx-target="#result" hx-trigger="submit, change">
-  <button type="submit">Run validation</button>
-  <label><input type="radio" name="switch" value="none" checked> As published</label>
-  <label><input type="radio" name="switch" value="negative"> Inject a negative concentration</label>
-  <label><input type="radio" name="switch" value="duplicate"> Duplicate an animal ID</label>
-  <label><input type="radio" name="switch" value="dose"> Use a dose not in TX</label>
+  {{ a.cue(1) }}<button type="submit">{{ t.s1_run }}</button>
+  {% for value in ("none", "negative", "duplicate", "dose") %}
+  <label><input type="radio" name="switch" value="{{ value }}"{% if loop.first %} checked{% endif %}> {{ t["s1_sw_" ~ value] }}</label>
+  {% endfor %}
 </form>
 
 <div id="result" class="result"></div>
-{{ a.in_production("a queue with workers.", "SIMULATED", "job runner: in process.") }}
+{{ a.in_production(t.s1_prod, "SIMULATED", t.s1_prod_lead, t.exp_prod_label) }}
 {% endcall %}
 {% endblock %}

@@ -18,9 +18,8 @@ from cairn import live
 from cairn.gateway import DEFAULT_MODEL, REGION
 from cairn.loop import LoopStatus
 from cairn.pricing import call_cost
-from cairn.questions import QUESTIONS
 from cairn.tools import LIVE_SEARCH
-from cairn.web import result_context, templates
+from cairn.web import i18n, result_context, templates
 
 explore_live = APIRouter()
 MAX_QUESTION_CHARS = 500
@@ -58,9 +57,13 @@ def _add_spend(amount: float) -> None:
     _spend[today] = _spend.get(today, 0.0) + amount
 
 
-def _refused(request: Request, message: str) -> HTMLResponse:
-    context = {"refused": message, "questions": QUESTIONS}
-    return templates.TemplateResponse(request, "explore_refused.html", context)
+def _refused(request: Request, key: str, **values: object) -> HTMLResponse:
+    """A refusal in the visitor's language: `key` names a catalogue message."""
+    shell = i18n.context(request)
+    message = shell["t"][key].format(**values)
+    return templates.TemplateResponse(
+        request, "explore_refused.html", {**shell, "refused": message}
+    )
 
 
 @explore_live.post("/explore/live", response_class=HTMLResponse)
@@ -71,16 +74,16 @@ def explore_ask_live(
 ) -> HTMLResponse:
     question = question.strip()
     if not code_ok(code):
-        return _refused(request, "Live questions need the access code. Try a recorded question.")
+        return _refused(request, "live_need_code")
     if not question or len(question) > MAX_QUESTION_CHARS:
-        return _refused(request, f"A question has 1 to {MAX_QUESTION_CHARS} characters.")
+        return _refused(request, "live_length", n=MAX_QUESTION_CHARS)
     if spent_today() >= daily_cap():
-        return _refused(request, "The daily live budget is used up. Try a recorded question.")
+        return _refused(request, "live_budget")
     if not _busy.acquire(blocking=False):
-        return _refused(request, "Another live question is running. Try again in a minute.")
+        return _refused(request, "live_busy")
     try:
         if spent_today() >= daily_cap():  # a question that just finished may have used it up
-            return _refused(request, "The daily live budget is used up. Try a recorded question.")
+            return _refused(request, "live_budget")
         gateway: live.SpendGateway | None = None
         token = LIVE_SEARCH.set(True)
         try:
@@ -88,7 +91,7 @@ def explore_ask_live(
             result = live.ask_live(question, DEFAULT_MODEL, gateway)
         except Exception as error:  # a timeout or a Bedrock error: count what the calls cost
             _add_spend(gateway.spent if gateway else 0.0)
-            return _refused(request, f"The live call failed ({type(error).__name__}).")
+            return _refused(request, "live_failed", error=type(error).__name__)
         finally:
             LIVE_SEARCH.reset(token)
         cost = call_cost(DEFAULT_MODEL, result.input_tokens, result.output_tokens)
@@ -102,4 +105,6 @@ def explore_ask_live(
     context = result_context(result, "REAL", meta)
     if result.status is not LoopStatus.ANSWERED:  # shown as is, never as an answer
         context["text"] = None
-    return templates.TemplateResponse(request, "step2_result.html", {"r": context})
+    return templates.TemplateResponse(
+        request, "explore_answer.html", {**i18n.context(request), "r": context}
+    )

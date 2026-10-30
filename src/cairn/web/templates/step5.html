@@ -1,25 +1,31 @@
 {% extends "base.html" %}
 {% import "_components.html" as a with context %}
 {% block main %}
-{% call a.step(5, "Draft", "RECORDED", "The model drafts the summary; code places every value and every quotation.", "two-col") %}
+{% call a.step(5, t.step_5, "RECORDED", t.s5_lede, "two-col") %}
+{{ a.reading_path([t.s5_path_1, t.s5_path_2, t.s5_path_3], t.s_path_label) }}
 <div class="col-left">
-{{ a.badge_meta("RECORDED", meta) }}
-{% call a.disclosure("Final text") %}<div class="card answer"><p>{{ text }}</p></div>{% endcall %}
+<div class="detail">{{ a.cue(1) }}
+{% call a.disclosure("final_text", text.split()|length, "words") %}<div class="card answer"><p>{{ text }}</p></div>{% endcall %}
+{% call a.disclosure("recording", 2, "items") %}{{ a.badge_meta("RECORDED", meta) }}<p class="meta">{{ a.badge("RECORDED") }} {{ judge_meta }}</p>{% endcall %}
+</div>
 {% if error %}{% call a.callout("blocked") %}<p>{{ error }}</p>{% endcall %}{% endif %}
-{% if approved_by %}{% call a.callout("rules") %}<p>Approved by {{ approved_by }}.</p>{% endcall %}
+{% if approved_by %}{% call a.callout("rules") %}<p>{{ t.s5_approved }} {{ approved_by }}.</p>{% endcall %}
 {% else %}
-<form method="post" action="/step/5/approve" class="controls"><input type="hidden" name="thread" value="{{ thread }}">
-<button type="submit" name="actor" value="A. Author">Approve as A. Author</button>
-<button type="submit" name="actor" value="R. Reviewer">Approve as R. Reviewer</button></form>
+<form method="post" action="/step/5/approve" class="controls"><input type="hidden" name="thread" value="{{ thread }}">{{ a.cue(2) }}
+<button type="submit" name="actor" value="A. Author">{{ t.s5_approve_as }} A. Author</button>
+<button type="submit" name="actor" value="R. Reviewer">{{ t.s5_approve_as }} R. Reviewer</button></form>
 {% endif %}
-{{ a.in_production("an editor with tracked changes.") }}
+{{ a.in_production(t.s5_prod, label=t.exp_prod_label) }}
 </div>
 <div class="col-right card">
-<h2>Judge panel</h2>
-<p class="meta">{{ a.badge("RECORDED") }} {{ judge_meta }}</p>
-{% call a.callout("stale") %}<p>The judge warns and never blocks. {{ judged }} of {{ total }} sentences judged.</p>{% endcall %}
-{{ a.data_table(["Sentence", "Judge", "Reason"], judge_rows) }}
-<p><a href="/step/6?thread={{ thread }}&amp;actor={{ actor }}">{{ rules }}</a></p>
+<h2>{{ a.cue(3) }}{{ t.s5_judge_h }}</h2>
+<div class="tiles">
+{{ a.tile(judged ~ "/" ~ total, t.s5_tile_judged) }}
+{{ a.tile(passed ~ "/" ~ rule_total, t.s5_tile_rules, tone="ok") }}
+</div>
+<p class="meta">{{ t.s5_never }}</p>
+{{ a.data_table([t.s5_th_sentence, t.s5_th_judge, t.s5_th_reason], judge_rows) }}
+<p><a href="/step/6?thread={{ thread }}&amp;actor={{ actor }}">{{ t.s5_rules_link }}</a></p>
 </div>
 {% endcall %}
 {% endblock %}

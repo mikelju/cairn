@@ -1,6 +1,6 @@
 {% import "_components.html" as shell %}
 <!doctype html>
-<html lang="en">
+<html lang="{{ t.html_lang }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -9,8 +9,9 @@
 <script src="/static/vendor/htmx.min.js"></script>
 </head>
 <body>
-{{ shell.shell_header(steps, current, role, actor|default(none)) }}
+{{ shell.shell_header(steps, current, t, locale, lang_links, actor|default(none)) }}
 <main>{% block main %}{% endblock %}</main>
-{{ shell.shell_footer(footer) }}
+{{ shell.shell_footer(footer, t) }}
+{% block scripts %}{% endblock %}
 </body>
 </html>
