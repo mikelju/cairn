@@ -117,7 +117,67 @@ def open_toggle(html: str) -> str:
 BROKEN_STATES = {"step6_broken", "step7_broken", "step7_mismatch"}
 
 
+def _literal(text: str) -> str:
+    """The fixed text of a catalogue value: up to its first placeholder."""
+    return text.split("{")[0]
+
+
+def _chain(label: str):  # type: ignore[no-untyped-def]
+    """The step 7 chain row: "{n} entries, verified" without the number."""
+    return lambda t: _literal(t["s7_chain_value"].split("{n}")[1].replace("{state}", t[label]))
+
+
+# Per state: catalogue entries the page must show, and entries it must not (a fall-through fails).
+# An entry is a catalogue key, or a function of the catalogue for a computed marker.
+STATE_MARKERS: dict[str, tuple[tuple, tuple]] = {  # type: ignore[type-arg]
+    "landing": (("land_cta",), ()),
+    "step1_before": (("s1_run",), ("s1_th_rule",)),
+    "step1_after": (("s1_tile_q",), ("s1_tile_inj",)),
+    "step1_injected": (("s1_tile_inj",), ()),
+    "step1_duplicate": (("s1_tile_q",), ("s1_tile_inj",)),
+    "step1_dose": (("s1_tile_q",), ("s1_tile_inj",)),
+    "step2_before": (("s2_ask",), ("exp_rules",)),
+    "step2_q2": (("exp_rules",), ("fmt_refusal_h",)),
+    "step2_q2_open": (("exp_rules", "disc_model_text"), ()),
+    "step2_q6": (("fmt_refusal_h",), ()),
+    "step3": (("s3_lede",), ()),
+    "step4_empty": (("s4_example",), ()),
+    "step4_filled": (("s4_example",), ()),
+    "step5": (("s5_lede",), ("s5_refused",)),
+    "step5_refused": (("s5_refused",), ()),
+    "step6": (("s6_chain_ok",), ("s6_chain_broken",)),
+    "step6_broken": (("s6_chain_broken",), ("s6_chain_ok",)),
+    "step7": (("s7_same", _chain("s7_verified")), ("s7_differ", _chain("s7_broken"))),
+    "step7_broken": (("s7_same", _chain("s7_broken")), ("s7_differ", _chain("s7_verified"))),
+    "step7_mismatch": (("s7_differ", _chain("s7_verified")), ("s7_same",)),
+}
+
+
+def _marker_text(entry, t: dict[str, str]) -> str:  # type: ignore[no-untyped-def]
+    return entry(t) if callable(entry) else _literal(t[entry])
+
+
+def assert_expected_page(name: str, html: str) -> None:
+    """The state renders the page it names, so a state that falls through to another fails here."""
+    lang = re.search(r'<html lang="(\w+)"', html)
+    t = CATALOGUES[lang.group(1) if lang else "es"]
+    present, absent = STATE_MARKERS[name]
+    text = " ".join(re.sub(r"<[^>]+>", " ", html).split())
+    for entry in present:
+        marker = _marker_text(entry, t)
+        assert marker and marker in text, f"{name} does not render {marker!r}"
+    for entry in absent:
+        marker = _marker_text(entry, t)
+        assert marker and marker not in text, f"{name} renders {marker!r}"
+
+
 def rendered_state(name: str, lang: str | None = None) -> str:
+    html = _rendered_state_unchecked(name, lang)
+    assert_expected_page(name, html)
+    return html
+
+
+def _rendered_state_unchecked(name: str, lang: str | None = None) -> str:
     # Step 2 states always replay the real-shape fixtures, whatever the cwd or the environment say.
     saved = os.environ.get("CAIRN_RECORDINGS")
     os.environ["CAIRN_RECORDINGS"] = str(REAL_RECORDINGS)
@@ -188,6 +248,9 @@ def _people_state(client: TestClient, name: str, db: Path | None = None) -> str:
         with sqlite3.connect(db) as conn:
             conn.execute("UPDATE audit SET actor = 'X' WHERE thread_id = ? AND seq = 3", (thread,))
         return client.get(f"/step/6?thread={thread}").text
+    if name == "step7":
+        client.post("/step/5/approve", data={"thread": thread, "actor": "R. Reviewer"})
+        return client.get(f"/step/7?thread={thread}").text
     if name == "step7_broken":
         assert db is not None
         with sqlite3.connect(db) as conn:
@@ -199,6 +262,7 @@ def _people_state(client: TestClient, name: str, db: Path | None = None) -> str:
         other = {"content_sha256": "x" * 64}
         with mock.patch.object(app_module, "call_tool", lambda tool, args: other):
             return client.get(f"/step/7?thread={thread}").text
+    assert name == "step5_refused", f"unknown people state {name}"
     refused = client.post("/step/5/approve", data={"thread": thread, "actor": "A. Author"})
     assert "Authors cannot approve their own draft" in refused.text
     return refused.text

@@ -252,7 +252,7 @@ def _screen(result: LoopResult) -> tuple[list[str], list[dict[str, Any]]]:
     return [], []
 
 
-def _evidence(result: LoopResult) -> list[dict[str, str]]:
+def _evidence(result: LoopResult) -> list[dict[str, object]]:
     evidence = []
     for o in result.ledger.observations:
         ids = sorted({str(row["usubjid"]) for row in o.source_rows if "usubjid" in row})

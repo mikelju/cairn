@@ -93,6 +93,7 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | E14 | ejecutor | Increment 5 part B, second half: steps 6 and 7 in ES and EN (tiles, reading path, pills, catalogue strings) | done | See plan item 5 (part B) and Evidence |
 | E15 | ejecutor | Increment 6: walkthrough of all states in ES and EN, word-cap and scroll measurements, offline check fixed for the new locale, final `npm run check` | done | See plan item 6 and Evidence |
 | E16 | ejecutor | Corrections from adversarial review (C4, C9, C11, C14) | done | See Adversarial review |
+| E17 | ejecutor | Close review gaps in tests and evidence (C1, C3, C6, C9, C11, C12, C13, C14) | done | See Adversarial review and Evidence |
 
 ## User decisions
 Questions the supervisor raises with the user. Statuses: open, answered, deferred; each closes with the user's literal answer.
@@ -122,6 +123,16 @@ E16 fixed six confirmed findings, each with a regression test in `tests/test_i18
 5. `_card_kinds` skips unreadable recordings, so Explore renders.
 6. Disclosure pills with no content (evidence, trace) are not rendered.
 
+E17 closed the test and evidence gaps: the `step7` state in `tests/test_word_cap.py` is the real approved page (`rendered_state` now asserts a per-state marker, so a fall-through fails); `tests/test_disclosures.py` covers steps 1 (after a run), 5 (refused), 6 and 7 (real thread, broken and mismatch states); `tests/test_pages_contract.py` adds the C1 reading path per page, the C12 single non-empty format line on `/step/2/run` (Q2, Q6, both locales) and the C14 cross-locale leak check (other-locale catalogue values of 12 characters or more, skipping values shared with the own catalogue and all-capital status badges). `offline_check.py` again requires the "see step 6" link in the judge panel and a stricter step 7 check.
+
+Known gaps:
+- C5: keyboard pass not run in a browser (controls are native `button`, `a` and `summary` elements under the shared `:focus-visible` rule).
+- C2: computed styles not measured in a browser.
+- C15: JS-off visibility checked once manually.
+- `lang` given twice in the query string is an untested edge case.
+- "Not examined" cells render in English in the ES locale.
+- Step 3 shows the English badge "COMPUTED AT BUILD" in ES, like the other status badges, while the highlight page has a translated one.
+
 ## Evidence
 - Before set at commit ceb0f17: `uv run cairn serve --port 8765` (after `uv run python -m cairn.ingest`), headless Edge over the DevTools protocol at 1440x900; landing, steps 1 to 7 measured `scrollHeight` 900 and `scrollWidth` 1440; Explore after Q1 measured 985.
 - Word counts before (`tests/test_word_cap.py`, cap 93): landing 41, step1 before 45, after 71, injected 80, duplicate 89, dose 89, step2 before 20, Q2 80, Q2 open 92, Q6 39, step3 93, step4 empty 75, filled 79, step5 77, refused 92, step6 46, step7 60.
@@ -136,6 +147,8 @@ E16 fixed six confirmed findings, each with a regression test in `tests/test_i18
 - Increment 5b (E13): steps 4 and 5 rebuilt in ES and EN. Word counts (cap 93) ES/EN: step4_empty 79/75, step4_filled 87/82, step5 77/76, step5_refused 89/88. Commit f0c141e.
 - Increment 5c (E14): steps 6 and 7 rebuilt with `tile`, `reading_path`, cues and the production `disclosure`; strings `s6_*` and `s7_*` in `src/cairn/web/i18n.py`, rule notes stay in English as data. `test_steps_1_to_7_are_within_the_cap_in_both_locales` now covers steps 6 and 7: step 6 61 words in ES, 58 in EN; step 7 86 in ES, 76 in EN (cap 93). Headless Edge at 1440x900: `scrollHeight` 900 in ES for both; `docs/changes/003-evidence/after-step6.png` and `after-step7.png`.
 - Increment 6 (E15): walkthrough with headless Edge at 1440x900 in ES and EN, every state on a live server (`uv run cairn serve`), the 403 refusal and the hash mismatch rendered from the app and loaded with its static files. `scrollHeight`/`scrollWidth`: landing, steps 1 (before, after run, injected, duplicate, dose), 2 (before, Q2, Q6), 3, 4 (empty, filled), 5, 5 refused, 6, 6 with a broken chain, 7, 7 with a broken chain and 7 with mismatched hashes all 900/1440 in ES and EN (no scroll); Explore 2790/1440 in ES and 2730/1440 in EN (scrolls vertically by design, no horizontal scroll). New word-cap states `step6_broken`, `step7_broken`, `step7_mismatch` in `tests/test_word_cap.py`: 65/61, 83/76 and 82/75 words in ES/EN (cap 93), no catalogue change needed. `after-step1` to `after-step7` (ES, step 4 filled, step 2 after Q2) and the two landing PNGs refreshed; Explore PNGs kept (unchanged code). `make demo-offline-check` could not run (no Docker); the offline check itself failed on this tree because it read English strings from pages that now default to Spanish and the restyled step 4 to 7 text: `src/cairn/offline_check.py` now sends the English cookie and matches the new strings (`tests/test_offline_check.py` fake updated), and `python -m cairn.offline_check` passes on the live app (8 of 8 steps 4-7 checks), without the `--network none` container isolation. `npm run check` once on the final tree: ruff, format, mypy clean, 765 passed, coverage 97.27 percent, hook tests all correct.
+
+- Increment 6 correction (E17): Explore screenshots re-captured at 1440 wide after Q2, Q6 and G2 with all three stages revealed: `scrollHeight` 2812 (ES) and 2753 (EN), `scrollWidth` 1440 in both; `after-landing-es.png` and `after-landing-en.png` refreshed (`scrollHeight` 900, `scrollWidth` 1440; 88 and 81 words in `<main>`). `uv run python -m cairn.offline_check` exited 0 on the host without Docker network isolation, so `make demo-offline-check` (C9) stays unverified here.
 
 ## Delivery
 Not started.

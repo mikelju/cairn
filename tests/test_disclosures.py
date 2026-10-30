@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from cairn.app import create_app
 from cairn.web import templates
 from cairn.web.i18n import CATALOGUES
+from test_word_cap import rendered_state
 
 WEB = Path(__file__).resolve().parents[1] / "src" / "cairn" / "web"
 REAL_RECORDINGS = Path(__file__).resolve().parent / "fixtures" / "recordings_real_shape"
@@ -20,6 +21,15 @@ HELP_MARKERS = (
     "How to read this page",
     "Cómo leer esta página",
 )
+REAL_STATES = (
+    "step1_after",
+    "step5_refused",
+    "step6",
+    "step7",
+    "step6_broken",
+    "step7_broken",
+    "step7_mismatch",
+)
 
 
 def _pages(lang: str, monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
@@ -28,7 +38,7 @@ def _pages(lang: str, monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
     with TestClient(create_app()) as client:
         client.get(f"/?lang={lang}")
         thread = client.post("/api/threads").json()["thread_id"]
-        for name in ("/", "/explore", "/step/1", "/step/2", "/step/3", "/step/6", "/step/7"):
+        for name in ("/", "/explore", "/step/1", "/step/2", "/step/3"):
             pages[name] = client.get(name).text
         pages["q2"] = client.post("/step/2/run", data={"question": "Q2"}).text
         pages["q6"] = client.post("/step/2/run", data={"question": "Q6"}).text
@@ -39,6 +49,9 @@ def _pages(lang: str, monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
         ).text
         client.post("/step/4/confirm", data={"thread": thread, "actor": "R. Reviewer"})
         pages["/step/5"] = client.get(f"/step/5?thread={thread}").text
+    # Steps that need a real thread or a run: the same states the word-cap tests render.
+    for state in REAL_STATES:
+        pages[state] = rendered_state(state, lang)
     return pages
 
 
