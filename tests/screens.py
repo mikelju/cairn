@@ -143,7 +143,7 @@ def _render(client: TestClient, db: Path, name: str) -> str:
         return client.get("/decide" if name == "decide_confirmed" else "/draft").text
     if name == "draft_rejected":
         refused = client.post("/draft/approve", data={"actor": "A. Author"})
-        assert "Authors cannot approve their own draft" in refused.text
+        assert refused.status_code == 403
         return refused.text
     if name == "draft_broken":
         _break_chain(db, thread)

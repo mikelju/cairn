@@ -48,7 +48,9 @@ def _draft(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, lang: str) -> tuple[
 
 def _strip_tags(html: str) -> str:
     """The text of the draft body with every provenance tag removed."""
-    body = html.split('<div class="card answer">', 1)[1].split('<p class="prov-legend">')[0]
+    body = html.split('<div class="card answer answer-unit">', 1)[1].split(
+        '<p class="prov-legend">'
+    )[0]
     while (tag := re.search(r'<details class="prov ', body)) is not None:
         depth, pos = 0, tag.start()
         for found in re.finditer(r"<details\b|</details>", body[pos:]):
@@ -132,3 +134,51 @@ def test_a_refused_choice_is_an_html_page_with_a_plain_message(
             assert reply.headers["content-type"].startswith("text/html")
             assert message in reply.text and '{"detail"' not in reply.text
             assert 'class="callout' in reply.text or "callout" in reply.text
+
+
+@pytest.mark.parametrize(
+    ("lang", "label", "rules", "judge", "differ", "refusal"),
+    [
+        (
+            "en",
+            "Show draft in English",
+            "Rules: 8/8 passed.",
+            "Judge: 1/16 flagged; a person reviews.",
+            "Rules check numbers and quotations; the judge reads meaning.",
+            "The author cannot sign; another person signs.",
+        ),
+        (
+            "es",
+            "Ver borrador en inglés",
+            "Reglas: 8/8 superadas.",
+            "Juez: 1/16 marcadas; revisión humana.",
+            "Reglas miran números y citas; el juez, el sentido.",
+            "Quien redacta no puede firmar; firma otra persona.",
+        ),
+    ],
+)
+def test_draft_explains_its_checks_and_refuses_the_author_plainly(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    lang: str,
+    label: str,
+    rules: str,
+    judge: str,
+    differ: str,
+    refusal: str,
+) -> None:
+    """C16 and C12 with the real judge recordings: the recovery flag is explained, not hidden."""
+    monkeypatch.setenv("CAIRN_THREADS_DB", str(tmp_path / "threads.db"))
+    with TestClient(create_app()) as client:
+        _decided(client, lang)
+        page = client.get("/draft").text
+        main = page[page.index("<main") : page.index("</main>")]
+        before_panel = main[: main.index('class="inside"')] if 'class="inside"' in main else main
+        for line in (label, rules, judge, differ):
+            assert line in unescape(before_panel), line
+        refused = client.post("/draft/approve", data={"actor": "A. Author"})
+        assert refused.status_code == 403
+        assert refusal in refused.text
+        assert "(403)" not in refused.text and "Rechazado" not in refused.text
+        signed = client.post("/draft/approve", data={"actor": "R. Reviewer"})
+        assert signed.status_code == 200 and refusal not in signed.text

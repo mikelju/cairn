@@ -620,9 +620,15 @@ def test_decide_and_draft_people_decide_and_the_author_cannot_approve() -> None:
         one = client.post("/decide/confirm", data={"actor": "R. Reviewer", "sex": "F"})
         assert "NOAEL, Females: 20 mg/kg" in one.text and "Confirm Males" in one.text
         confirmed = client.post("/decide/confirm", data={"actor": "R. Reviewer", "sex": "M"})
-        assert "Acting as: R. Reviewer" in confirmed.text and "Show final text" in confirmed.text
+        assert (
+            "Acting as: R. Reviewer" in confirmed.text and "Show draft in English" in confirmed.text
+        )
         refused = client.post("/draft/approve", data={"actor": "A. Author"})
-        assert "403 · Authors cannot approve their own draft. Enforced by the API" in refused.text
+        assert (
+            refused.status_code == 403
+            and "The author cannot sign; another person signs." in refused.text
+        )
+        assert "Rejected" not in refused.text and "(403)" not in refused.text
         done = client.post("/draft/approve", data={"actor": "R. Reviewer"})
         assert "Approved by R. Reviewer" in done.text
 

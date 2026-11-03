@@ -459,6 +459,7 @@ async def _draft_page(request: Request, thread: str, actor: str, error: str = ""
         judge_meta=_judge_meta(),
         judge_rows=_judge_rows(view["judge"], state, t),
         judged=sum(r["verdict"] != NOT_JUDGED for r in view["judge"]),
+        flagged=sum(r["verdict"] == "overstated" for r in view["judge"]),
         total=len(view["judge"]),
         rules=[
             [n, t["s6_fired"] if n in failed else t["s6_passed"], failed.get(n, reason)]
@@ -510,5 +511,8 @@ async def draft_approve(
         if refusal.status_code != 403:
             raise
         t = i18n.context(request)["t"]
-        error = t["s5_refused"].format(detail=refusal.detail)
-    return await _draft_page(request, thread, who, error)
+        error = t["s5_refused"]
+    page_response = await _draft_page(request, thread, who, error)
+    if error:
+        page_response.status_code = 403  # the API's refusal stays a 403; the page says it plainly
+    return page_response

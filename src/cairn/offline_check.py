@@ -92,7 +92,7 @@ def people_decide() -> bool:
             and CATALOGUES["en"]["s7_differ"] not in draft
             and CATALOGUES["en"]["s7_chain_value"].format(n="", state="verified").strip() in draft
         ),
-        "author refused with 403": "403 · Authors cannot approve their own draft" in refused,
+        "author refused with 403": CATALOGUES["en"]["s5_refused"] in refused,
         "reviewer approves": "Approved by R. Reviewer" in approved,
     }
     for name, ok in checks.items():

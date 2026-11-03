@@ -13,6 +13,7 @@ STEP_WORD_CAP = 93
 STUDY_WORD_CAP = 60  # change 004 C14: set screen by screen as each one is redesigned
 ASK_WORD_CAP = 60
 DECIDE_WORD_CAP = 60
+DRAFT_WORD_CAP = 60
 SENTENCE_WORD_CAP = 25
 
 
@@ -151,6 +152,8 @@ def _cap(state: str) -> int:
         return STUDY_WORD_CAP
     if state.startswith("decide_"):
         return DECIDE_WORD_CAP
+    if state.startswith("draft_"):
+        return DRAFT_WORD_CAP
     return ASK_WORD_CAP if state.startswith("ask_") else STEP_WORD_CAP
 
 
