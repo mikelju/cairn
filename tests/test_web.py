@@ -595,8 +595,8 @@ def _filled(client: TestClient) -> str:
     client.get("/decide")
     id_ = client.cookies.get("cairn_thread")
     assert id_
-    client.post("/decide/choose", data={"sex": "F", "adverse": "200"})
-    client.post("/decide/choose", data={"sex": "M", "adverse": "400"})
+    client.post("/decide/choose", data={"sex": "F", "related": "20", "adverse": "200"})
+    client.post("/decide/choose", data={"sex": "M", "related": "400", "adverse": "400"})
     return id_
 
 
@@ -615,8 +615,8 @@ def test_decide_and_draft_people_decide_and_the_author_cannot_approve() -> None:
         assert "checked" not in step4 and "selected" not in step4  # nothing preselected
         assert step4.count("not decided yet") == 2 and "NOAEL, Females: 400" not in step4
         assert "no decision yet" not in step4 and "Decide" in step4
-        client.post("/decide/choose", data={"sex": "F", "adverse": "200"})
-        client.post("/decide/choose", data={"sex": "M", "adverse": "400"})
+        client.post("/decide/choose", data={"sex": "F", "related": "20", "adverse": "200"})
+        client.post("/decide/choose", data={"sex": "M", "related": "400", "adverse": "400"})
         one = client.post("/decide/confirm", data={"actor": "R. Reviewer", "sex": "F"})
         assert "NOAEL, Females: 20 mg/kg" in one.text and "Confirm Males" in one.text
         confirmed = client.post("/decide/confirm", data={"actor": "R. Reviewer", "sex": "M"})
@@ -638,7 +638,9 @@ def test_decide_pages_redirect_on_409_and_reject_bad_input() -> None:
     with TestClient(create_app(), follow_redirects=False) as client:
         id_ = _filled(client)
         client.post("/decide/confirm", data={"actor": "R. Reviewer"})
-        again = client.post("/decide/choose", data={"sex": "F", "adverse": "200"})  # back button
+        again = client.post(
+            "/decide/choose", data={"sex": "F", "related": "20", "adverse": "200"}
+        )  # back button
         assert again.status_code == 303 and again.headers["location"].startswith("/draft?actor=")
         twice = client.post("/draft/approve", data={"actor": "R. Reviewer"})
         assert twice.status_code == 200
@@ -870,3 +872,43 @@ def test_decide_first_render_shows_incidence_examples_and_no_noael() -> None:
         for group in row["groups"]:
             assert f"{group['affected']}/{group['examined']}" in main
     assert main.count(">example<") == 9 and "REAL" not in main
+
+
+def _stored(client: TestClient, sex: str) -> tuple[float | None, float | None]:
+    id_ = client.cookies.get("cairn_thread")
+    slot = next(
+        s["slot"]
+        for s in client.get(f"/api/threads/{id_}").json()["slots"]
+        if s["finding"] == "GLAND, ADRENAL Vacuolization" and s["sex"] == sex
+    )
+    decision = next(
+        (d for d in client.get(f"/api/threads/{id_}").json()["decisions"] if d["dec_id"] == slot),
+        None,
+    )
+    assert decision is not None
+    return decision["treatment_related_from"], decision["adverse_from"]
+
+
+def test_decide_stores_what_the_person_chose_and_never_infers_relatedness() -> None:
+    with TestClient(create_app(), follow_redirects=False) as client:
+        client.get("/decide")
+        only_adverse = client.post("/decide/choose", data={"sex": "F", "adverse": "200"})
+        assert only_adverse.status_code == 422
+        below = client.post("/decide/choose", data={"sex": "F", "related": "400", "adverse": "200"})
+        assert below.status_code == 422
+        id_ = client.cookies.get("cairn_thread")
+        assert client.get(f"/api/threads/{id_}").json()["decisions"] == []  # still undecided
+        # Incidence would suggest 20 for females; the person says 200 and code keeps it.
+        client.post("/decide/choose", data={"sex": "F", "related": "200", "adverse": "200"})
+        assert _stored(client, "F") == (200, 200)
+        client.cookies.clear()
+        client.get("/decide")
+        client.post("/decide/choose", data={"sex": "M", "related": "20", "adverse": "none"})
+        assert _stored(client, "M") == (20, None)
+
+
+def test_no_code_path_derives_relatedness_from_incidence() -> None:
+    source = Path("src/cairn/web/people.py").read_text(encoding="utf-8")
+    assert "_incidence(state, sex)" in source  # shown to the person, only in the table
+    choose = source.split("async def decide_choose")[1].split("@people.post")[0]
+    assert "_incidence" not in choose and "control" not in choose

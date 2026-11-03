@@ -129,7 +129,7 @@ def _decide_context(state: Any, view: dict[str, Any], t: dict[str, str]) -> dict
                 "name": t["s1_sex_" + sex].capitalize(),
                 "doses": [f"{d:g}" for d in slot["doses"] if d > 0],
                 "decided": decision is not None,
-                "adverse": "" if decision is None else _adverse(decision["adverse_from"], sex, t),
+                "adverse": "" if decision is None else _decision_line(decision, sex, t),
                 "confirmed": confirmed,
                 "noael": (
                     t["undecided"]
@@ -166,11 +166,13 @@ def _decide_context(state: Any, view: dict[str, Any], t: dict[str, str]) -> dict
     }
 
 
-def _adverse(dose: float | None, sex: str, t: dict[str, str]) -> str:
+def _decision_line(decision: dict[str, Any], sex: str, t: dict[str, str]) -> str:
     name = t["s1_sex_" + sex].capitalize()
-    if dose is None:
-        return t["s4_adv_none"].format(sex=name)
-    return t["s4_adv_from"].format(sex=name, dose=f"{dose:g}")
+    return t["s4_chosen"].format(
+        sex=name,
+        related=_label(decision["treatment_related_from"], t),
+        adverse=_label(decision["adverse_from"], t),
+    )
 
 
 def _label(dose: float | None, t: dict[str, str]) -> str:
@@ -190,17 +192,25 @@ async def decide(request: Request, thread: str | None = None) -> Response:
 async def decide_choose(
     request: Request,
     sex: Annotated[str, Form()],
-    adverse: Annotated[str, Form()],
+    adverse: Annotated[str, Form()] = "",
+    related: Annotated[str, Form()] = "",
     thread: Annotated[str | None, Form()] = None,
 ) -> RedirectResponse:
-    """Record the visitor's adversity decision for one sex; the examples fill the other findings."""
+    """Record the visitor's two choices for one sex, as posted; the examples fill the others."""
     thread = await _session_thread(request, thread)
-    state, _, view = await load_view(request, thread)
+    _, _, view = await load_view(request, thread)
     if sex not in ("F", "M"):
         raise HTTPException(status_code=422, detail="unknown sex")
+    if not related or not adverse:
+        raise HTTPException(status_code=422, detail="choose both related and adverse")
     dose = _dose(adverse)
+    related_from = _dose(related)
+    if related_from is not None and dose is not None and related_from > dose:
+        raise HTTPException(status_code=422, detail="adverse cannot be below treatment-related")
+    if related_from is None and dose is not None:
+        raise HTTPException(status_code=422, detail="adverse needs a treatment-related dose")
     mine = next(s for s in view["slots"] if s["finding"] == KEY_FINDING and s["sex"] == sex)
-    if dose is not None and dose not in mine["doses"]:
+    if any(x is not None and x not in mine["doses"] for x in (dose, related_from)):
         raise HTTPException(status_code=422, detail="dose not in the study")
     items = {
         d["dec_id"]: DecisionIn(
@@ -212,17 +222,14 @@ async def decide_choose(
     }
     for s in view["slots"]:
         if s["finding"] != KEY_FINDING and s["slot"] not in items:
-            related, adverse_from = EXAMPLE[s["sex"], s["finding"]]
+            example_related, example_adverse = EXAMPLE[s["sex"], s["finding"]]
             items[s["slot"]] = DecisionIn(
-                dec_id=s["slot"], treatment_related_from=related, adverse_from=adverse_from
+                dec_id=s["slot"],
+                treatment_related_from=example_related,
+                adverse_from=example_adverse,
             )
-    # Code places the relatedness: the lowest dose with more animals affected than control.
-    rows = _incidence(state, sex)
-    control = next((a for d, a, _ in rows if d == 0), 0)
-    first = next((d for d, a, _ in rows if d > 0 and a > control), None)
-    related = None if dose is None else min(dose, first if first is not None else dose)
     items[mine["slot"]] = DecisionIn(
-        dec_id=mine["slot"], treatment_related_from=related, adverse_from=dose
+        dec_id=mine["slot"], treatment_related_from=related_from, adverse_from=dose
     )
     try:
         await record_decisions(

@@ -113,8 +113,8 @@ def _ask(client: TestClient, name: str) -> str:
 
 def decide_both(client: TestClient) -> None:
     """The visitor decides both sexes on the key finding (not yet confirmed)."""
-    client.post("/decide/choose", data={"sex": "F", "adverse": "200"})
-    client.post("/decide/choose", data={"sex": "M", "adverse": "400"})
+    client.post("/decide/choose", data={"sex": "F", "related": "20", "adverse": "200"})
+    client.post("/decide/choose", data={"sex": "M", "related": "400", "adverse": "400"})
 
 
 def _render(client: TestClient, db: Path, name: str) -> str:

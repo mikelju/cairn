@@ -72,8 +72,8 @@ def people_decide() -> bool:
         print("decide screen has no thread cookie or no decide button")
         return False
     calibration = _calibration()
-    post("/decide/choose", {"sex": "F", "adverse": "200"})
-    post("/decide/choose", {"sex": "M", "adverse": "400"})
+    post("/decide/choose", {"sex": "F", "related": "20", "adverse": "200"})
+    post("/decide/choose", {"sex": "M", "related": "400", "adverse": "400"})
     final = post("/decide/confirm", {"actor": "R. Reviewer"})
     refused = post("/draft/approve", {"actor": "A. Author"})
     approved = post("/draft/approve", {"actor": "R. Reviewer"})

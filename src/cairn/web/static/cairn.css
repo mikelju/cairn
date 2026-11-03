@@ -365,5 +365,9 @@ details.prov[open] > summary.prov-chip { outline: var(--border-focus) solid curr
 .decide-sex .noael-line { font-weight: var(--weight-semibold); }
 .choice { border: 0; padding: 0; margin: 0 0 var(--space-3); display: flex; flex-wrap: wrap; gap: var(--space-3); }
 .choice legend { padding: 0; margin-bottom: var(--space-2); }
+.choice-grid { border: 0; padding: 0; margin: 0 0 var(--space-3); display: grid; grid-template-columns: auto repeat(4, 1fr); gap: var(--space-2) var(--space-3); align-items: center; }
+.choice-grid legend { padding: 0; margin-bottom: var(--space-2); font-weight: 600; }
+.choice-grid .dose-head { text-align: center; }
+.choice-grid input { justify-self: center; }
 .choice label { display: inline-flex; align-items: center; gap: var(--space-2); }
 @media (max-width: 900px) { .decide-grid { grid-template-columns: minmax(0, 1fr); } }
