@@ -31,8 +31,6 @@ def _pages(lang: str, monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
             pages[name] = client.get(name).text
         pages["ask_q2"] = client.post("/ask/run", data={"question": "Q2"}).text
         pages["ask_q6"] = client.post("/ask/run", data={"question": "Q6"}).text
-        client.post("/decide/example")
-        pages["decide_fragment"] = client.post("/decide/set", data={"t_x": "1", "a_x": "1"}).text
     # Screens that need a real thread or a run: the same states the word-cap tests render.
     for state in STATE_MARKERS:
         pages[state] = rendered_state(state, lang)

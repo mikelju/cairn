@@ -2,7 +2,7 @@
 
 import json
 import re
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import httpx
 from fastapi import APIRouter, Form, HTTPException, Request
@@ -11,7 +11,7 @@ from fastmcp import Client
 from markupsafe import Markup, escape
 
 from cairn.content import QuoteRef, Text, ValueRef
-from cairn.decisions import EXAMPLE, Decision, apply_decisions
+from cairn.decisions import EXAMPLE, KEY_FINDING, Decision, apply_decisions, finding_key
 from cairn.gateway import DEFAULT_MODEL
 from cairn.judge import (
     EXAMPLE_OBS,
@@ -25,7 +25,7 @@ from cairn.recording import RECORDINGS_DIR, ReplayClient, recorded_model, total_
 from cairn.render import render
 from cairn.verify import RULE_REASONS
 from cairn.web import _page as page
-from cairn.web import i18n, templates
+from cairn.web import i18n
 from cairn.web.threads import (
     AUTHOR,
     REVIEWER,
@@ -46,10 +46,6 @@ from cairn.workflow import build_ledger, draft_key, sections_of, shown_facts, ve
 
 people = APIRouter()
 EMPTY_SLOT = re.compile(r"\[((?:D\d+|NOAEL-[FM]): no decision yet)\]")
-
-
-def _choice(dose: float | None) -> str:
-    return "none" if dose is None else f"{dose:g}"
 
 
 def _dose(value: str) -> float | None:
@@ -106,113 +102,132 @@ async def _draft(request: Request, thread: str) -> Markup:
     return Markup(EMPTY_SLOT.sub(r'<span class="slot">\1</span>', text))
 
 
-def _select(name: str, label: str, doses: list[str], chosen: str, t: dict[str, str]) -> Markup:
-    options = [("", t["s4_choose"]), ("none", t["s4_none"]), *[(d, d) for d in doses]]
-    body = "".join(
-        Markup('<option value="{}"{}>{}</option>').format(
-            v, Markup(" selected" if v == chosen else ""), t
-        )
-        for v, t in options
-    )
-    return Markup('<select name="{}" aria-label="{}">{}</select>').format(name, label, Markup(body))
+def _incidence(state: Any, sex: str) -> list[tuple[float, int, int]]:
+    """Dose, affected and examined animals of the key finding for one sex, from the Observation."""
+    for observation in build_ledger(state).observations:
+        if not observation.kind.startswith("incidence"):
+            continue
+        for row in observation.values["findings"]:
+            if f"{row['tissue']} {row['finding']}" == KEY_FINDING and row["sex"] == sex:
+                return [(g["dose"], g["affected"] or 0, g["examined"] or 0) for g in row["groups"]]
+    return []
 
 
-async def _fragment(request: Request, view: dict[str, Any]) -> dict[str, Any]:
-    """What a dropdown change recomputes, and what the page needs to draw its rows."""
+def _decide_context(state: Any, view: dict[str, Any], t: dict[str, str]) -> dict[str, Any]:
+    """What /decide draws: the incidence table, one block per sex and the example list."""
     given = {d["dec_id"]: d for d in view["decisions"]}
+    slots = {s["slot"]: s for s in view["slots"]}
+    sexes = []
+    for sex in ("F", "M"):
+        slot = next(s for s in view["slots"] if s["finding"] == KEY_FINDING and s["sex"] == sex)
+        decision = given.get(slot["slot"])
+        confirmed = sex in view["confirmed"]
+        noael = view["noael"][sex]["dose"]
+        sexes.append(
+            {
+                "sex": sex,
+                "name": t["s1_sex_" + sex].capitalize(),
+                "doses": [f"{d:g}" for d in slot["doses"] if d > 0],
+                "decided": decision is not None,
+                "adverse": "" if decision is None else _adverse(decision["adverse_from"], sex, t),
+                "confirmed": confirmed,
+                "noael": (
+                    t["undecided"]
+                    if not confirmed
+                    else t["s4_not_set"]
+                    if noael is None
+                    else f"{noael:g} mg/kg"
+                ),
+            }
+        )
     rows = [
-        {
-            **s,
-            "doses": [f"{d:g}" for d in s["doses"] if d > 0],
-            "t": _choice(given[s["slot"]]["treatment_related_from"]) if s["slot"] in given else "",
-            "a": _choice(given[s["slot"]]["adverse_from"]) if s["slot"] in given else "",
-        }
-        for s in view["slots"]
+        [f"{r[0]}", *[f"{a}/{n}" for _, a, n in r[1]]]
+        for r in ((t["s1_sex_" + sex], _incidence(state, sex)) for sex in ("F", "M"))
     ]
-    t = i18n.context(request)["t"]
-    table = [
+    doses = [d for d, _, _ in _incidence(state, "F")]
+    heads = [t["s4_th_sex"], *[t["s4_control"] if d == 0 else f"{d:g}" for d in doses]]
+    examples = [
         [
-            r["finding"],
-            r["sex"],
-            _select(
-                "t_" + r["slot"],
-                f"{t['s4_th_related']} {r['finding']} {r['sex']}",
-                r["doses"],
-                r["t"],
-                t,
-            ),
-            _select(
-                "a_" + r["slot"],
-                f"{t['s4_th_adverse']} {r['finding']} {r['sex']}",
-                r["doses"],
-                r["a"],
-                t,
-            ),
+            t[finding_key(s["finding"])],
+            t["s1_sex_" + s["sex"]],
+            _label(EXAMPLE[s["sex"], s["finding"]][1], t),
+            t["s4_ex_tag"],
         ]
-        for r in rows
+        for s in slots.values()
+        if s["finding"] != KEY_FINDING
     ]
     return {
         "thread": view["thread_id"],
-        "rows": table,
-        "noael": view["noael"],
-        "complete": len(given) == len(view["slots"]),
-        "draft": await _draft(request, view["thread_id"]),
+        "sexes": sexes,
+        "inc_heads": heads,
+        "inc_rows": rows,
+        "examples": examples,
+        "both_confirmed": all(x["confirmed"] for x in sexes),
     }
+
+
+def _adverse(dose: float | None, sex: str, t: dict[str, str]) -> str:
+    name = t["s1_sex_" + sex].capitalize()
+    if dose is None:
+        return t["s4_adv_none"].format(sex=name)
+    return t["s4_adv_from"].format(sex=name, dose=f"{dose:g}")
+
+
+def _label(dose: float | None, t: dict[str, str]) -> str:
+    return t["s4_none"] if dose is None else f"{dose:g}"
 
 
 @people.get("/decide", response_class=HTMLResponse)
 async def decide(request: Request, thread: str | None = None) -> Response:
     thread = await _session_thread(request, thread)
-    view = await get_thread(request, thread)
-    fragment = await _fragment(request, view)
-    response = page(request, "decide.html", current=3, actor=AUTHOR, **fragment)
+    state, _, view = await load_view(request, thread)
+    context = _decide_context(state, view, i18n.context(request)["t"])
+    response = page(request, "decide.html", current=3, actor=AUTHOR, **context)
     return _remember(response, thread)
 
 
-@people.post("/decide/set", response_class=HTMLResponse)
-async def decide_set(request: Request) -> HTMLResponse:
-    form = await request.form()
-    thread = await _session_thread(request, str(form["thread"]) if "thread" in form else None)
-    items = []
-    for slot in (await get_thread(request, thread))["slots"]:
-        t, a = str(form.get("t_" + slot["slot"], "")), str(form.get("a_" + slot["slot"], ""))
-        if t and a:
-            items.append(
-                DecisionIn(
-                    dec_id=slot["slot"], treatment_related_from=_dose(t), adverse_from=_dose(a)
-                )
-            )
-    try:
-        view = await record_decisions(request, thread, Record(actor=AUTHOR, decisions=items))
-    except HTTPException as refusal:
-        if refusal.status_code != 409:
-            raise
-        return HTMLResponse(
-            status_code=204, headers={"HX-Redirect": _current(AUTHOR).headers["location"]}
-        )
-    fragment = await _fragment(request, view)
-    response = templates.TemplateResponse(
-        request, "decide_result.html", {**i18n.context(request), **fragment}
-    )
-    return _remember(response, thread)  # type: ignore[return-value]
-
-
-@people.post("/decide/example")
-async def decide_example(
-    request: Request, thread: Annotated[str | None, Form()] = None
+@people.post("/decide/choose")
+async def decide_choose(
+    request: Request,
+    sex: Annotated[str, Form()],
+    adverse: Annotated[str, Form()],
+    thread: Annotated[str | None, Form()] = None,
 ) -> RedirectResponse:
+    """Record the visitor's adversity decision for one sex; the examples fill the other findings."""
     thread = await _session_thread(request, thread)
-    slots = (await get_thread(request, thread))["slots"]
-    items = [
-        DecisionIn(
-            dec_id=s["slot"],
-            treatment_related_from=EXAMPLE[s["sex"], s["finding"]][0],
-            adverse_from=EXAMPLE[s["sex"], s["finding"]][1],
+    state, _, view = await load_view(request, thread)
+    if sex not in ("F", "M"):
+        raise HTTPException(status_code=422, detail="unknown sex")
+    dose = _dose(adverse)
+    mine = next(s for s in view["slots"] if s["finding"] == KEY_FINDING and s["sex"] == sex)
+    if dose is not None and dose not in mine["doses"]:
+        raise HTTPException(status_code=422, detail="dose not in the study")
+    items = {
+        d["dec_id"]: DecisionIn(
+            dec_id=d["dec_id"],
+            treatment_related_from=d["treatment_related_from"],
+            adverse_from=d["adverse_from"],
         )
-        for s in slots
-    ]
+        for d in view["decisions"]
+    }
+    for s in view["slots"]:
+        if s["finding"] != KEY_FINDING and s["slot"] not in items:
+            related, adverse_from = EXAMPLE[s["sex"], s["finding"]]
+            items[s["slot"]] = DecisionIn(
+                dec_id=s["slot"], treatment_related_from=related, adverse_from=adverse_from
+            )
+    # Code places the relatedness: the lowest dose with more animals affected than control.
+    rows = _incidence(state, sex)
+    control = next((a for d, a, _ in rows if d == 0), 0)
+    first = next((d for d, a, _ in rows if d > 0 and a > control), None)
+    related = None if dose is None else min(dose, first if first is not None else dose)
+    items[mine["slot"]] = DecisionIn(
+        dec_id=mine["slot"], treatment_related_from=related, adverse_from=dose
+    )
     try:
-        await record_decisions(request, thread, Record(actor=AUTHOR, decisions=items))
+        await record_decisions(
+            request, thread, Record(actor=AUTHOR, decisions=list(items.values()))
+        )
     except HTTPException as refusal:
         if refusal.status_code != 409:
             raise
@@ -225,14 +240,21 @@ async def decide_confirm(
     request: Request,
     actor: Annotated[str, Form()],
     thread: Annotated[str | None, Form()] = None,
+    sex: Annotated[str, Form()] = "",
 ) -> RedirectResponse:
     who = _actor(actor)
     thread = await _session_thread(request, thread)
+    if sex not in ("", "F", "M"):
+        raise HTTPException(status_code=422, detail="unknown sex")
+    sexes: list[Literal["F", "M"]] = [sex] if sex else ["F", "M"]  # type: ignore[list-item]
     try:
-        await confirm(request, thread, Confirm(actor=who, confirmed=["F", "M"]))
+        await confirm(request, thread, Confirm(actor=who, confirmed=sexes))
     except HTTPException as refusal:
         if refusal.status_code != 409:
             raise
+        return _remember(_current(who), thread)  # type: ignore[return-value]
+    if (await get_thread(request, thread))["waiting"] == "await_decisions":
+        return _remember(RedirectResponse("/decide", status_code=303), thread)  # type: ignore[return-value]
     return _remember(_current(who), thread)  # type: ignore[return-value]
 
 

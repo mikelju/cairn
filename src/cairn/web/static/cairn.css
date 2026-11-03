@@ -357,3 +357,13 @@ details.prov[open] > summary.prov-chip { outline: var(--border-focus) solid curr
 .prov-legend { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); margin: var(--space-3) 0; padding: 0; list-style: none; font-size: var(--text-sm); }
 .prov-key { display: inline-block; padding: 0 var(--space-2); border-radius: var(--radius-sm); border-bottom: var(--border-badge) solid; font-weight: var(--weight-semibold); }
 .prov-key::before { margin-right: var(--space-1); font-size: var(--text-xs); }
+
+/* Screen 3: the key finding, one block per sex */
+.decide-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-5); align-items: start; margin: var(--space-4) 0; }
+.decide-sexes { display: grid; gap: var(--space-4); }
+.decide-sex p { margin: 0 0 var(--space-2); }
+.decide-sex .noael-line { font-weight: var(--weight-semibold); }
+.choice { border: 0; padding: 0; margin: 0 0 var(--space-3); display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.choice legend { padding: 0; margin-bottom: var(--space-2); }
+.choice label { display: inline-flex; align-items: center; gap: var(--space-2); }
+@media (max-width: 900px) { .decide-grid { grid-template-columns: minmax(0, 1fr); } }

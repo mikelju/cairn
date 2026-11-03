@@ -39,9 +39,9 @@ STATE_MARKERS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "ask_q2_open": (("exp_rules", "disc_model_text"), ()),
     "ask_q6": (("trick_Q6",), ()),
     "ask_g2": (("exp_official",), ("trick_Q6",)),
-    "decide_empty": (("s4_example",), ()),
-    "decide_filled": (("s4_example",), ()),
-    "decide_confirmed": (("s4_example",), ()),
+    "decide_empty": (("s4_decide", "disc_examples"), ("s4_confirm",)),
+    "decide_filled": (("s4_confirm", "disc_examples"), ("s4_decide",)),
+    "decide_confirmed": (("disc_examples",), ("s4_decide", "s4_confirm")),
     "draft_empty": (("undecided",), ("s5_approved",)),
     "draft_confirmed": (("s5_lede", "s6_chain_ok"), ("s5_refused", "s5_approved")),
     "draft_rejected": (("s5_refused",), ("s5_approved",)),
@@ -111,6 +111,12 @@ def _ask(client: TestClient, name: str) -> str:
     return with_result(page, result, "result")
 
 
+def decide_both(client: TestClient) -> None:
+    """The visitor decides both sexes on the key finding (not yet confirmed)."""
+    client.post("/decide/choose", data={"sex": "F", "adverse": "200"})
+    client.post("/decide/choose", data={"sex": "M", "adverse": "400"})
+
+
 def _render(client: TestClient, db: Path, name: str) -> str:
     if name == "landing":
         return client.get("/").text
@@ -129,7 +135,7 @@ def _render(client: TestClient, db: Path, name: str) -> str:
     client.get("/decide")
     thread = client.cookies.get("cairn_thread")
     assert thread, "the decide screen starts no thread"
-    client.post("/decide/example")
+    decide_both(client)
     if name == "decide_filled":
         return client.get("/decide").text
     client.post("/decide/confirm", data={"actor": "R. Reviewer"})

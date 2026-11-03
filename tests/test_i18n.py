@@ -76,7 +76,8 @@ def test_toggle_on_a_post_page_keeps_the_thread() -> None:
         client.get("/decide")
         thread = client.cookies.get("cairn_thread")
         assert thread
-        client.post("/decide/example")
+        client.post("/decide/choose", data={"sex": "F", "adverse": "200"})
+        client.post("/decide/choose", data={"sex": "M", "adverse": "400"})
         client.post("/decide/confirm", data={"actor": "R. Reviewer"})
         refused = client.post("/draft/approve", data={"actor": "A. Author"}).text
         links = re.findall(r'href="(/draft\?[^"]*lang=[^"]*)"', refused)
@@ -124,3 +125,18 @@ def test_explore_survives_an_unreadable_recording(
     monkeypatch.setenv("CAIRN_RECORDINGS", str(tmp_path))
     with TestClient(create_app()) as client:
         assert client.get("/ask").status_code == 200
+
+
+def test_every_finding_in_the_ledger_has_a_plain_name_in_both_locales() -> None:
+    from cairn.content import ObservationLedger
+    from cairn.decisions import enumerate_slots, finding_key
+    from cairn.incidence import incidence
+    from cairn.web.i18n import CATALOGUES
+
+    ledger = ObservationLedger()
+    ledger.add(incidence())
+    findings = {s.finding for s in enumerate_slots(ledger)} | {"body weight"}
+    for lang in ("es", "en"):
+        for finding in findings:
+            name = CATALOGUES[lang][finding_key(finding)]
+            assert name and name != finding and not name.isupper()

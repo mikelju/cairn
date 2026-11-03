@@ -595,7 +595,8 @@ def _filled(client: TestClient) -> str:
     client.get("/decide")
     id_ = client.cookies.get("cairn_thread")
     assert id_
-    client.post("/decide/example")
+    client.post("/decide/choose", data={"sex": "F", "adverse": "200"})
+    client.post("/decide/choose", data={"sex": "M", "adverse": "400"})
     return id_
 
 
@@ -610,10 +611,15 @@ def test_decide_and_draft_people_decide_and_the_author_cannot_approve() -> None:
         client.cookies.set(COOKIE, "en")
         step4 = client.get("/decide").text  # starts a thread and sets the cookie
         assert client.cookies.get("cairn_thread")
-        assert "Acting as: A. Author" in step4 and "disabled" in step4
-        assert "Show draft with gaps" in step4 and "no decision yet" in step4
-        client.post("/decide/example")
-        confirmed = client.post("/decide/confirm", data={"actor": "R. Reviewer"})
+        assert "Acting as: A. Author" in step4
+        assert "checked" not in step4 and "selected" not in step4  # nothing preselected
+        assert step4.count("not decided yet") == 2 and "NOAEL, Females: 400" not in step4
+        assert "no decision yet" not in step4 and "Decide" in step4
+        client.post("/decide/choose", data={"sex": "F", "adverse": "200"})
+        client.post("/decide/choose", data={"sex": "M", "adverse": "400"})
+        one = client.post("/decide/confirm", data={"actor": "R. Reviewer", "sex": "F"})
+        assert "NOAEL, Females: 20 mg/kg" in one.text and "Confirm Males" in one.text
+        confirmed = client.post("/decide/confirm", data={"actor": "R. Reviewer", "sex": "M"})
         assert "Acting as: R. Reviewer" in confirmed.text and "Show final text" in confirmed.text
         refused = client.post("/draft/approve", data={"actor": "A. Author"})
         assert "403 · Authors cannot approve their own draft. Enforced by the API" in refused.text
@@ -632,7 +638,7 @@ def test_decide_pages_redirect_on_409_and_reject_bad_input() -> None:
     with TestClient(create_app(), follow_redirects=False) as client:
         id_ = _filled(client)
         client.post("/decide/confirm", data={"actor": "R. Reviewer"})
-        again = client.post("/decide/example")  # back button, Fill example
+        again = client.post("/decide/choose", data={"sex": "F", "adverse": "200"})  # back button
         assert again.status_code == 303 and again.headers["location"].startswith("/draft?actor=")
         twice = client.post("/draft/approve", data={"actor": "R. Reviewer"})
         assert twice.status_code == 200
@@ -648,21 +654,9 @@ def test_decide_pages_redirect_on_409_and_reject_bad_input() -> None:
         fresh = _filled(client)
         assert fresh != id_
         slot = client.get(f"/api/threads/{fresh}").json()["slots"][0]["slot"]
-        bad = client.post("/decide/set", data={"t_" + slot: "x", "a_" + slot: "x"})
+        bad = client.post("/decide/choose", data={"sex": "F", "adverse": "x"})
         assert bad.status_code == 422
-
-
-def test_decide_set_recomputes_the_fragment_without_the_page() -> None:
-    with TestClient(create_app()) as client:
-        id_ = _filled(client)
-        slots = client.get(f"/api/threads/{id_}").json()["slots"]
-        data: dict[str, str] = {}
-        for slot in slots:
-            dose = str(max(slot["doses"]))
-            data |= {"t_" + slot["slot"]: dose, "a_" + slot["slot"]: dose}
-        reply = client.post("/decide/set", data=data)
-        assert reply.status_code == 200
-        assert "NOAEL" in reply.text and "<html" not in reply.text
+        assert slot
 
 
 def test_draft_without_judge_recordings_shows_not_judged_and_the_rules_line(
@@ -856,3 +850,23 @@ def test_explore_recorded_prose_is_identical_in_both_locales() -> None:
         return _prose_text(html)
 
     assert prose(_explore("Q1", "es")) == prose(_explore("Q1", "en"))
+
+
+def test_decide_first_render_shows_incidence_examples_and_no_noael() -> None:
+    from cairn.incidence import incidence
+
+    adrenal = [
+        row
+        for row in incidence().values["findings"]
+        if row["tissue"] == "GLAND, ADRENAL" and row["finding"] == "Vacuolization"
+    ]
+    with TestClient(create_app()) as client:
+        client.cookies.set(COOKIE, "en")
+        main = client.get("/decide").text.split("<main")[1].split("</main>")[0]
+    assert " checked" not in main and " selected" not in main
+    assert "ADRENAL" not in main and "Adrenal gland, vacuolization" in main
+    assert main.count("not decided yet") == 2 and "400 mg/kg" not in main
+    for row in adrenal:
+        for group in row["groups"]:
+            assert f"{group['affected']}/{group['examined']}" in main
+    assert main.count(">example<") == 9 and "REAL" not in main

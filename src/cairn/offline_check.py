@@ -68,11 +68,12 @@ def _judged(page: str) -> bool:
 def people_decide() -> bool:
     """Decide and draft end to end: example, confirm, author refused, reviewer approves."""
     page = get("/decide")[1].decode()
-    if THREAD_COOKIE not in JAR or CATALOGUES["en"]["s4_example"] not in page:
-        print("decide screen has no thread cookie or no example button")
+    if THREAD_COOKIE not in JAR or CATALOGUES["en"]["s4_decide"] not in page:
+        print("decide screen has no thread cookie or no decide button")
         return False
     calibration = _calibration()
-    post("/decide/example", {})
+    post("/decide/choose", {"sex": "F", "adverse": "200"})
+    post("/decide/choose", {"sex": "M", "adverse": "400"})
     final = post("/decide/confirm", {"actor": "R. Reviewer"})
     refused = post("/draft/approve", {"actor": "A. Author"})
     approved = post("/draft/approve", {"actor": "R. Reviewer"})

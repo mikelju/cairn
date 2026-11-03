@@ -135,7 +135,7 @@ def test_c4_menu_navigation_keeps_thread_and_decisions(client: TestClient) -> No
     client.get("/decide")
     cookie = client.cookies.get("cairn_thread")
     assert cookie
-    client.post("/decide/example", follow_redirects=False)
+    client.post("/decide/choose", data={"sex": "F", "adverse": "200"}, follow_redirects=False)
     before = client.get("/draft").text
     for path in ("/study", "/ask", "/draft"):
         html = client.get(path).text

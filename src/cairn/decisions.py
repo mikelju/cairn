@@ -6,6 +6,7 @@ slot with a Decision; the NOAEL of a sex is a pure function of those decisions a
 only once a person confirms it.
 """
 
+import re
 from dataclasses import dataclass, field
 
 from pydantic import BaseModel
@@ -41,6 +42,14 @@ class Noael:
     sex: str
     dose: float | None  # None: not established
     flags: list[str] = field(default_factory=list)  # adverse findings not fully examined at dose
+
+
+KEY_FINDING = "GLAND, ADRENAL Vacuolization"  # the one finding a visitor decides on screen 3
+
+
+def finding_key(finding: str) -> str:
+    """The catalogue key of a finding's plain name, for example find_gland_adrenal_vacuolization."""
+    return "find_" + re.sub(r"\W+", "_", finding.lower()).strip("_")
 
 
 def enumerate_slots(ledger: ObservationLedger) -> list[Slot]:

@@ -189,10 +189,25 @@ async def _record(request: Request, thread_id: str, body: Record) -> dict[str, A
                 ts=now,
             ).model_dump()
         )
-    await graph.aupdate_state(config, {"decisions": records, "confirmed": []})
+    kept = _still_confirmed(state, records)
+    await graph.aupdate_state(config, {"decisions": records, "confirmed": kept})
     await _log(request, thread_id, body.actor, "decisions_recorded", decisions=records)
     _, _, state, waiting = await _load(request, thread_id)
     return _view(thread_id, state, waiting)
+
+
+def _still_confirmed(state: State, records: list[dict[str, Any]]) -> list[str]:
+    """The sexes confirmed before whose decisions are unchanged by this record."""
+
+    def doses(items: list[dict[str, Any]], sex: str) -> set[tuple[Any, ...]]:
+        return {
+            (d["dec_id"], d["treatment_related_from"], d["adverse_from"])
+            for d in items
+            if d["sex"] == sex
+        }
+
+    before = state.get("decisions", [])
+    return [s for s in state.get("confirmed", []) if doses(before, s) == doses(records, s)]
 
 
 @threads.post("/{thread_id}/confirm")
@@ -210,7 +225,14 @@ async def _confirm(request: Request, thread_id: str, body: Confirm) -> dict[str,
         await _refuse(
             request, thread_id, body.actor, "confirm", 403, "Only the reviewer confirms a NOAEL."
         )
-    state = {**state, "confirmed": list(body.confirmed)}
+    sexes = {s.sex for s in enumerate_slots(build_ledger(state))}
+    merged = sorted(set(state.get("confirmed", [])) | set(body.confirmed))
+    if not sexes <= set(merged):  # one sex confirmed, the other still open: wait, do not resume
+        await graph.aupdate_state(config, {"confirmed": merged})
+        await _log(request, thread_id, body.actor, "noael_confirmed", confirmed=merged)
+        _, _, state, waiting = await _load(request, thread_id)
+        return _view(thread_id, state, waiting)
+    state = {**state, "confirmed": merged}
     if not verify_final(state).ok:
         await _refuse(request, thread_id, body.actor, "confirm", 409, "verify_final is not green")
     resume = {"decisions": state.get("decisions", []), "confirmed": state["confirmed"]}
