@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastmcp import Client
 from markupsafe import Markup, escape
 
-from cairn.content import QuoteRef, Sentence, Text, ValueRef
+from cairn.content import QuoteRef, Text, ValueRef
 from cairn.decisions import EXAMPLE, KEY_FINDING, Decision, apply_decisions, finding_key
 from cairn.gateway import DEFAULT_MODEL
 from cairn.judge import (
@@ -25,7 +25,7 @@ from cairn.recording import RECORDINGS_DIR, ReplayClient, recorded_model, total_
 from cairn.render import render
 from cairn.verify import RULE_REASONS
 from cairn.web import _page as page
-from cairn.web import i18n, provenance
+from cairn.web import _recordings_dir, _step2_context, i18n, provenance
 from cairn.web.provenance import DecisionInfo, TextPart, stray_digits, tag_counts
 from cairn.web.threads import (
     AUTHOR,
@@ -488,48 +488,26 @@ async def _draft_page(request: Request, thread: str, actor: str, error: str = ""
     return _remember(response, thread)
 
 
-def _landing_sentence(state: Any) -> list[provenance.Part]:
-    """The body-weight sentence of the draft, rendered by code; every digit sits in a tag.
+def _landing_sentence(t: dict[str, str]) -> list[provenance.Part]:
+    """The first clause of the recorded body-weight answer (Q3 of /ask), same parts as there."""
+    parts: list[provenance.Part] = _step2_context(LANDING_QUESTION, _recordings_dir(), t)["parts"]
+    for i, part in enumerate(parts):
+        if isinstance(part, TextPart) and ";" in part.text:
+            head = part.text.split(";", 1)[0]
+            return [*parts[:i], TextPart(head + " ...")]
+    return parts
 
-    The recorded draft has no such sentence yet, so the code composes it from the first
-    body-weight Observation: text and references only, placed by the same renderer.
-    """
-    ledger = final_ledger(state)
-    for section in sections_of(state):
-        parts = provenance.provenance_parts(section, ledger)
-        data = [p for p in parts if not isinstance(p, TextPart)]
-        if data and all(getattr(p, "tool", "") == "body_weight_change" for p in data):
-            return parts
-    obs_id = next(i for i in ledger.ids if ledger.get(i).kind == "body_weight_change")
 
-    def ref(field: str) -> ValueRef:
-        return ValueRef(obs_id=obs_id, field=field)
-
-    sentence = Sentence(
-        parts=[
-            Text(text="Mean body weight on day "),
-            ref("day"),
-            Text(text=" at "),
-            ref("groups.1.dose"),
-            Text(text=" mg/kg was "),
-            ref("groups.1.mean_day29_g"),
-            Text(text=" g, "),
-            ref("groups.1.percent_lower_than_control"),
-            Text(text=" percent lower than control."),
-        ]
-    )
-    return provenance.provenance_parts(sentence, ledger)
+LANDING_QUESTION = "Q3"  # the recorded body-weight answer of /ask
 
 
 @people.get("/", response_class=HTMLResponse)
 async def landing(request: Request) -> Response:
     """The result first: one real draft sentence with its numbers marked, then one button."""
     thread = await _session_thread(request)
-    parts = _landing_sentence((await load_view(request, thread))[0])
     t = i18n.context(request)["t"]
+    parts = _landing_sentence(t)
     counts = t["land_counts"].format(numbers=tag_counts(parts)["data"], ai=len(stray_digits(parts)))
-    if i18n.context(request)["locale"] == "es":
-        counts += " | " + t["land_english"]
     response = page(request, "landing.html", current=0, parts=parts, counts_line=counts)
     return _remember(response, thread)
 

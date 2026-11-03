@@ -839,6 +839,24 @@ def test_landing_shows_one_h1_a_real_marked_sentence_and_one_primary_action(lang
     assert "aria-current" not in main and 'aria-current="page"' not in page
 
 
+def _flat(html: str) -> str:
+    return " ".join(unescape(re.sub(r"<[^>]+>", " ", html)).split())
+
+
+@pytest.mark.parametrize("lang", ["es", "en"])
+def test_landing_sentence_is_the_recorded_body_weight_answer_of_ask(lang: str) -> None:
+    with TestClient(create_app()) as client:
+        landing = client.get(f"/?lang={lang}").text
+        ask = client.post(f"/ask/run?lang={lang}", data={"question": "Q3"}).text
+    lede = re.search(r'<p class="lede answer">(.*?)</p>\s*<p class="meta">', landing, re.S)
+    assert lede
+    chips = re.findall(r'<details class="prov .*?</details>', lede.group(1), re.S)
+    assert len(chips) >= 5 and all(chip in ask for chip in chips)
+    shown = _flat(lede.group(1)).removesuffix(" ...")
+    assert shown in _flat(ask) and shown.endswith("lower than control")
+    assert "9.3" not in _flat(landing)
+
+
 @pytest.mark.parametrize("lang", ["es", "en"])
 def test_explore_strings_come_from_the_active_catalogue(lang: str) -> None:
     from cairn.web.i18n import CATALOGUES
