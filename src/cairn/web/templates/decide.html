@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% import "_components.html" as a with context %}
+{% block main %}
+<section class="step two-col">
+{{ a.screen_head(3, t.step_3, "REAL", t.s4_lede) }}
+<div class="col-left">
+<form method="post" action="/decide/example"><input type="hidden" name="thread" value="{{ thread }}"><button type="submit">{{ t.s4_example }}</button></form>
+<div id="recompute">{% include "decide_result.html" %}</div>
+{{ a.in_production(t.s4_prod, label=t.exp_prod_label) }}
+</div>
+<div class="col-right card">
+<form hx-post="/decide/set" hx-trigger="change" hx-target="#recompute">
+<input type="hidden" name="thread" value="{{ thread }}">
+<h2>{{ t.s4_table_h }}</h2>
+{{ a.data_table([t.s4_th_finding, t.s4_th_sex, t.s4_th_related, t.s4_th_adverse], rows) }}
+</form>
+</div>
+{{ a.screen_nav(3, screens) }}
+</section>
+{% endblock %}

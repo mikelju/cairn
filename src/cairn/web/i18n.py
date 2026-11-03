@@ -11,6 +11,7 @@ from starlette.requests import Request
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 DEFAULT_LOCALE = "es"
+SCREEN_PATHS = {0: "/", 1: "/study", 2: "/ask", 3: "/decide", 4: "/draft"}
 COOKIE = "cairn_lang"
 COOKIE_MAX_AGE = 60 * 60 * 24 * 365
 
@@ -18,13 +19,19 @@ EN: dict[str, str] = {
     "html_lang": "en",
     "brand": "Cairn",
     "nav_steps": "Steps",
-    "step_1": "Validate",
-    "step_2": "Ask",
-    "step_3": "Explore",
-    "step_4": "Analyse",
-    "step_5": "Draft",
-    "step_6": "Check",
-    "step_7": "Review",
+    "step_1": "The study",
+    "step_2": "Ask it",
+    "step_3": "You decide",
+    "step_4": "The draft",
+    "step_counter": "Step {n} of 4",
+    "nav_next": "Next",
+    "nav_back": "Back",
+    "undecided": "not decided yet",
+    "draft_noael": "NOAEL",
+    "draft_decide": "Decide in step 3",
+    "disc_explore": "Show more questions",
+    "disc_guides": "Show guideline quotes",
+    "disc_checks": "Show checks and sign-off",
     "role": "Role: Study toxicologist (simulated)",
     "acting_as": "Acting as:",
     "lang_label": "Language",
@@ -294,13 +301,19 @@ ES: dict[str, str] = {
     "html_lang": "es",
     "brand": "Cairn",
     "nav_steps": "Pasos",
-    "step_1": "Validar",
-    "step_2": "Preguntar",
-    "step_3": "Explorar",
-    "step_4": "Analizar",
-    "step_5": "Redactar",
-    "step_6": "Comprobar",
-    "step_7": "Revisar",
+    "step_1": "El estudio",
+    "step_2": "Pregúntale",
+    "step_3": "Decides tú",
+    "step_4": "El borrador",
+    "step_counter": "Paso {n} de 4",
+    "nav_next": "Siguiente",
+    "nav_back": "Anterior",
+    "undecided": "sin decidir",
+    "draft_noael": "NOAEL",
+    "draft_decide": "Decidir en el paso 3",
+    "disc_explore": "Mostrar más preguntas",
+    "disc_guides": "Mostrar citas de guías",
+    "disc_checks": "Mostrar comprobaciones y firma",
     "role": "Rol: toxicólogo del estudio (simulado)",
     "acting_as": "Actuando como:",
     "lang_label": "Idioma",
@@ -594,9 +607,9 @@ def context(
     locale = locale_of(request)
     if request.method == "GET":
         base = request.url
-    else:  # a POST page has no GET twin: toggle on the step it shows
+    else:  # a POST page has no GET twin: toggle on the screen it shows
         query = "&".join(f"{k}={quote(v)}" for k, v in (keep or {}).items())
-        base = request.url.replace(path=f"/step/{current}" if current else "/", query=query)
+        base = request.url.replace(path=SCREEN_PATHS.get(current or 0, "/"), query=query)
     links = {code: f"{base.path}?{base.include_query_params(lang=code).query}" for code in LOCALES}
     return {"t": CATALOGUES[locale], "locale": locale, "lang_links": links}
 

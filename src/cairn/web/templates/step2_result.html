@@ -7,7 +7,7 @@
 <div class="col-left">
 {{ a.format_line(r.kind) }}
 {% if r.text %}
-<div class="card answer">{{ a.cue(2) }}
+<div class="card answer">
 <p class="lang-tag">{{ t.exp_en_rec if r.badge == "RECORDED" else t.exp_en_live }}</p>
 <p class="prose"><strong>{{ r.text }}</strong></p></div>
 {% endif %}
@@ -17,7 +17,7 @@
 {% if r.failures %}<ul>{% for f in r.failures %}<li>{{ f }}</li>{% endfor %}</ul>{% endif %}
 {% endcall %}
 {% endif %}
-<div class="detail">{{ a.cue(3) }}
+<div class="detail">
 {% if r.written %}{% call a.disclosure("model_text", r.written.split()|length, "words") %}<p>{{ r.written }}</p>{% endcall %}{% endif %}
 {% macro trace_body() %}{{ a.badge_meta(r.badge, r.meta) }}
 {{ a.trace(r.trace, t.exp_trace) }}

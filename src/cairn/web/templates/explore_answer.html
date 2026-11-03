@@ -6,7 +6,7 @@
 {{ a.badge_meta(r.badge, r.meta) }}
 {{ a.format_line(r.kind, 2) }}
 {% if r.text %}
-<div class="card answer">{{ a.cue(3) }}
+<div class="card answer">
 <p class="lang-tag">{{ t.exp_en_rec if r.badge == "RECORDED" else t.exp_en_live }}</p>
 <p class="prose"><strong>{{ r.text }}</strong></p>
 {% for q in r.quotes %}
@@ -20,7 +20,7 @@
 {% if r.failures %}<ul>{% for f in r.failures %}<li>{{ f }}</li>{% endfor %}</ul>{% endif %}
 {% endcall %}
 {% endif %}
-<div class="detail">{{ a.cue(4) }}
+<div class="detail">
 {% if r.rows %}{% call a.disclosure("table", r.rows|length, "rows") %}
 <p class="meta">{{ r.rule }}</p>
 {% set screen = namespace(rows=[]) %}

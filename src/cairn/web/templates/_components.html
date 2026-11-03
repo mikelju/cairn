@@ -8,8 +8,8 @@
   <div class="bar">
     <a class="brand" href="/">{{ t.brand }}</a>
     <nav class="steps" aria-label="{{ t.nav_steps }}">
-      {% for n in steps %}
-        <a href="/step/{{ n }}"{% if current == n %} aria-current="step"{% endif %}><span class="n">{{ "%02d"|format(n) }}</span>{{ t["step_" ~ n] }}</a>
+      {% for n, path in steps %}
+        <a href="{{ path }}"{% if current == n %} aria-current="page"{% endif %}><span class="n">{{ n }}</span>{{ t["step_" ~ n] }}</a>
       {% endfor %}
     </nav>
     <span class="role">{% if actor %}{{ t.acting_as }} {{ actor }} {{ badge("SIMULATED") }}{% else %}{{ t.role }}{% endif %}</span>
@@ -32,6 +32,20 @@
 {% macro page_header(title, sentence) %}
 <h1>{{ title }}</h1>
 <p class="lede">{{ sentence }}</p>
+{% endmacro %}
+
+{# One screen of four: the counter, the title and the lede; screen_nav closes it with Back and Next. #}
+{% macro screen_head(number, title, kind, sentence) %}
+<p class="stepcount">{{ t.step_counter.format(n=number) }}</p>
+<h1>{{ title }} {{ badge(page_badge|default(kind)) }}</h1>
+<p class="lede">{{ sentence }}</p>
+{% endmacro %}
+
+{% macro screen_nav(number, screens) %}
+<p class="btn-row screen-nav">
+  {% if number > 1 %}<a class="btn-secondary" href="{{ screens[number - 2][1] }}">&larr; {{ t.nav_back }}</a>{% endif %}
+  {% if number < 4 %}<a class="btn-primary" href="{{ screens[number][1] }}">{{ t.nav_next }} &rarr;</a>{% endif %}
+</p>
 {% endmacro %}
 
 {% macro step_header(number, title, kind, sentence) %}

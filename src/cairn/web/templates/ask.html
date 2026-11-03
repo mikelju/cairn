@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% import "_components.html" as a with context %}
+{% macro quote(q) %}<blockquote class="quote">{% if q.verbatim %}<span class="verb">{{ t.s3_literal }}</span>{% endif %}<p>{{ q.text }}</p><p class="meta">{{ q.cite }}{% if q.highlight %} · <a href="{{ q.highlight }}">{{ t.exp_hl }}</a>{% endif %} · <a href="{{ q.link }}">{{ t.exp_official }}</a></p></blockquote>{% endmacro %}
+{% block main %}
+<section class="step">
+{{ a.screen_head(2, t.step_2, "RECORDED", t.s2_lede) }}
+<form class="controls" hx-post="/ask/run" hx-target="#result">
+  <select name="question" aria-label="{{ t.s2_q_label }}">{% for id in questions %}<option value="{{ id }}">{{ id }}</option>{% endfor %}</select>
+  <button type="submit">{{ t.s2_ask }}</button>
+</form>
+{% call a.disclosure("questions", questions|length, "questions") %}<ul class="questions">{% for id in questions %}<li>{{ id }}: {{ t["q_" ~ id] }}</li>{% endfor %}</ul>{% endcall %}
+<div id="result"></div>
+{% call a.disclosure("explore", cards|length, "questions") %}
+<div class="explore">
+  <div class="qgrid" role="group" aria-label="{{ t.disc_explore }}">
+    {% for id, kind in cards %}
+    <button type="button" class="qcard" id="card-{{ id }}" aria-controls="answer-explore" hx-post="/explore/run" hx-vals='{"question": "{{ id }}"}' hx-target="#answer-explore">
+      <span class="q">{{ t["q_" ~ id] }}</span>
+      <span class="row"><span class="fmt-tag {{ kind }}">{{ t["tag_" ~ kind] }}</span><span class="go">{{ t.exp_card_go }} &darr;</span></span>
+    </button>
+    {% endfor %}
+  </div>
+  <div class="slot" id="answer-explore" aria-live="polite"></div>
+</div>
+{% endcall %}
+{% if live %}
+<form class="live card" hx-post="/explore/live" hx-target="#answer-live" autocomplete="off" aria-label="{{ t.exp_live_label }}">
+  <label>{{ t.exp_live_q }} <input type="text" name="question" maxlength="500" required></label>
+  <label>{{ t.exp_live_code }} <input type="password" name="code" autocomplete="off"></label>
+  <button type="submit">{{ t.exp_live_go }}</button>
+</form>
+<div class="slot" id="answer-live" aria-live="polite"></div>
+{% endif %}
+{% call a.disclosure("guides", r.quotes|length, "quotes") %}
+<div class="guides">
+{% set headers = [t.s3_th_guideline, t.s3_th_section, t.s3_th_page, "Lex", "Sem", "Fused"] %}
+{% for q in r.queries %}
+<div class="guide-col">
+<h2>{{ t["s3_q_" ~ q.id] }}</h2>
+{% for x in q.quotes %}{{ quote(x) }}{% endfor %}
+{% call a.disclosure("ranking", q.rows|length + q.folded|length, "rows") %}
+{{ a.data_table(headers, q.rows) }}
+{% if q.folded %}{% call a.disclosure("lower_ranks", q.folded|length, "rows") %}{{ a.data_table(headers, q.folded) }}{% endcall %}{% endif %}
+{% endcall %}
+</div>
+{% endfor %}
+</div>
+{% endcall %}
+{{ a.in_production(t.exp_prod, label=t.exp_prod_label) }}
+{{ a.screen_nav(2, screens) }}
+</section>
+{% endblock %}

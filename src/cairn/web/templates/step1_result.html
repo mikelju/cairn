@@ -13,4 +13,4 @@
 {% endif %}
 {% set held = namespace(rows=[]) %}
 {% for q in r.rows %}{% set held.rows = held.rows + [[q.rule, q.usubjid, q.test, q.visit_day|int, q.value]] %}{% endfor %}
-<div class="detail">{{ a.cue(3) }}{% call a.disclosure("quarantined", r.rows|length, "rows") %}{{ a.data_table(heads + [t.s1_th_day, t.s1_th_value], held.rows) }}{% endcall %}</div>
+<div class="detail">{% call a.disclosure("quarantined", r.rows|length, "rows") %}{{ a.data_table(heads + [t.s1_th_day, t.s1_th_value], held.rows) }}{% endcall %}</div>
