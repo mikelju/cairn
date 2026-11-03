@@ -118,7 +118,11 @@ def test_the_counts_line_equals_the_rendered_tags(
         assert counts[kind] == sum(t["kind"] == kind for t in shown)
     line = _squash(re.search(r'<p class="meta prov-counts">(.*?)</p>', page, re.S).group(1))  # type: ignore[union-attr]
     numbers = [int(n) for n in re.findall(r"\d+", line)]
-    assert numbers == [counts["data"], 0, counts["decision"], counts["quote"]]
+    example = sum(
+        getattr(p, "who", "") in ("Preloaded example", "Ejemplo precargado") for p in parts
+    )
+    assert example > 0
+    assert numbers == [counts["data"], 0, counts["decision"] - example, example, counts["quote"]]
     assert tail in line
 
 

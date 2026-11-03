@@ -15,7 +15,7 @@ from langgraph.types import Command
 from pydantic import BaseModel
 
 from cairn import audit
-from cairn.decisions import Decision, apply_decisions, enumerate_slots
+from cairn.decisions import EXAMPLE_ACTOR, Decision, apply_decisions, enumerate_slots
 from cairn.gateway import DEFAULT_MODEL, LLMGateway, Mode
 from cairn.judge import JUDGE_MODEL, summary
 from cairn.observation import current_snapshot
@@ -40,6 +40,7 @@ class DecisionIn(BaseModel):
     dec_id: str
     treatment_related_from: float | None = None
     adverse_from: float | None = None
+    example: bool = False  # a preloaded example, stored under the actor Example
 
 
 class Record(BaseModel):
@@ -185,7 +186,7 @@ async def _record(request: Request, thread_id: str, body: Record) -> dict[str, A
                 sex=slot.sex,
                 treatment_related_from=item.treatment_related_from,
                 adverse_from=item.adverse_from,
-                actor=body.actor,
+                actor=EXAMPLE_ACTOR if item.example else body.actor,
                 ts=now,
             ).model_dump()
         )

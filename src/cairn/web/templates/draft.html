@@ -15,6 +15,7 @@
 <p class="meta">{{ t.draft_differ }}</p>
 {% if error %}{% call a.callout("blocked") %}<p>{{ error }}</p>{% endcall %}{% endif %}
 {% if approved_by %}{% call a.callout("rules") %}<p>{{ t.s5_approved }} {{ approved_by }}.</p>{% endcall %}
+<form method="post" action="/restart"><button type="submit">{{ t.s4_restart }}</button></form>
 {% else %}
 <form method="post" action="/draft/approve" class="controls"><input type="hidden" name="thread" value="{{ thread }}">
 <button type="submit" name="actor" value="A. Author">{{ t.s5_approve_as }} A. Author</button>

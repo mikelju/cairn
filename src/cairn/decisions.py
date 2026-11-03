@@ -18,6 +18,9 @@ SEX_WORDS = {"F": "females", "M": "males"}
 NOAEL_DEFINITION = QuoteRef(passage_id="FDA-IV-01", sentence_ids=["FDA-IV-01.s2"])
 
 
+EXAMPLE_ACTOR = "Example"  # the actor of a preloaded example decision: never a person
+
+
 class Decision(BaseModel):
     dec_id: str  # the slot it fills
     finding: str

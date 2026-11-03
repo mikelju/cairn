@@ -145,10 +145,17 @@ EN: dict[str, str] = {
     "prov_role": "Role",
     "role_author": "Author",
     "role_reviewer": "Reviewer",
+    "prov_example": "Preloaded example",
+    "role_example": "Not a person",
     "draft_counts": (
-        "{numbers} numbers placed by code, {ai} by the AI, "
-        "{decisions} decisions by people, {quotes} quotations with page"
+        "{numbers} numbers placed by code, {ai} by the AI, {decisions} decisions by people, "
+        "{example} from preloaded examples, {quotes} quotations with page"
     ),
+    "confirm_error": "That confirmation was not saved: {detail}.",
+    "confirm_err_undecided": "{sex} has no decision yet",
+    "confirm_err_verify": "the draft does not pass its checks",
+    "s4_change": "Change",
+    "s4_restart": "Start over",
     "decide_error": "That choice could not be saved: {detail}.",
     "decide_err_sex": "the sex is not one of the study",
     "decide_err_both": "choose both the treatment-related and the adverse dose",
@@ -196,7 +203,10 @@ EN: dict[str, str] = {
     "s4_noael": "NOAEL, {sex}: {value}",
     "disc_examples": "Show example decisions",
     "s4_ex_tag": "example",
-    "s4_ex_note": "Example decisions so the draft is complete; they are not real.",
+    "s4_ex_note": (
+        "Example decisions so the draft is complete; they are not real. "
+        "They count toward the NOAEL."
+    ),
     "s4_prod": "named reviewers and signed records.",
     "find_gland_adrenal_vacuolization": "Adrenal gland, vacuolization",
     "find_gland_mammary_atrophy_fat": "Mammary gland, fat atrophy",
@@ -413,10 +423,17 @@ ES: dict[str, str] = {
     "prov_role": "Rol",
     "role_author": "Autor",
     "role_reviewer": "Revisor",
+    "prov_example": "Ejemplo precargado",
+    "role_example": "No es una persona",
     "draft_counts": (
-        "{numbers} números puestos por código, {ai} por la IA, "
-        "{decisions} decisiones de personas, {quotes} citas con página"
+        "{numbers} números puestos por código, {ai} por la IA, {decisions} decisiones de "
+        "personas, {example} de ejemplos precargados, {quotes} citas con página"
     ),
+    "confirm_error": "No se guardó esa confirmación: {detail}.",
+    "confirm_err_undecided": "{sex} aún no tiene decisión",
+    "confirm_err_verify": "el borrador no pasa sus comprobaciones",
+    "s4_change": "Cambiar",
+    "s4_restart": "Empezar de nuevo",
     "decide_error": "No se pudo guardar esa elección: {detail}.",
     "decide_err_sex": "el sexo no es uno de los del estudio",
     "decide_err_both": "elige la dosis relacionada con el tratamiento y la adversa",
@@ -464,7 +481,9 @@ ES: dict[str, str] = {
     "s4_noael": "NOAEL, {sex}: {value}",
     "disc_examples": "Ver decisiones de ejemplo",
     "s4_ex_tag": "ejemplo",
-    "s4_ex_note": "Decisiones de ejemplo para completar el borrador; no son reales.",
+    "s4_ex_note": (
+        "Decisiones de ejemplo para completar el borrador; no son reales. Cuentan para el NOAEL."
+    ),
     "s4_prod": "revisores con nombre y registros firmados.",
     "find_gland_adrenal_vacuolization": "Glándula suprarrenal, vacuolización",
     "find_gland_mammary_atrophy_fat": "Glándula mamaria, atrofia grasa",

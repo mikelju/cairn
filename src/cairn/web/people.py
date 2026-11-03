@@ -11,7 +11,14 @@ from fastmcp import Client
 from markupsafe import Markup, escape
 
 from cairn.content import QuoteRef, Text, ValueRef
-from cairn.decisions import EXAMPLE, KEY_FINDING, Decision, apply_decisions, finding_key
+from cairn.decisions import (
+    EXAMPLE,
+    EXAMPLE_ACTOR,
+    KEY_FINDING,
+    Decision,
+    apply_decisions,
+    finding_key,
+)
 from cairn.gateway import DEFAULT_MODEL
 from cairn.judge import (
     EXAMPLE_OBS,
@@ -117,6 +124,8 @@ def _decision_info(state: Any, t: dict[str, str]) -> dict[str, DecisionInfo]:
     """Who decided each slot: the author for a recorded decision, the reviewer for a NOAEL."""
 
     def info(who: str) -> DecisionInfo:
+        if who == EXAMPLE_ACTOR:
+            return DecisionInfo(t["prov_example"], t["role_example"])
         return DecisionInfo(who, t[ROLE_KEYS[who]])
 
     found = {d["dec_id"]: info(d["actor"]) for d in state.get("decisions", [])}
@@ -130,10 +139,12 @@ def _body(state: Any, t: dict[str, str]) -> dict[str, Any]:
     )
     counts = tag_counts(parts)
     kinds = [k for k in ("data", "quote", "decision") if counts[k]]
+    example = sum(getattr(p, "who", "") == t["prov_example"] for p in parts)
     line = t["draft_counts"].format(
         numbers=counts["data"],
         ai=len(stray_digits(parts)),
-        decisions=counts["decision"],
+        decisions=counts["decision"] - example,
+        example=example,
         quotes=counts["quote"],
     )
     words = len("".join(p.text for p in parts).split())
@@ -151,7 +162,9 @@ def _incidence(state: Any, sex: str) -> list[tuple[float, int, int]]:
     return []
 
 
-def _decide_context(state: Any, view: dict[str, Any], t: dict[str, str]) -> dict[str, Any]:
+def _decide_context(
+    state: Any, view: dict[str, Any], t: dict[str, str], change: str = ""
+) -> dict[str, Any]:
     """What /decide draws: the incidence table, one block per sex and the example list."""
     given = {d["dec_id"]: d for d in view["decisions"]}
     slots = {s["slot"]: s for s in view["slots"]}
@@ -166,7 +179,7 @@ def _decide_context(state: Any, view: dict[str, Any], t: dict[str, str]) -> dict
                 "sex": sex,
                 "name": t["s1_sex_" + sex].capitalize(),
                 "doses": [f"{d:g}" for d in slot["doses"] if d > 0],
-                "decided": decision is not None,
+                "decided": decision is not None and sex != change,
                 "adverse": "" if decision is None else _decision_line(decision, sex, t),
                 "confirmed": confirmed,
                 "noael": (
@@ -174,7 +187,7 @@ def _decide_context(state: Any, view: dict[str, Any], t: dict[str, str]) -> dict
                     if not confirmed
                     else t["s4_not_set"]
                     if noael is None
-                    else f"{noael:g} mg/kg"
+                    else f"{noael:g} mg/kg/day"
                 ),
             }
         )
@@ -200,6 +213,7 @@ def _decide_context(state: Any, view: dict[str, Any], t: dict[str, str]) -> dict
         "inc_heads": heads,
         "inc_rows": rows,
         "examples": examples,
+        "started": any(d["actor"] != EXAMPLE_ACTOR for d in view["decisions"]),
         "both_confirmed": all(x["confirmed"] for x in sexes),
     }
 
@@ -218,15 +232,15 @@ def _label(dose: float | None, t: dict[str, str]) -> str:
 
 
 @people.get("/decide", response_class=HTMLResponse)
-async def decide(request: Request, thread: str | None = None) -> Response:
-    return await _decide_page(request, await _session_thread(request, thread))
+async def decide(request: Request, thread: str | None = None, change: str = "") -> Response:
+    return await _decide_page(request, await _session_thread(request, thread), change=change)
 
 
 async def _decide_page(
-    request: Request, thread: str, error: str = "", status: int = 200
+    request: Request, thread: str, error: str = "", status: int = 200, change: str = ""
 ) -> Response:
     state, _, view = await load_view(request, thread)
-    context = _decide_context(state, view, i18n.context(request)["t"])
+    context = _decide_context(state, view, i18n.context(request)["t"], change)
     response = page(request, "decide.html", current=3, actor=AUTHOR, error=error, **context)
     response.status_code = status
     return _remember(response, thread)
@@ -285,6 +299,7 @@ async def _choose(
             dec_id=d["dec_id"],
             treatment_related_from=d["treatment_related_from"],
             adverse_from=d["adverse_from"],
+            example=d["actor"] == EXAMPLE_ACTOR,
         )
         for d in view["decisions"]
     }
@@ -295,6 +310,7 @@ async def _choose(
                 dec_id=s["slot"],
                 treatment_related_from=example_related,
                 adverse_from=example_adverse,
+                example=True,
             )
     items[mine["slot"]] = DecisionIn(
         dec_id=mine["slot"], treatment_related_from=related_from, adverse_from=dose
@@ -310,27 +326,50 @@ async def _choose(
     return _remember(RedirectResponse("/decide", status_code=303), thread)  # type: ignore[return-value]
 
 
-@people.post("/decide/confirm")
+@people.post("/decide/confirm", response_model=None)
 async def decide_confirm(
     request: Request,
     actor: Annotated[str, Form()],
     thread: Annotated[str | None, Form()] = None,
     sex: Annotated[str, Form()] = "",
-) -> RedirectResponse:
+) -> Response:
     who = _actor(actor)
     thread = await _session_thread(request, thread)
     if sex not in ("", "F", "M"):
         raise HTTPException(status_code=422, detail="unknown sex")
     sexes: list[Literal["F", "M"]] = [sex] if sex else ["F", "M"]  # type: ignore[list-item]
+    t = i18n.context(request)["t"]
+    _, waiting, view = await load_view(request, thread)
+    if waiting == "await_decisions":
+        keyed = {s["slot"]: s["sex"] for s in view["slots"] if s["finding"] == KEY_FINDING}
+        decided = {keyed[d["dec_id"]] for d in view["decisions"] if d["dec_id"] in keyed}
+        if missing := [x for x in sexes if x not in decided]:
+            names = " / ".join(t["s1_sex_" + x] for x in missing)
+            reason = t["confirm_err_undecided"].format(sex=names)
+            return await _decide_page(
+                request, thread, t["confirm_error"].format(detail=reason), 409
+            )
     try:
         await confirm(request, thread, Confirm(actor=who, confirmed=sexes))
     except HTTPException as refusal:
         if refusal.status_code != 409:
             raise
-        return _remember(_current(who), thread)  # type: ignore[return-value]
+        if refusal.detail == "verify_final is not green":
+            reason = t["confirm_err_verify"]
+            return await _decide_page(
+                request, thread, t["confirm_error"].format(detail=reason), 409
+            )
+        return _remember(_current(who), thread)
     if (await get_thread(request, thread))["waiting"] == "await_decisions":
-        return _remember(RedirectResponse("/decide", status_code=303), thread)  # type: ignore[return-value]
-    return _remember(_current(who), thread)  # type: ignore[return-value]
+        return _remember(RedirectResponse("/decide", status_code=303), thread)
+    return _remember(_current(who), thread)
+
+
+@people.post("/restart")
+async def restart(request: Request) -> Response:
+    """Start over: a new thread replaces the one in the cookie."""
+    thread = str((await start(request))["thread_id"])
+    return _remember(RedirectResponse("/decide", status_code=303), thread)
 
 
 async def _undecided(request: Request, thread: str, view: dict[str, Any], actor: str) -> Response:

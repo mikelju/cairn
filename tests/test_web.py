@@ -946,8 +946,109 @@ def test_decide_stores_what_the_person_chose_and_never_infers_relatedness() -> N
         assert _stored(client, "M") == (20, None)
 
 
-def test_no_code_path_derives_relatedness_from_incidence() -> None:
-    source = Path("src/cairn/web/people.py").read_text(encoding="utf-8")
-    assert "_incidence(state, sex)" in source  # shown to the person, only in the table
-    choose = source.split("async def decide_choose")[1].split("@people.post")[0]
-    assert "_incidence" not in choose and "control" not in choose
+DOSES = ("20", "200", "400")
+
+
+@pytest.mark.parametrize("sex", ["F", "M"])
+def test_stored_related_and_adverse_equal_the_posted_values_for_every_dose(sex: str) -> None:
+    """Behavioural: whatever the incidence, the stored choice is exactly what the person posted."""
+    with TestClient(create_app(), follow_redirects=False) as client:
+        client.get("/decide")
+        for related in ("none", *DOSES):
+            for adverse in ("none", *DOSES):
+                valid = (related == "none" and adverse == "none") or (
+                    related != "none" and (adverse == "none" or float(related) <= float(adverse))
+                )
+                reply = client.post(
+                    "/decide/choose", data={"sex": sex, "related": related, "adverse": adverse}
+                )
+                if not valid:
+                    assert reply.status_code == 422
+                    continue
+                assert reply.status_code == 303
+                want = (
+                    None if related == "none" else float(related),
+                    None if adverse == "none" else float(adverse),
+                )
+                assert (
+                    _stored(
+                        client,
+                        sex,
+                    )
+                    == want
+                )
+
+
+def _decisions(client: TestClient) -> list[dict[str, Any]]:
+    id_ = client.cookies.get("cairn_thread")
+    decisions: list[dict[str, Any]] = client.get(f"/api/threads/{id_}").json()["decisions"]
+    return decisions
+
+
+CHIP = re.compile(
+    r"<dt>Decided by</dt><dd>(.*?)</dd><dt>Role</dt><dd>(.*?)</dd><dt>Value</dt><dd>(.*?)</dd>"
+)
+
+
+def test_example_decisions_are_labelled_as_examples_end_to_end() -> None:
+    with TestClient(create_app()) as client:
+        client.cookies.set(COOKIE, "en")
+        _decided(client)
+        by_actor = [d["actor"] for d in _decisions(client)]
+        assert by_actor.count("Example") == 9 and by_actor.count("A. Author") == 2
+        draft = client.get("/draft").text
+        decide = client.get("/decide").text
+    chips = CHIP.findall(draft)
+    kidney = [who for who, _, value in chips if value.startswith("KIDNEY Necrosis")]
+    assert kidney and set(kidney) == {"Preloaded example"}
+    own = [c for c in chips if c[0] in ("A. Author", "R. Reviewer")]
+    assert own and all("ADRENAL" in c[2] or c[2].startswith("NOAEL") for c in own)
+    counts = re.search(r"(\d+) decisions by people, (\d+) from preloaded examples", draft)
+    assert counts
+    assert int(counts.group(2)) == sum(1 for c in chips if c[0] == "Preloaded example")
+    assert int(counts.group(1)) == len(own)
+    assert "count toward the NOAEL" in decide
+
+
+def test_every_decision_chip_shows_who_and_a_nonempty_role() -> None:
+    with TestClient(create_app()) as client:
+        client.cookies.set(COOKIE, "en")
+        _decided(client)
+        html = client.get("/draft").text
+    chips = CHIP.findall(html)
+    assert chips and all(who.strip() and role.strip() for who, role, _ in chips)
+
+
+def test_change_before_confirming_and_start_over() -> None:
+    with TestClient(create_app(), follow_redirects=False) as client:
+        client.get("/decide")
+        client.post("/decide/choose", data={"sex": "F", "related": "20", "adverse": "200"})
+        plain = client.get("/decide").text
+        assert "/decide?change=F" in plain
+        assert plain.count('action="/decide/choose"') == 1  # only males, still undecided
+        changing = client.get("/decide?change=F").text
+        assert changing.count('action="/decide/choose"') == 2
+        client.post("/decide/choose", data={"sex": "F", "related": "400", "adverse": "400"})
+        assert _stored(client, "F") == (400, 400)
+        old = client.cookies.get("cairn_thread")
+        reply = client.post("/restart")
+        assert reply.status_code == 303 and client.cookies.get("cairn_thread") != old
+        assert _decisions(client) == []
+
+
+def test_confirm_refusals_are_shown_not_redirected() -> None:
+    with TestClient(create_app(), follow_redirects=False) as client:
+        client.cookies.set(COOKIE, "en")
+        client.get("/decide")
+        none = client.post("/decide/confirm", data={"actor": "R. Reviewer", "sex": "F"})
+        assert none.status_code == 409 and "has no decision yet" in none.text
+        both = client.post("/decide/confirm", data={"actor": "R. Reviewer"})
+        assert both.status_code == 409 and "has no decision yet" in both.text
+
+
+def test_noael_unit_is_per_day_on_decide_and_draft() -> None:
+    with TestClient(create_app()) as client:
+        client.cookies.set(COOKIE, "en")
+        _filled(client)
+        one = client.post("/decide/confirm", data={"actor": "R. Reviewer", "sex": "F"}).text
+        assert "NOAEL, Females: 20 mg/kg/day" in one
