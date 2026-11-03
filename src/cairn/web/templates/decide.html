@@ -6,7 +6,6 @@
 <div class="col-left">
 <form method="post" action="/decide/example"><input type="hidden" name="thread" value="{{ thread }}"><button type="submit">{{ t.s4_example }}</button></form>
 <div id="recompute">{% include "decide_result.html" %}</div>
-{{ a.in_production(t.s4_prod, label=t.exp_prod_label) }}
 </div>
 <div class="col-right card">
 <form hx-post="/decide/set" hx-trigger="change" hx-target="#recompute">
@@ -16,5 +15,6 @@
 </form>
 </div>
 {{ a.screen_nav(3, screens) }}
+{% call a.inside([[t.step_3, "-", t.s4_prod]]) %}{% endcall %}
 </section>
 {% endblock %}

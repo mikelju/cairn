@@ -226,7 +226,7 @@ def test_shared_components_exist_and_replace_anatomy() -> None:
         "evidence_panel",
         "callout",
         "disclosure",
-        "in_production",
+        "inside",
     ):
         assert re.search(rf"\{{% macro {macro}\(", text), macro
     for name, pattern in LEAKS.items():
@@ -311,9 +311,8 @@ def test_badge_recorded_keeps_its_metadata_and_simulated_its_production_line(
     assert str(recorded["date"]) in meta.group(1) and str(recorded["region"]) in meta.group(1)
     assert "opus-4-6" in meta.group(1)
     assert re.search(r"\| \d+\.\d s \|", meta.group(1)) and "USD" in meta.group(1)
-    prod = re.search(r'<p class="prod">(.*?)</p>', study, flags=re.S)
-    assert prod is not None
-    assert 'class="badge simulated"' in prod.group(1) and "In production" in prod.group(1)
+    panel = re.search(r'<details class="inside">.*?</details>', study, flags=re.S)
+    assert panel is not None and "In production" in panel.group(0)
 
 
 # --- Contrast and focus (C7) ---

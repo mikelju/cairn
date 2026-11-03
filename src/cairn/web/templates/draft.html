@@ -18,7 +18,10 @@
 <button type="submit" name="actor" value="A. Author">{{ t.s5_approve_as }} A. Author</button>
 <button type="submit" name="actor" value="R. Reviewer">{{ t.s5_approve_as }} R. Reviewer</button></form>
 {% endif %}
-{% call a.disclosure("checks", 3, "items") %}
+{% endif %}
+{{ a.screen_nav(4, screens) }}
+{% call a.inside([[t.step_4, "-", t.s5_prod], [t.s6_chain_h, "-", t.s6_prod]] + (production|list if production is defined else [])) %}
+{% if not undecided %}
 <h2>{{ t.s5_judge_h }}</h2>
 {{ a.badge_meta("RECORDED", meta) }}
 <p class="meta">{{ a.badge("RECORDED") }} {{ judge_meta }}</p>
@@ -51,10 +54,7 @@
 {% if same %}{% call a.callout("rules") %}<p>{{ t.s7_same }}</p>{% endcall %}
 {% else %}{% call a.callout("blocked") %}<p>{{ t.s7_differ }}</p>{% endcall %}{% endif %}
 <p>{% for text, href in links %}<a href="{{ href }}">{{ text }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</p>
-{% call a.disclosure("production", production|length, "rows") %}{{ a.data_table([t.s7_th_piece, t.s7_th_demo, t.s7_th_prod], production) }}{% endcall %}
-{% endcall %}
-{{ a.in_production(t.s5_prod, label=t.exp_prod_label) }}
 {% endif %}
-{{ a.screen_nav(4, screens) }}
+{% endcall %}
 </section>
 {% endblock %}

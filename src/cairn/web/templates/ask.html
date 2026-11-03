@@ -33,20 +33,15 @@
 {% endif %}
 {% call a.disclosure("guides", r.quotes|length, "quotes") %}
 <div class="guides">
-{% set headers = [t.s3_th_guideline, t.s3_th_section, t.s3_th_page, "Lex", "Sem", "Fused"] %}
 {% for q in r.queries %}
 <div class="guide-col">
 <h2>{{ t["s3_q_" ~ q.id] }}</h2>
 {% for x in q.quotes %}{{ quote(x) }}{% endfor %}
-{% call a.disclosure("ranking", q.rows|length + q.folded|length, "rows") %}
-{{ a.data_table(headers, q.rows) }}
-{% if q.folded %}{% call a.disclosure("lower_ranks", q.folded|length, "rows") %}{{ a.data_table(headers, q.folded) }}{% endcall %}{% endif %}
-{% endcall %}
 </div>
 {% endfor %}
 </div>
-{{ a.in_production(t.exp_prod, label=t.exp_prod_label) }}
 {% endcall %}
 {{ a.screen_nav(2, screens) }}
+{% call a.inside([[t.step_2, "-", t.exp_prod]]) %}<div id="inside-trace"></div>{% endcall %}
 </section>
 {% endblock %}

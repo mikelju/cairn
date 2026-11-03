@@ -47,8 +47,7 @@ def _english(client: TestClient) -> TestClient:
 def test_step1_run_shows_quarantine_and_computed_means() -> None:
     with TestClient(create_app()) as client:
         _english(client)
-        assert "In production" in client.get("/study").text
-        assert 'class="badge simulated"' in client.get("/study").text
+        assert "job runner: in process." in _inside(client.get("/study").text)
         result = client.post("/study/run").text
     assert 'class="num">12<' in result and "quarantined" in result
     assert result.count("pp_auc_positive") == 12
@@ -91,11 +90,22 @@ def test_templates_hold_no_literal_means() -> None:
         assert not pattern.search(template.read_text(encoding="utf-8")), template.name
 
 
+def _inside(page: str) -> str:
+    """The folded Inside panel of a screen."""
+    panel = re.search(r'<details class="inside">.*?</details>', page, re.S)
+    assert panel, "no Inside panel"
+    return panel.group(0)
+
+
 def test_footer_uses_baked_commit(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CAIRN_COMMIT", "abc1234")
     with TestClient(create_app()) as client:
-        page = client.get("/").text
-    assert "commit abc1234" in page
+        landing = client.get("/").text
+        screen = client.get("/study").text
+    assert "commit abc1234" in landing
+    assert "commit abc1234" in _inside(screen) and "commit abc1234" not in screen.replace(
+        _inside(screen), ""
+    )
 
 
 FIXTURES = Path(__file__).parent / "fixtures" / "recordings"
@@ -114,7 +124,7 @@ def test_step2_page_lists_the_questions_with_the_recorded_badge() -> None:
     with TestClient(create_app()) as client:
         page = _english(client).get("/ask").text
     assert 'class="badge recorded"' in page
-    assert "In production" in page
+    assert "In production" in _inside(page)
     assert 'value="Q2"' in page and 'value="Q6"' in page
 
 
@@ -313,7 +323,7 @@ def test_explore_page_has_a_button_for_every_question() -> None:
     for question_id in QUESTIONS:
         assert f'"question": "{question_id}"' in page
     assert len(QUESTIONS) == 11
-    assert "In production" in page and 'class="badge recorded"' in page
+    assert "live model calls." in _inside(page) and 'class="badge recorded"' in page
 
 
 @pytest.mark.parametrize("question", ["Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8"])
@@ -337,19 +347,16 @@ def test_explore_rejects_an_unknown_question() -> None:
         assert client.post("/explore/run", data={"question": "Q99"}).status_code == 422
 
 
-def test_step3_shows_the_two_fixed_queries_with_ranks_and_the_build_badge() -> None:
+def test_step3_shows_the_two_fixed_queries_without_the_passage_ranking() -> None:
     from cairn import retrieval
 
     with TestClient(create_app()) as client:
         page = client.get("/ask?lang=en").text
     fixed = [q for q in retrieval.load_fixed_queries() if q["used_by"] == "nonclinical-summary"]
     assert len(fixed) == 2
-    for query in fixed:
-        top = retrieval.cached_guidance(query["query"]).hits[0]
-        assert f"<td>{top.fused_rank}</td>" in page
-    assert page.count("<tr>") >= 2 * (1 + 3)  # a header row and three passages per query
-    assert "Show lower ranks" in page and "In production" in page
-    assert "<th>Lex</th>" in page and "<th>Sem</th>" in page and "<th>Fused</th>" in page
+    assert page.count('class="guide-col"') == 2
+    for word in ("Show passage ranking", "Show lower ranks", "<th>Lex</th>", "<th>Fused</th>"):
+        assert word not in page
 
 
 def test_step3_counts_quotes_verbatim_on_the_cited_page() -> None:
@@ -635,10 +642,12 @@ def test_draft_shows_rules_chain_status_and_the_production_note() -> None:
         assert (
             'class="badge recorded"' in page and "passed" in page and "<td>fired</td>" not in page
         )
-        assert "Verified." in page and "chained entries" in page
+        assert "Verified." in _inside(page) and "chained entries" in _inside(page)
         assert "8/8" in page and "rules passed" in page
-        assert "not a validated or external log" in page
-        assert "In production" in page and "an editor with tracked changes" in page
+        assert "not a validated or external log" in _inside(page)
+        inside = _inside(page)
+        assert "In production" in inside and "an editor with tracked changes" in inside
+        assert "an external append-only log" in inside
 
 
 def test_draft_closes_the_session_with_one_tool_over_mcp_and_rest() -> None:
@@ -655,8 +664,8 @@ def test_draft_closes_the_session_with_one_tool_over_mcp_and_rest() -> None:
             and "R. Reviewer" in page
             and "8 of 8 passed" in page
         )
-        assert "Show production table" in page
-        hashes = re.findall(r"<td>(?:MCP|REST)</td><td>([0-9a-f]{16})</td>", page)
+        assert "Show production table" not in page and "In production" in _inside(page)
+        hashes = re.findall(r"<td>(?:MCP|REST)</td><td>([0-9a-f]{16})</td>", _inside(page))
         assert len(hashes) == 2 and hashes[0] == hashes[1]
         assert client.get("/docs").status_code == 200
         assert client.get("/mcp").status_code < 500

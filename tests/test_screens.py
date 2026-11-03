@@ -1,4 +1,4 @@
-"""C2-C6 of change 004: four screens, one menu, old routes redirect, nothing is lost on the way."""
+"""C2-C6 and C13 of change 004: four screens, one menu, redirects, a folded Inside panel."""
 
 import re
 from collections.abc import Iterator
@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from cairn.app import create_app
+from screens import rendered_state
 
 SCREENS = ("/study", "/ask", "/decide", "/draft")
 MENU = {
@@ -162,3 +163,81 @@ def test_c6_one_current_page_per_screen(client: TestClient, lang: str) -> None:
         current = [href for href, _, cur in _menu(html) if cur]
         assert current == [path]
     assert 'aria-current="page"' not in client.get("/", params={"lang": lang}).text
+
+
+# C13: technical detail is folded into one closed Inside panel per screen.
+INSIDE_STATES = {
+    "/study": "study_after",
+    "/ask": "ask_q2",
+    "/decide": "decide_filled",
+    "/draft": "draft_approved",
+}
+# Catalogue keys of the detail that lives only inside the panel, per state.
+INSIDE_ONLY = {
+    "study_after": ("inside_prod_h", "s1_prod_lead", "s1_prod"),
+    "ask_q2": ("inside_prod_h", "exp_prod", "exp_trace", "exp_en_rec"),
+    "decide_filled": ("inside_prod_h", "s4_prod"),
+    "draft_approved": (
+        "inside_prod_h",
+        "s5_prod",
+        "s6_prod",
+        "s6_chain_note",
+        "s5_judge_h",
+        "s6_chain_h",
+        "s7_doors_h",
+        "s7_same",
+        "s7_th_hash",
+        "footer_build",
+    ),
+}
+REMOVED_KEYS = (
+    "disc_ranking",
+    "disc_lower_ranks",
+    "disc_trace",
+    "disc_checks",
+    "disc_production",
+    "unit_calls",
+    "exp_prod_label",
+    "s_path_label",
+    "s3_th_guideline",
+    "s3_th_section",
+    "s3_th_page",
+    "s3_prod",
+    *(f"s{n}_path_{i}" for n in (1, 2, 3, 4) for i in (1, 2, 3)),
+    *(f"exp_path_{i}" for i in (1, 2, 3, 4)),
+)
+INSIDE = re.compile(r'<details class="inside">.*?</details>', re.S)
+
+
+@pytest.mark.parametrize("lang", ["es", "en"])
+@pytest.mark.parametrize("screen", SCREENS)
+def test_c13_one_closed_inside_panel_holds_the_technical_detail(screen: str, lang: str) -> None:
+    from cairn.web.i18n import CATALOGUES
+
+    state = INSIDE_STATES[screen]
+    html = rendered_state(state, lang)
+    t = CATALOGUES[lang]
+    assert html.count('<details class="inside"') == 1
+    assert '<details class="inside">' in html and '<details class="inside" open' not in html
+    panel = INSIDE.search(html)
+    assert panel and t["inside"] in panel.group(0).split("</summary>")[0]
+    outside = html.replace(panel.group(0), "")
+    for key in INSIDE_ONLY[state]:
+        marker = t[key].split("{")[0]
+        assert marker in panel.group(0), f"{state}: {marker!r} is not inside the panel"
+        assert marker not in outside, f"{state}: {marker!r} leaks into main copy"
+    for word in ("Lex", "Sem", "Fused"):
+        assert f"<th>{word}</th>" not in html
+
+
+def test_c13_removed_keys_are_gone_from_templates_and_catalogues() -> None:
+    from pathlib import Path
+
+    from cairn.web import i18n
+
+    web = Path(i18n.__file__).parent
+    sources = "\n".join(p.read_text(encoding="utf-8") for p in (web / "templates").glob("*.html"))
+    sources += (web / "i18n.py").read_text(encoding="utf-8")
+    for key in REMOVED_KEYS:
+        assert f'"{key}"' not in sources and f"t.{key}" not in sources, key
+        assert all(key not in c for c in i18n.CATALOGUES.values()), key

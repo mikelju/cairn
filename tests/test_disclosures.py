@@ -49,8 +49,10 @@ def test_every_rendered_summary_is_a_pill_that_names_content_and_size(
     seen = 0
     for name, html in pages.items():
         for attrs, text in SUMMARY.findall(html):
-            seen += 1
             label = re.sub(r"<[^>]+>", "", text).strip()
+            if not attrs and label == CATALOGUES[lang]["inside"]:
+                continue  # the one Inside panel per screen has its own plain summary (C13)
+            seen += 1
             assert 'class="pill"' in attrs, (lang, name, label)
             match = re.fullmatch(r"(\S+) (.+?) · (\d+) (\S+)", label)
             assert match, (lang, name, label)
@@ -70,7 +72,7 @@ def test_the_disclosure_labels_come_from_the_active_catalogue(
     lang: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     html = _pages(lang, monkeypatch)["/ask"]
-    assert CATALOGUES[lang]["disc_lower_ranks"] in html
+    assert CATALOGUES[lang]["inside"] in html
     assert CATALOGUES[lang]["disc_guides"] in html
 
 

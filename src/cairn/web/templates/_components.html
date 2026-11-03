@@ -22,10 +22,12 @@
 </header>
 {% endmacro %}
 
-{% macro shell_footer(footer, t) %}
+{% macro build_line(footer, t) %}v{{ footer.version }} · {{ t.footer_build }} {{ footer.commit }} · {{ t.footer_snapshot }} {{ footer.snapshot[:12] }}{% endmacro %}
+
+{% macro shell_footer(footer, t, current) %}
 <footer>
   <span>{{ t.footer_note }}</span>
-  <span>v{{ footer.version }} · {{ t.footer_build }} {{ footer.commit }} · {{ t.footer_snapshot }} {{ footer.snapshot[:12] }}</span>
+  {% if not current %}<span>{{ build_line(footer, t) }}</span>{% endif %}
 </footer>
 {% endmacro %}
 
@@ -99,6 +101,21 @@
 {# How the answer is shaped, explained in one line; kind: table, text, refusal or quotes. #}
 {% macro format_line(kind, n=none) %}<p class="format-line {{ kind }}">{% if n %}{{ cue(n) }}{% endif %}<span><b>{{ t["fmt_" ~ kind ~ "_h"] }}</b> {{ t["fmt_" ~ kind] }}</span></p>{% endmacro %}
 
-{% macro in_production(text, kind=none, lead=none, label="In production →") %}
-<p class="prod">{% if kind %}{{ badge(kind) }} {{ lead }} <strong>{{ label }}</strong>{% else %}{{ label }}{% endif %} {{ text }}</p>
+{# The one folded panel at the foot of a screen: technical detail in the caller, then the In production table (rows of piece, demo, production), then version and commit. #}
+{% macro inside(prod) %}
+<details class="inside"><summary>{{ t.inside }}</summary>
+<div class="inside-body">
+{{ caller() }}
+<h2>{{ t.inside_prod_h }}</h2>
+{{ data_table([t.s7_th_piece, t.s7_th_demo, t.s7_th_prod], prod) }}
+<p class="meta">{{ build_line(footer, t) }}</p>
+</div></details>
 {% endmacro %}
+
+{# The trace of the last answer, swapped out of band into the Inside panel of the Ask screen. #}
+{% macro inside_trace(r) %}<div id="inside-trace" hx-swap-oob="true">
+{{ badge_meta(r.badge, r.meta) }}
+<p class="lang-tag">{{ t.exp_en_rec if r.badge == "RECORDED" else t.exp_en_live }}</p>
+{{ trace(r.trace, t.exp_trace) }}
+{% call callout("rules") %}<p>{{ t.exp_rules }} {{ r.rules or t.exp_none }}</p>{% endcall %}
+</div>{% endmacro %}

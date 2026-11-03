@@ -65,8 +65,20 @@ def assert_expected_page(name: str, html: str) -> None:
         assert marker and marker not in text, f"{name} renders {marker!r}"
 
 
+OOB_TRACE = '<div id="inside-trace" hx-swap-oob="true">'
+
+
 def with_result(page: str, fragment: str, target: str = "result") -> str:
-    """The GET page with the POST fragment inside its target element, as HTMX places it."""
+    """The GET page with the POST fragment inside its target element, as HTMX places it.
+
+    An out-of-band trace block goes where HTMX puts it: into the Inside panel's empty slot.
+    """
+    if OOB_TRACE in fragment:
+        fragment, rest = fragment.split(OOB_TRACE)
+        trace = rest[: rest.rindex("</div>")]
+        slot = '<div id="inside-trace"></div>'
+        assert page.count(slot) == 1, "no empty #inside-trace slot in the page"
+        page = page.replace(slot, f'<div id="inside-trace">{trace}</div>')
     empty = re.compile(rf'(<div [^>]*id="{target}"[^>]*>)</div>')
     placed, count = empty.subn(lambda m: f"{m.group(1)}{fragment}</div>", page)
     assert count == 1, f"no empty #{target} element to place the fragment in"

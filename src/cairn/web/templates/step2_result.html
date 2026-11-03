@@ -18,13 +18,8 @@
 {% endif %}
 <div class="detail">
 {% if r.written %}{% call a.disclosure("model_text", r.written.split()|length, "words") %}<p>{{ r.written }}</p>{% endcall %}{% endif %}
-{% macro trace_body() %}{{ a.badge_meta(r.badge, r.meta) }}
-<p class="lang-tag">{{ t.exp_en_rec if r.badge == "RECORDED" else t.exp_en_live }}</p>
-{{ a.trace(r.trace, t.exp_trace) }}
-{% call a.callout("rules") %}<p>{{ t.exp_rules }} {{ r.rules or t.exp_none }}</p>{% endcall %}
 {% if r.rows %}<p>{{ r.rule }}</p>{% endif %}
-{{ a.evidence_panel(r.evidence) }}{% endmacro %}
-{% if r.calls %}{% call a.disclosure("trace", r.calls, "calls") %}{{ trace_body() }}{% endcall %}{% else %}{{ trace_body() }}{% endif %}
+{{ a.evidence_panel(r.evidence) }}
 </div>
 </div>
 {% if r.rows or r.quotes %}
@@ -39,4 +34,5 @@
 {% endif %}
 </div>
 {% endif %}
+{{ a.inside_trace(r) }}
 {% endif %}

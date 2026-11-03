@@ -3,11 +3,9 @@
 {% call a.callout("stale") %}<p>{{ stale }}</p>{% endcall %}
 {% else %}
 <article class="answer-panel">
-{{ a.badge_meta(r.badge, r.meta) }}
 {{ a.format_line(r.kind, 2) }}
 {% if r.text %}
 <div class="card answer">
-<p class="lang-tag">{{ t.exp_en_rec if r.badge == "RECORDED" else t.exp_en_live }}</p>
 <p class="prose"><strong>{{ r.text }}</strong></p>
 {% for q in r.quotes %}
 <blockquote class="quote"><p>{{ q.text }}</p><p class="meta">{{ q.citation }}{% if q.highlight %} · <a href="{{ q.highlight }}">{{ t.exp_hl }}</a>{% endif %} · <a href="{{ q.link }}">{{ t.exp_official }}</a></p></blockquote>
@@ -28,11 +26,8 @@
 {{ a.data_table([t.exp_th_sex, t.exp_th_tissue, t.exp_th_finding] + r.doses, screen.rows) }}
 {% endcall %}{% endif %}
 {% if r.written %}{% call a.disclosure("model_text", r.written.split()|length, "words") %}<p>{{ r.written }}</p>{% endcall %}{% endif %}
-{% if r.calls %}{% call a.disclosure("trace", r.calls, "calls") %}
-{{ a.trace(r.trace, t.exp_trace) }}
-{% call a.callout("rules") %}<p>{{ t.exp_rules }} {{ r.rules or t.exp_none }}</p>{% endcall %}
-{% endcall %}{% else %}{% call a.callout("rules") %}<p>{{ t.exp_rules }} {{ r.rules or t.exp_none }}</p>{% endcall %}{% endif %}
 {{ a.evidence_panel(r.evidence) }}
 </div>
 </article>
+{{ a.inside_trace(r) }}
 {% endif %}

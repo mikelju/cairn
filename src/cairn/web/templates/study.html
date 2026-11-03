@@ -11,7 +11,7 @@
 </form>
 
 <div id="result" class="result"></div>
-{{ a.in_production(t.s1_prod, "SIMULATED", t.s1_prod_lead, t.exp_prod_label) }}
 {{ a.screen_nav(1, screens) }}
+{% call a.inside([[t.step_1, t.s1_prod_lead, t.s1_prod]]) %}{% endcall %}
 </section>
 {% endblock %}
