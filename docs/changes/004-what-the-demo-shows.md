@@ -78,7 +78,9 @@ Supervisor, 2026-11-03, on the Jefe's question about the answer unit: C14 as fro
 | E17 | ejecutor (sonnet) | I4 screen 2 (C7, C12, cap 60 on `/ask`) | failed | Context; WIP 99cb081 (src only, never run): one POST `/ask/run` for Q1-Q8, G1-G3, NS1-NS2; `/explore/run` and old partials removed; 4 questions visible, 9 in a closed disclosure (accepted: 13 buttons do not fit 60 words) |
 | E18 | ejecutor (sonnet) | I4b: app boots, answer-unit counter, screens states, word cap, offline check | done | Commit 39dfbc1; all ask ids 200, unknown 422; `/ask` 57-59 words; 89 passed, ruff and mypy green |
 | E19 | ejecutor (sonnet) | I4c: migrate remaining suites to the single `/ask/run`, C7 tests | done | Commit ad10e20; C7 tests; 261 passed before deleting one broken contract test, then 79 passed on the two touched files; Q6 tests now assert the decline text, not the rules fired (to restore inside the Inside panel in E20) |
-| E20 | ejecutor (sonnet) | I5a: provenance tags and legend on `/ask` answers (C8, C10), Q6 rule assertion, dead code | in progress | |
+| E20 | ejecutor (sonnet) | I5a: provenance tags and legend on `/ask` answers (C8, C10), Q6 rule assertion, dead code | failed | Context; only CSS landed (4ec0281, c18232a); design findings kept for the next briefs |
+| E21 | ejecutor (sonnet) | I5b: Python provenance builder over `render_parts` and its unit tests | done | Commit 6dca771: `provenance_parts(sentence, ledger, decisions)` returns TextPart, DataTag, QuoteTag, DecisionTag; joined text equals `render_sentence`; 21 passed, ruff and mypy green |
+| E22 | ejecutor (sonnet) | I5c: provenance macro, legend and wiring on `/ask` answers, Q6 rule test, dead code | in progress | |
 
 ## User decisions
 | ID | Question | Options and recommendation | Status | User's answer |
