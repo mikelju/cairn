@@ -18,7 +18,6 @@
 {% endif %}
 <div class="detail">
 {% if r.written %}{% call a.disclosure("model_text", r.written.split()|length, "words") %}<p>{{ r.written }}</p>{% endcall %}{% endif %}
-{% if r.rows %}<p>{{ r.rule }}</p>{% endif %}
 {{ a.evidence_panel(r.evidence) }}
 </div>
 </div>

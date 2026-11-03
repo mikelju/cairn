@@ -175,7 +175,7 @@ INSIDE_STATES = {
 # Catalogue keys of the detail that lives only inside the panel, per state.
 INSIDE_ONLY = {
     "study_after": ("inside_prod_h", "s1_prod_lead", "s1_prod"),
-    "ask_q2": ("inside_prod_h", "exp_prod", "exp_trace", "exp_en_rec"),
+    "ask_q2": ("inside_prod_h", "exp_prod", "exp_trace", "exp_en_live"),
     "decide_filled": ("inside_prod_h", "s4_prod"),
     "draft_approved": (
         "inside_prod_h",

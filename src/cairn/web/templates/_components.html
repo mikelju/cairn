@@ -117,5 +117,6 @@
 {{ badge_meta(r.badge, r.meta) }}
 <p class="lang-tag">{{ t.exp_en_rec if r.badge == "RECORDED" else t.exp_en_live }}</p>
 {{ trace(r.trace, t.exp_trace) }}
+{% if r.rows %}<p>{{ r.rule }}</p>{% endif %}
 {% call callout("rules") %}<p>{{ t.exp_rules }} {{ r.rules or t.exp_none }}</p>{% endcall %}
 </div>{% endmacro %}

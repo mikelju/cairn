@@ -20,7 +20,6 @@
 {% endif %}
 <div class="detail">
 {% if r.rows %}{% call a.disclosure("table", r.rows|length, "rows") %}
-<p class="meta">{{ r.rule }}</p>
 {% set screen = namespace(rows=[]) %}
 {% for row in r.rows %}{% set screen.rows = screen.rows + [[row.sex, row.tissue, row.finding] + row.cells] %}{% endfor %}
 {{ a.data_table([t.exp_th_sex, t.exp_th_tissue, t.exp_th_finding] + r.doses, screen.rows) }}
