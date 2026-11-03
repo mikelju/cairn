@@ -25,7 +25,8 @@ from cairn.recording import RECORDINGS_DIR, ReplayClient, recorded_model, total_
 from cairn.render import render
 from cairn.verify import RULE_REASONS
 from cairn.web import _page as page
-from cairn.web import i18n
+from cairn.web import i18n, provenance
+from cairn.web.provenance import DecisionInfo, stray_digits, tag_counts
 from cairn.web.threads import (
     AUTHOR,
     REVIEWER,
@@ -42,7 +43,14 @@ from cairn.web.threads import (
     start,
     verify_audit,
 )
-from cairn.workflow import build_ledger, draft_key, sections_of, shown_facts, verify_final
+from cairn.workflow import (
+    build_ledger,
+    draft_key,
+    final_ledger,
+    sections_of,
+    shown_facts,
+    verify_final,
+)
 
 people = APIRouter()
 EMPTY_SLOT = re.compile(r"\[((?:D\d+|NOAEL-[FM]): no decision yet)\]")
@@ -100,6 +108,36 @@ async def _draft(request: Request, thread: str) -> Markup:
     apply_decisions(ledger, decisions, frozenset(state.get("confirmed", [])))
     text = str(escape(render(sections_of(state), ledger)))
     return Markup(EMPTY_SLOT.sub(r'<span class="slot">\1</span>', text))
+
+
+ROLE_KEYS: dict[str, str] = {AUTHOR: "role_author", REVIEWER: "role_reviewer"}
+
+
+def _decision_info(state: Any, t: dict[str, str]) -> dict[str, DecisionInfo]:
+    """Who decided each slot: the author for a recorded decision, the reviewer for a NOAEL."""
+
+    def info(who: str) -> DecisionInfo:
+        return DecisionInfo(who, t[ROLE_KEYS[who]])
+
+    found = {d["dec_id"]: info(d["actor"]) for d in state.get("decisions", [])}
+    return {**found, "NOAEL-F": info(REVIEWER), "NOAEL-M": info(REVIEWER)}
+
+
+def _body(state: Any, t: dict[str, str]) -> dict[str, Any]:
+    """The final draft as tagged parts, the legend kinds used and the counts line."""
+    parts = provenance.draft_parts(
+        sections_of(state), final_ledger(state), _decision_info(state, t)
+    )
+    counts = tag_counts(parts)
+    kinds = [k for k in ("data", "quote", "decision") if counts[k]]
+    line = t["draft_counts"].format(
+        numbers=counts["data"],
+        ai=len(stray_digits(parts)),
+        decisions=counts["decision"],
+        quotes=counts["quote"],
+    )
+    words = len("".join(p.text for p in parts).split())
+    return {"parts": parts, "kinds": kinds, "counts_line": line, "words": words}
 
 
 def _incidence(state: Any, sex: str) -> list[tuple[float, int, int]]:
@@ -181,23 +219,53 @@ def _label(dose: float | None, t: dict[str, str]) -> str:
 
 @people.get("/decide", response_class=HTMLResponse)
 async def decide(request: Request, thread: str | None = None) -> Response:
-    thread = await _session_thread(request, thread)
+    return await _decide_page(request, await _session_thread(request, thread))
+
+
+async def _decide_page(
+    request: Request, thread: str, error: str = "", status: int = 200
+) -> Response:
     state, _, view = await load_view(request, thread)
     context = _decide_context(state, view, i18n.context(request)["t"])
-    response = page(request, "decide.html", current=3, actor=AUTHOR, **context)
+    response = page(request, "decide.html", current=3, actor=AUTHOR, error=error, **context)
+    response.status_code = status
     return _remember(response, thread)
+
+
+REFUSALS = {
+    "unknown sex": "decide_err_sex",
+    "choose both related and adverse": "decide_err_both",
+    "adverse cannot be below treatment-related": "decide_err_order",
+    "adverse needs a treatment-related dose": "decide_err_need",
+    "dose not in the study": "decide_err_dose",
+}
 
 
 @people.post("/decide/choose")
 async def decide_choose(
     request: Request,
-    sex: Annotated[str, Form()],
+    sex: Annotated[str, Form()] = "",
     adverse: Annotated[str, Form()] = "",
     related: Annotated[str, Form()] = "",
     thread: Annotated[str | None, Form()] = None,
-) -> RedirectResponse:
-    """Record the visitor's two choices for one sex, as posted; the examples fill the others."""
+) -> Response:
+    """Record the visitor's two choices for one sex; a refusal is a one-line message, not JSON."""
     thread = await _session_thread(request, thread)
+    try:
+        return await _choose(request, thread, sex, adverse, related)
+    except HTTPException as refusal:
+        if refusal.status_code != 422:
+            raise
+        t = i18n.context(request)["t"]
+        raw = str(refusal.detail)
+        key = "decide_err_dose" if raw.startswith("bad dose") else REFUSALS.get(raw, "")
+        detail = t.get(key, raw)
+        return await _decide_page(request, thread, t["decide_error"].format(detail=detail), 422)
+
+
+async def _choose(
+    request: Request, thread: str, sex: str, adverse: str, related: str
+) -> RedirectResponse:
     _, _, view = await load_view(request, thread)
     if sex not in ("F", "M"):
         raise HTTPException(status_code=422, detail="unknown sex")
@@ -380,7 +448,7 @@ async def _draft_page(request: Request, thread: str, actor: str, error: str = ""
         thread=thread,
         undecided=False,
         error=error,
-        text=view["final"]["text"],
+        body=_body(state, t),
         approved_by=view["approved_by"],
         meta=(
             f"{recording['date']} | {recording['region']} | {recording['model']} | "

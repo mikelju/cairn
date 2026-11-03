@@ -240,3 +240,36 @@ def provenance_parts(
 def joined(parts: list[Part]) -> str:
     """The plain text of the parts."""
     return "".join(p.text for p in parts)
+
+
+# Digits that may stay in the text once every tag is removed: fixed headings written in code.
+FIXED_DIGIT_WORDS: tuple[str, ...] = ()
+
+
+def draft_parts(
+    sentences: list[Sentence],
+    ledger: ObservationLedger,
+    decisions: Mapping[str, DecisionInfo] | None = None,
+) -> list[Part]:
+    """The draft body as parts: every sentence tagged, one space between sentences."""
+    parts: list[Part] = []
+    for index, sentence in enumerate(sentences):
+        if index:
+            parts.append(TextPart(" "))
+        parts.extend(provenance_parts(sentence, ledger, decisions))
+    return parts
+
+
+def stray_digits(parts: list[Part]) -> str:
+    """The digits left in the plain text once every tag and the fixed words are removed."""
+    text = "".join(p.text for p in parts if isinstance(p, TextPart))
+    for word in FIXED_DIGIT_WORDS:
+        text = text.replace(word, "")
+    return "".join(c for c in text if c.isdigit())
+
+
+def tag_counts(parts: list[Part]) -> dict[str, int]:
+    """How many tags of each kind: data, quote and decision."""
+    return {
+        k: sum(getattr(p, "kind", "") == k for p in parts) for k in ("data", "quote", "decision")
+    }

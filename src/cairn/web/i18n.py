@@ -159,6 +159,18 @@ EN: dict[str, str] = {
     "prov_page": "Page",
     "prov_who": "Decided by",
     "prov_role": "Role",
+    "role_author": "Author",
+    "role_reviewer": "Reviewer",
+    "draft_counts": (
+        "{numbers} numbers placed by code, {ai} by the AI, "
+        "{decisions} decisions by people, {quotes} quotations with page"
+    ),
+    "decide_error": "That choice could not be saved: {detail}.",
+    "decide_err_sex": "the sex is not one of the study",
+    "decide_err_both": "choose both the treatment-related and the adverse dose",
+    "decide_err_order": "the adverse dose cannot be below the treatment-related one",
+    "decide_err_need": "an adverse dose needs a treatment-related dose",
+    "decide_err_dose": "that dose is not in the study",
     "prov_value": "Value",
     "prov_decide": "See the decision",
     "disc_source_rows": "Show source rows",
@@ -430,6 +442,18 @@ ES: dict[str, str] = {
     "prov_page": "Página",
     "prov_who": "Decidido por",
     "prov_role": "Rol",
+    "role_author": "Autor",
+    "role_reviewer": "Revisor",
+    "draft_counts": (
+        "{numbers} números puestos por código, {ai} por la IA, "
+        "{decisions} decisiones de personas, {quotes} citas con página"
+    ),
+    "decide_error": "No se pudo guardar esa elección: {detail}.",
+    "decide_err_sex": "el sexo no es uno de los del estudio",
+    "decide_err_both": "elige la dosis relacionada con el tratamiento y la adversa",
+    "decide_err_order": "la dosis adversa no puede ser menor que la relacionada con el tratamiento",
+    "decide_err_need": "una dosis adversa necesita una dosis relacionada con el tratamiento",
+    "decide_err_dose": "esa dosis no está en el estudio",
     "prov_value": "Valor",
     "prov_decide": "Ver la decisión",
     "disc_source_rows": "Ver filas de origen",

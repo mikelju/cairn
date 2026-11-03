@@ -9,7 +9,8 @@
 {% call a.disclosure("final_text", text.split()|length, "words") %}<div class="card answer"><p>{{ text }}</p></div>{% endcall %}
 {% else %}
 <div class="detail">
-{% call a.disclosure("final_text", text.split()|length, "words") %}<div class="card answer"><p>{{ text }}</p></div>{% endcall %}
+{% call a.disclosure("final_text", body.words, "words") %}<div class="card answer"><p>{{ a.prov(body.parts) }}</p>{{ a.prov_legend(body.kinds) }}</div>{% endcall %}
+<p class="meta prov-counts">{{ body.counts_line }}</p>
 </div>
 {% if error %}{% call a.callout("blocked") %}<p>{{ error }}</p>{% endcall %}{% endif %}
 {% if approved_by %}{% call a.callout("rules") %}<p>{{ t.s5_approved }} {{ approved_by }}.</p>{% endcall %}

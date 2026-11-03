@@ -3,6 +3,7 @@
 {% block main %}
 <section class="step decide">
 {{ a.screen_head(3, t.step_3, "", t.s4_lede) }}
+{% if error %}{% call a.callout("blocked") %}<p>{{ error }}</p>{% endcall %}{% endif %}
 <div class="decide-grid">
 <div class="card">
 <h2>{{ t.find_gland_adrenal_vacuolization }}</h2>
