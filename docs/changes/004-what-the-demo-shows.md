@@ -80,7 +80,8 @@ Supervisor, 2026-11-03, on the Jefe's question about the answer unit: C14 as fro
 | E19 | ejecutor (sonnet) | I4c: migrate remaining suites to the single `/ask/run`, C7 tests | done | Commit ad10e20; C7 tests; 261 passed before deleting one broken contract test, then 79 passed on the two touched files; Q6 tests now assert the decline text, not the rules fired (to restore inside the Inside panel in E20) |
 | E20 | ejecutor (sonnet) | I5a: provenance tags and legend on `/ask` answers (C8, C10), Q6 rule assertion, dead code | failed | Context; only CSS landed (4ec0281, c18232a); design findings kept for the next briefs |
 | E21 | ejecutor (sonnet) | I5b: Python provenance builder over `render_parts` and its unit tests | done | Commit 6dca771: `provenance_parts(sentence, ledger, decisions)` returns TextPart, DataTag, QuoteTag, DecisionTag; joined text equals `render_sentence`; 21 passed, ruff and mypy green |
-| E22 | ejecutor (sonnet) | I5c: provenance macro, legend and wiring on `/ask` answers, Q6 rule test, dead code | in progress | |
+| E22 | ejecutor (sonnet) | I5c: provenance macro, legend and wiring on `/ask` answers, Q6 rule test, dead code | done | Commit 73fda4f: macro `prov(parts)` in `_components.html`, legend of used kinds, badges out of `/ask` main copy, Q6 rules asserted inside the panel; `/ask` 49-54 words; 292 passed, ruff and mypy green; `/draft` part of I5 goes with I7 |
+| E23 | ejecutor (sonnet) | I6 screen 3 decide (C11, C12, cap 60 on `/decide`) | in progress | |
 
 ## User decisions
 | ID | Question | Options and recommendation | Status | User's answer |
