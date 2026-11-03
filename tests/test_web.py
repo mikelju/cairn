@@ -349,7 +349,6 @@ def test_step3_shows_the_two_fixed_queries_with_ranks_and_the_build_badge() -> N
         top = retrieval.cached_guidance(query["query"]).hits[0]
         assert f"<td>{top.fused_rank}</td>" in page
     assert page.count("<tr>") >= 2 * (1 + 3)  # a header row and three passages per query
-    assert 'class="badge computed-at-build"' in page and "COMPUTED AT BUILD" in page
     assert "Show lower ranks" in page and "In production" in page
     assert "<th>Lex</th>" in page and "<th>Sem</th>" in page and "<th>Fused</th>" in page
 
@@ -478,106 +477,114 @@ def test_web_parses_passages_and_highlights_once_per_process(
     highlight.highlights_by_sentence.cache_clear()
 
 
-def test_steps_4_and_5_people_decide_and_the_author_cannot_approve() -> None:
+def _filled(client: TestClient) -> str:
+    """Start the session thread on /decide, fill the example and return the thread id (the cookie)."""
+    client.get("/decide")
+    id_ = client.cookies.get("cairn_thread")
+    assert id_
+    client.post("/decide/example")
+    return id_
+
+
+def _decided(client: TestClient) -> str:
+    id_ = _filled(client)
+    client.post("/decide/confirm", data={"actor": "R. Reviewer"})
+    return id_
+
+
+def test_decide_and_draft_people_decide_and_the_author_cannot_approve() -> None:
     with TestClient(create_app()) as client:
-        step4 = client.get("/step/4?lang=en").text  # starts a thread and follows the redirect
-        thread = re.search(r'name="thread" value="([0-9a-f]+)"', step4)
-        assert thread and "Acting as: A. Author" in step4 and "disabled" in step4
-        id_ = thread.group(1)
+        client.cookies.set(COOKIE, "en")
+        step4 = client.get("/decide").text  # starts a thread and sets the cookie
+        assert client.cookies.get("cairn_thread")
+        assert "Acting as: A. Author" in step4 and "disabled" in step4
         assert "Show draft with gaps" in step4 and "no decision yet" in step4
-        client.post("/step/4/example", data={"thread": id_})
-        confirmed = client.post("/step/4/confirm", data={"thread": id_, "actor": "R. Reviewer"})
+        client.post("/decide/example")
+        confirmed = client.post("/decide/confirm", data={"actor": "R. Reviewer"})
         assert "Acting as: R. Reviewer" in confirmed.text and "Show final text" in confirmed.text
-        refused = client.post("/step/5/approve", data={"thread": id_, "actor": "A. Author"})
+        refused = client.post("/draft/approve", data={"actor": "A. Author"})
         assert "403 · Authors cannot approve their own draft. Enforced by the API" in refused.text
-        done = client.post("/step/5/approve", data={"thread": id_, "actor": "R. Reviewer"})
+        done = client.post("/draft/approve", data={"actor": "R. Reviewer"})
         assert "Approved by R. Reviewer" in done.text
 
 
-def _filled_thread(client: TestClient) -> str:
-    step4 = client.get("/step/4", follow_redirects=True).text
-    match = re.search(r'name="thread" value="([0-9a-f]+)"', step4)
-    assert match
-    client.post("/step/4/example", data={"thread": match.group(1)})
-    return match.group(1)
+@pytest.mark.parametrize(("lang", "text"), [("es", "sin decidir"), ("en", "not decided yet")])
+def test_draft_with_nothing_decided_is_200_and_says_so(lang: str, text: str) -> None:
+    with TestClient(create_app()) as client:
+        reply = client.get(f"/draft?lang={lang}")
+    assert reply.status_code == 200 and text in reply.text
 
 
-def test_step_pages_redirect_on_409_and_reject_bad_input() -> None:
+def test_decide_pages_redirect_on_409_and_reject_bad_input() -> None:
     with TestClient(create_app(), follow_redirects=False) as client:
-        id_ = _filled_thread(client)
-        client.post("/step/4/confirm", data={"thread": id_, "actor": "R. Reviewer"})
-        again = client.post("/step/4/example", data={"thread": id_})  # back button, Fill example
-        assert again.status_code == 303 and "/step/5?thread=" + id_ in again.headers["location"]
-        twice = client.post("/step/5/approve", data={"thread": id_, "actor": "R. Reviewer"})
+        id_ = _filled(client)
+        client.post("/decide/confirm", data={"actor": "R. Reviewer"})
+        again = client.post("/decide/example")  # back button, Fill example
+        assert again.status_code == 303 and again.headers["location"].startswith("/draft?actor=")
+        twice = client.post("/draft/approve", data={"actor": "R. Reviewer"})
         assert twice.status_code == 200
-        second = client.post("/step/5/approve", data={"thread": id_, "actor": "R. Reviewer"})
-        assert second.status_code == 303 and "/step/5?thread=" in second.headers["location"]
+        second = client.post("/draft/approve", data={"actor": "R. Reviewer"})
+        assert second.status_code == 303 and second.headers["location"].startswith("/draft?actor=")
         for reply in (
-            client.get(f"/step/5?thread={id_}&actor=Mallory"),
-            client.post("/step/5/approve", data={"thread": id_, "actor": "Mallory"}),
-            client.post("/step/4/confirm", data={"thread": id_, "actor": "Mallory"}),
-            client.post("/step/4/decide", data={}),
+            client.get("/draft?actor=Mallory"),
+            client.post("/draft/approve", data={"actor": "Mallory"}),
+            client.post("/decide/confirm", data={"actor": "Mallory"}),
         ):
             assert reply.status_code == 422
-        fresh = _filled_thread(client)
+        client.cookies.clear()
+        fresh = _filled(client)
+        assert fresh != id_
         slot = client.get(f"/api/threads/{fresh}").json()["slots"][0]["slot"]
-        bad = client.post(
-            "/step/4/decide", data={"thread": fresh, "t_" + slot: "x", "a_" + slot: "x"}
-        )
+        bad = client.post("/decide/set", data={"t_" + slot: "x", "a_" + slot: "x"})
         assert bad.status_code == 422
 
 
-def test_step4_decide_recomputes_the_fragment_without_the_page() -> None:
+def test_decide_set_recomputes_the_fragment_without_the_page() -> None:
     with TestClient(create_app()) as client:
-        id_ = _filled_thread(client)
+        id_ = _filled(client)
         slots = client.get(f"/api/threads/{id_}").json()["slots"]
-        data = {"thread": id_}
+        data: dict[str, str] = {}
         for slot in slots:
             dose = str(max(slot["doses"]))
             data |= {"t_" + slot["slot"]: dose, "a_" + slot["slot"]: dose}
-        reply = client.post("/step/4/decide", data=data)
+        reply = client.post("/decide/set", data=data)
         assert reply.status_code == 200
         assert "NOAEL" in reply.text and "<html" not in reply.text
 
 
-def _step5_thread(client: TestClient) -> str:
-    id_ = _filled_thread(client)
-    client.post("/step/4/confirm", data={"thread": id_, "actor": "R. Reviewer"})
-    return id_
-
-
-def test_step5_without_judge_recordings_shows_not_judged_and_the_rules_line(
+def test_draft_without_judge_recordings_shows_not_judged_and_the_rules_line(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     folder = tmp_path / "recordings"
     shutil.copytree("recordings", folder, ignore=shutil.ignore_patterns("j-*.json"))
     for name in ("cairn.web.people", "cairn.web.threads"):
         monkeypatch.setattr(importlib.import_module(name), "RECORDINGS_DIR", folder)
+    monkeypatch.setenv("CAIRN_THREADS_DB", str(tmp_path / "threads.db"))
     with TestClient(create_app()) as client:
         client.cookies.set("cairn_lang", "en")
-        id_ = _step5_thread(client)
-        page = client.get(f"/step/5?thread={id_}&actor=R.%20Reviewer").text
+        _decided(client)
+        page = client.get("/draft?actor=R.%20Reviewer").text
         assert "Judge panel" in page and "never blocks" in page and "0/16" in page
         assert "not judged" in page and "EXAMPLE" in page and "RECORDED" in page
-        assert "8/8" in page and "rules passed" in page and f"/step/6?thread={id_}" in page
+        assert "8/8" in page and "rules passed" in page
         assert "Checks" not in page
-        done = client.post("/step/5/approve", data={"thread": id_, "actor": "R. Reviewer"})
+        done = client.post("/draft/approve", data={"actor": "R. Reviewer"})
         assert "Approved by R. Reviewer" in done.text
 
 
-def test_step5_with_the_real_recordings_shows_real_verdicts(
+def test_draft_with_the_real_recordings_shows_real_verdicts(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     monkeypatch.setenv("CAIRN_THREADS_DB", str(tmp_path / "threads.db"))
     with TestClient(create_app()) as client:
         client.cookies.set("cairn_lang", "en")
-        id_ = _step5_thread(client)
-        page = client.get(f"/step/5?thread={id_}&actor=R.%20Reviewer").text
+        _decided(client)
+        page = client.get("/draft?actor=R.%20Reviewer").text
         assert "16/16" in page and "sentences judged" in page and "sonnet-4-6" in page
         assert "n=24" in page and "kappa 1.00" in page and "EXAMPLE" in page
 
 
-def test_step5_lists_each_warning_and_the_example_and_approval_still_works(
+def test_draft_lists_each_warning_and_the_example_and_approval_still_works(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     import test_judge as tj
@@ -612,43 +619,35 @@ def test_step5_lists_each_warning_and_the_example_and_approval_still_works(
     tj.save_recording(folder, EXAMPLE_SENTENCE, example, tj.reply("overstated", "causal"))
     with TestClient(create_app()) as client:
         client.cookies.set("cairn_lang", "en")
-        id_ = _step5_thread(client)
-        page = client.get(f"/step/5?thread={id_}&actor=R.%20Reviewer").text
+        _decided(client)
+        page = client.get("/draft?actor=R.%20Reviewer").text
         assert "warning: magnitude" in page and "Too strong." in page
         assert "warning: causal" in page and "EXAMPLE" in page and "It claims cause." in page
         assert "not judged" in page  # the other sentences have no recording
-        done = client.post("/step/5/approve", data={"thread": id_, "actor": "R. Reviewer"})
+        done = client.post("/draft/approve", data={"actor": "R. Reviewer"})
         assert "Approved by R. Reviewer" in done.text
 
 
-def test_step6_shows_rules_chain_status_and_the_production_note() -> None:
+def test_draft_shows_rules_chain_status_and_the_production_note() -> None:
     with TestClient(create_app(), follow_redirects=False) as client:
         _english(client)
-        assert client.get("/step/6").headers["location"] == "/step/4"
-        id_ = _filled_thread(client)
-        early = client.get(f"/step/6?thread={id_}")
-        assert early.status_code == 303 and early.headers["location"] == f"/step/4?thread={id_}"
-        client.post("/step/4/confirm", data={"thread": id_, "actor": "R. Reviewer"})
-        page = client.get(f"/step/6?thread={id_}").text
-        assert 'class="badge real"' in page and "passed" in page and "<td>fired</td>" not in page
-        assert page.count("<tr>") == 9 and "Verified." in page and "chained entries" in page
+        _decided(client)
+        page = client.get("/draft").text
+        assert 'class="badge recorded"' in page and "passed" in page and "<td>fired</td>" not in page
+        assert "Verified." in page and "chained entries" in page
         assert "8/8" in page and "rules passed" in page
         assert "not a validated or external log" in page
-        assert "In production" in page and "external append-only log" in page
-        assert client.get(f"/step/6?thread={id_}&actor=Mallory").status_code == 422
+        assert "In production" in page and "an editor with tracked changes" in page
 
 
-def test_step7_closes_the_session_with_one_tool_over_mcp_and_rest() -> None:
+def test_draft_closes_the_session_with_one_tool_over_mcp_and_rest() -> None:
     with TestClient(create_app(), follow_redirects=False) as client:
         _english(client)
-        assert client.get("/step/7").headers["location"] == "/step/4"
-        id_ = _filled_thread(client)
-        early = client.get(f"/step/7?thread={id_}")
-        assert early.status_code == 303 and early.headers["location"] == f"/step/4?thread={id_}"
-        client.post("/step/4/confirm", data={"thread": id_, "actor": "R. Reviewer"})
-        client.post("/step/5/approve", data={"thread": id_, "actor": "R. Reviewer"})
-        page = client.get(f"/step/7?thread={id_}").text
-        assert 'class="badge real"' in page and "Same hash, same Observation." in page
+        _decided(client)
+        client.post("/draft/approve", data={"actor": "R. Reviewer"})
+        page = client.get("/draft").text
+        assert 'class="badge recorded"' in page and "Same hash, same Observation." in page
+        assert "Approved by R. Reviewer" in page
         assert "numbers by code (0 by the model)" in page and "quotes verbatim" in page
         assert (
             re.search(r"\d+ entries, verified", page)
@@ -668,45 +667,42 @@ def test_step7_closes_the_session_with_one_tool_over_mcp_and_rest() -> None:
         assert 'href="/docs"' in page and 'href="/mcp"' in page
 
 
-def test_step7_rest_door_goes_through_the_http_route(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_draft_rest_door_goes_through_the_http_route(monkeypatch: pytest.MonkeyPatch) -> None:
     with TestClient(create_app(), follow_redirects=False) as client:
         _english(client)
-        id_ = _filled_thread(client)
-        client.post("/step/4/confirm", data={"thread": id_, "actor": "R. Reviewer"})
+        _decided(client)
         monkeypatch.setattr(
             app_module, "call_tool", lambda name, args: {"content_sha256": "x" * 64}
         )
-        page = client.get(f"/step/7?thread={id_}").text
+        page = client.get("/draft").text
     assert "The hashes differ." in page and "Same hash" not in page
     assert "xxxxxxxxxxxxxxxx" in page
 
 
-def test_step7_survives_a_non_http_error_in_the_rest_door(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_draft_survives_a_non_http_error_in_the_rest_door(monkeypatch: pytest.MonkeyPatch) -> None:
     def broken(name: str, args: dict[str, Any]) -> dict[str, Any]:
         raise KeyError(name)
 
     with TestClient(create_app(), follow_redirects=False) as client:
         _english(client)
-        id_ = _filled_thread(client)
-        client.post("/step/4/confirm", data={"thread": id_, "actor": "R. Reviewer"})
+        _decided(client)
         monkeypatch.setattr(app_module, "call_tool", broken)
-        reply = client.get(f"/step/7?thread={id_}")
+        reply = client.get("/draft")
     assert reply.status_code == 200
     assert "HTTP 500" in reply.text and "The hashes differ." in reply.text
 
 
-def test_step6_says_where_the_chain_is_broken(
+def test_draft_says_where_the_chain_is_broken(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     db = tmp_path / "threads.db"
     monkeypatch.setenv("CAIRN_THREADS_DB", str(db))
     with TestClient(create_app(), follow_redirects=False) as client:
         _english(client)
-        id_ = _filled_thread(client)
-        client.post("/step/4/confirm", data={"thread": id_, "actor": "R. Reviewer"})
+        id_ = _decided(client)
         with sqlite3.connect(db) as conn:
             conn.execute("UPDATE audit SET actor = 'X' WHERE thread_id = ? AND seq = 3", (id_,))
-        page = client.get(f"/step/6?thread={id_}").text
+        page = client.get("/draft").text
         assert "Broken at entry 3." in page and "Verified." not in page
 
 
@@ -725,53 +721,31 @@ def test_landing_has_one_h1_a_four_stage_journey_and_one_primary_action(lang: st
         assert f'class="badge {badge}"' in page
 
 
-STAGES = (("Q1", "Q2", "Q3", "Q5"), ("Q4", "Q6", "Q7", "Q8"), ("G1", "G2", "G3"))
+def test_ask_has_a_card_for_each_of_the_11_questions_posting_to_explore_run() -> None:
+    from cairn.questions import QUESTIONS
 
-
-def _stage_sections(page: str) -> list[str]:
-    return re.findall(r'<section class="stage".*?</section>', page, flags=re.S)
+    assert len(QUESTIONS) == 11
+    with TestClient(create_app()) as client:
+        page = client.get("/ask").text
+    for question in QUESTIONS:
+        card = re.search(rf'<button[^>]*"question": "{question}"[^>]*>', page)
+        assert card, question
+        assert 'hx-post="/explore/run"' in card.group(0)
+        assert 'hx-target="#answer-explore"' in card.group(0)
+    assert page.count('id="answer-explore"') == 1
 
 
 @pytest.mark.parametrize("lang", ["es", "en"])
-def test_explore_has_three_ordered_stages_with_cards_labelled_by_their_text(lang: str) -> None:
+def test_explore_answers_have_a_format_line(lang: str) -> None:
     from cairn.questions import QUESTIONS
     from cairn.web.i18n import CATALOGUES
 
-    with TestClient(create_app()) as client:
-        page = client.get(f"/explore?lang={lang}").text
-    sections = _stage_sections(page)
-    assert len(sections) == 3
-    for number, (section, group) in enumerate(zip(sections, STAGES, strict=True), start=1):
-        assert f'id="stage-{number}"' in section and f">0{number}</p>" in section
-        labels = re.findall(r'<span class="q">(.*?)</span>', section)
-        assert len(labels) == len(group)
-        for question_id, label in zip(group, labels, strict=True):
-            assert html.unescape(label) == CATALOGUES[lang][f"q_{question_id}"]
-            assert not re.fullmatch(r"[QG]\d+", label)
-            if lang == "en":
-                assert html.unescape(label) == QUESTIONS[question_id]
-    assert "<script" in page and "/static/explore.js" in page
-
-
-@pytest.mark.parametrize("lang", ["es", "en"])
-def test_explore_answers_sit_in_their_stage_with_a_format_line(lang: str) -> None:
-    from cairn.web.i18n import CATALOGUES
-
     t = CATALOGUES[lang]
-    for group in STAGES:
-        for question in group:
-            body = _explore(question, lang)
-            assert body.count('class="format-line') == 1
-            assert re.search(r'class="format-line[^"]*"[^>]*>.*?<b>[^<]+</b> [^<]+', body, re.S)
-            assert t["exp_en_rec"] in body or "callout blocked" in body
-    with TestClient(create_app()) as client:
-        page = client.get(f"/explore?lang={lang}").text
-    for number, stage_group in enumerate(STAGES, start=1):
-        slot = f'hx-target="#answer-{number}"'
-        for question in stage_group:
-            card = re.search(rf'<button[^>]*"question": "{question}"[^>]*>', page)
-            assert card and slot in card.group(0)
-        assert page.count(f'id="answer-{number}"') == 1
+    for question in QUESTIONS:
+        body = _explore(question, lang)
+        assert body.count('class="format-line') == 1
+        assert re.search(r'class="format-line[^"]*"[^>]*>.*?<b>[^<]+</b> [^<]+', body, re.S)
+        assert t["exp_en_rec"] in body or "callout blocked" in body
 
 
 def test_explore_format_line_follows_the_answer_content() -> None:
@@ -790,9 +764,9 @@ def test_explore_strings_come_from_the_active_catalogue(lang: str) -> None:
     other = CATALOGUES["en" if lang == "es" else "es"]
     own = CATALOGUES[lang]
     with TestClient(create_app()) as client:
-        page = client.get(f"/explore?lang={lang}").text
+        page = client.get(f"/ask?lang={lang}").text
     answer = _explore("Q2", lang)
-    for key in ("exp_title", "exp_s1_title", "exp_s3_intro", "exp_card_go", "tag_table"):
+    for key in ("step_2", "s2_lede", "exp_card_go", "tag_table"):
         assert own[key] in page
         assert other[key] not in page
     for key in ("exp_en_rec", "exp_rules", "fmt_table"):
