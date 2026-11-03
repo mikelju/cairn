@@ -32,6 +32,16 @@ class _Server:
         self.terminated = True
 
 
+class _Headers:
+    """The `get_all` of urllib's response headers."""
+
+    def __init__(self, cookies: list[str]) -> None:
+        self.cookies = cookies
+
+    def get_all(self, name: str) -> list[str]:
+        return self.cookies if name == "Set-Cookie" else []
+
+
 @pytest.fixture
 def run_check(monkeypatch: pytest.MonkeyPatch) -> Iterator[Callable[..., int]]:
     """Run `offline_check.main()` with its HTTP layer served by the app's TestClient."""
@@ -47,14 +57,17 @@ def run_check(monkeypatch: pytest.MonkeyPatch) -> Iterator[Callable[..., int]]:
                     path = target.full_url.removeprefix(offline_check.BASE)
                     data = target.data
                     sent = target.headers or {}
-                    if "Cookie" in sent:  # the client's own jar wins over a raw Cookie header
-                        name, _, value = sent["Cookie"].partition("=")
-                        client.cookies.set(name, value)
+                    for pair in sent.get("Cookie", "").split("; "):  # the jar wins over the header
+                        name, _, value = pair.partition("=")
+                        if name:
+                            client.cookies.set(name, value)
                 forced = override(path)
                 if forced is not None and forced[0] >= 400:  # urllib raises on 4xx and 5xx
                     raise _http_error(path, forced[0], forced[1])
                 if forced is not None:
-                    yield SimpleNamespace(status=forced[0], read=lambda: forced[1])
+                    yield SimpleNamespace(
+                        status=forced[0], read=lambda: forced[1], headers=_Headers([])
+                    )
                     return
                 response = (
                     client.get(path, headers=sent)
@@ -67,7 +80,11 @@ def run_check(monkeypatch: pytest.MonkeyPatch) -> Iterator[Callable[..., int]]:
                 )
                 if response.status_code >= 400:
                     raise _http_error(path, response.status_code, response.content)
-                yield SimpleNamespace(status=response.status_code, read=lambda: response.content)
+                yield SimpleNamespace(
+                    status=response.status_code,
+                    read=lambda: response.content,
+                    headers=_Headers(response.headers.get_list("set-cookie")),
+                )
 
             monkeypatch.setattr(
                 offline_check,
@@ -89,6 +106,7 @@ def run_check(monkeypatch: pytest.MonkeyPatch) -> Iterator[Callable[..., int]]:
                     socket=lambda: SimpleNamespace(connect_ex=lambda address: 0),
                 ),
             )
+            offline_check.JAR.pop(offline_check.THREAD_COOKIE, None)
             return offline_check.main()
 
         yield run
@@ -99,14 +117,14 @@ def test_offline_check_passes_against_the_app(
 ) -> None:
     assert run_check() == 0
     out = capsys.readouterr().out
-    assert "/step/3 200" in out
+    assert "/ask 200" in out
     assert "PNG" in out
-    assert "POST /step/2/run 200 RECORDED" in out
-    assert "steps 4-7: reviewer approves ok" in out
+    assert "POST /ask/run 200 RECORDED" in out
+    assert "decide-draft: reviewer approves ok" in out
 
 
 def test_offline_check_fails_without_a_highlight_link(run_check: Callable[..., int]) -> None:
-    assert run_check(lambda path: (200, b"<html></html>") if path == "/step/3" else None) == 1
+    assert run_check(lambda path: (200, b"<html></html>") if path == "/ask" else None) == 1
 
 
 def test_offline_check_fails_without_a_png(run_check: Callable[..., int]) -> None:
@@ -127,14 +145,14 @@ def test_offline_check_fails_when_the_highlight_page_has_no_image(
     assert run_check(override) == 1
 
 
-def test_offline_check_fails_when_step_2_is_not_recorded(run_check: Callable[..., int]) -> None:
+def test_offline_check_fails_when_ask_run_is_not_recorded(run_check: Callable[..., int]) -> None:
     def override(path: str) -> tuple[int, bytes] | None:
-        return (200, b"no marker") if path == "/step/2/run" else None
+        return (200, b"no marker") if path == "/ask/run" else None
 
     assert run_check(override) == 1
 
 
-@pytest.mark.parametrize("route", ["/healthz", "/explore", "/step/1"])
+@pytest.mark.parametrize("route", ["/healthz", "/ask", "/study", "/decide", "/draft"])
 def test_offline_check_fails_when_a_route_does_not_answer_200(
     run_check: Callable[..., int], capsys: pytest.CaptureFixture[str], route: str
 ) -> None:
@@ -143,13 +161,13 @@ def test_offline_check_fails_when_a_route_does_not_answer_200(
 
 
 def test_offline_check_fails_when_the_author_is_not_refused(run_check: Callable[..., int]) -> None:
-    assert run_check(lambda path: (200, b"approved") if path == "/step/5/approve" else None) == 1
+    assert run_check(lambda path: (200, b"approved") if path == "/draft/approve" else None) == 1
 
 
-def test_offline_check_fails_when_step_6_has_no_verified_chain(
+def test_offline_check_fails_when_draft_has_no_verified_chain(
     run_check: Callable[..., int],
 ) -> None:
-    assert run_check(lambda path: (200, b"no chain") if path.startswith("/step/6") else None) == 1
+    assert run_check(lambda path: (200, b"no chain") if path == "/draft" else None) == 1
 
 
 def test_offline_check_fails_when_the_image_lacks_the_kappa_file(
