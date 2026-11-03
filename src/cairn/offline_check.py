@@ -41,13 +41,20 @@ def get(path: str) -> tuple[int, bytes]:
         return error.code, error.read()
 
 
-def post(path: str, fields: dict[str, str]) -> str:
-    """The page the POST ends on: urllib follows the 303 to a GET by itself."""
-    with http.urlopen(
-        http.Request(BASE + path, data=urlencode(fields).encode(), headers=_headers())
-    ) as response:
-        _remember(response)
-        return str(response.read().decode())
+def post(path: str, fields: dict[str, str], refused: bool = False) -> str:
+    """The page the POST ends on: urllib follows the 303 to a GET by itself.
+
+    With `refused`, a 403 is the expected answer and its page is read; any other 4xx or 5xx raises.
+    """
+    request = http.Request(BASE + path, data=urlencode(fields).encode(), headers=_headers())
+    try:
+        with http.urlopen(request) as response:
+            _remember(response)
+            return str(response.read().decode())
+    except HTTPError as error:
+        if not (refused and error.code == 403):
+            raise
+        return str(error.read().decode())
 
 
 def _calibration() -> str:
@@ -75,7 +82,7 @@ def people_decide() -> bool:
     post("/decide/choose", {"sex": "F", "related": "20", "adverse": "200"})
     post("/decide/choose", {"sex": "M", "related": "400", "adverse": "400"})
     final = post("/decide/confirm", {"actor": "R. Reviewer"})
-    refused = post("/draft/approve", {"actor": "A. Author"})
+    refused = post("/draft/approve", {"actor": "A. Author"}, refused=True)
     approved = post("/draft/approve", {"actor": "R. Reviewer"})
     draft = get("/draft")[1].decode()
     checks = {

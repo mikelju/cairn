@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastmcp import Client
 from markupsafe import Markup, escape
 
-from cairn.content import QuoteRef, Text, ValueRef
+from cairn.content import QuoteRef, Sentence, Text, ValueRef
 from cairn.decisions import EXAMPLE, KEY_FINDING, Decision, apply_decisions, finding_key
 from cairn.gateway import DEFAULT_MODEL
 from cairn.judge import (
@@ -489,16 +489,36 @@ async def _draft_page(request: Request, thread: str, actor: str, error: str = ""
 
 
 def _landing_sentence(state: Any) -> list[provenance.Part]:
-    """The shortest recorded draft sentence made of text and data tags only, rendered by code."""
+    """The body-weight sentence of the draft, rendered by code; every digit sits in a tag.
+
+    The recorded draft has no such sentence yet, so the code composes it from the first
+    body-weight Observation: text and references only, placed by the same renderer.
+    """
     ledger = final_ledger(state)
-    options = [provenance.provenance_parts(s, ledger) for s in sections_of(state)]
-    plain = [
-        parts
-        for parts in options
-        if tag_counts(parts)["data"] >= 2
-        and tag_counts(parts)["data"] == sum(not isinstance(p, TextPart) for p in parts)
-    ]
-    return min(plain, key=lambda parts: len(provenance.joined(parts).split()))
+    for section in sections_of(state):
+        parts = provenance.provenance_parts(section, ledger)
+        data = [p for p in parts if not isinstance(p, TextPart)]
+        if data and all(getattr(p, "tool", "") == "body_weight_change" for p in data):
+            return parts
+    obs_id = next(i for i in ledger.ids if ledger.get(i).kind == "body_weight_change")
+
+    def ref(field: str) -> ValueRef:
+        return ValueRef(obs_id=obs_id, field=field)
+
+    sentence = Sentence(
+        parts=[
+            Text(text="Mean body weight on day "),
+            ref("day"),
+            Text(text=" at "),
+            ref("groups.1.dose"),
+            Text(text=" mg/kg was "),
+            ref("groups.1.mean_day29_g"),
+            Text(text=" g, "),
+            ref("groups.1.percent_lower_than_control"),
+            Text(text=" percent lower than control."),
+        ]
+    )
+    return provenance.provenance_parts(sentence, ledger)
 
 
 @people.get("/", response_class=HTMLResponse)
@@ -508,6 +528,8 @@ async def landing(request: Request) -> Response:
     parts = _landing_sentence((await load_view(request, thread))[0])
     t = i18n.context(request)["t"]
     counts = t["land_counts"].format(numbers=tag_counts(parts)["data"], ai=len(stray_digits(parts)))
+    if i18n.context(request)["locale"] == "es":
+        counts += " | " + t["land_english"]
     response = page(request, "landing.html", current=0, parts=parts, counts_line=counts)
     return _remember(response, thread)
 

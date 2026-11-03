@@ -68,6 +68,7 @@ EN: dict[str, str] = {
     ),
     "land_counts": "{numbers} numbers placed by code, {ai} by the AI",
     "land_cta": "See how it is made",
+    "land_english": "Draft in English",
     "exp_title": "Ask the study",
     "exp_sub": "Pick a question; each answer opens under its card.",
     "exp_stagebar": "Stages",
@@ -329,11 +330,12 @@ ES: dict[str, str] = {
     "hl_back": "volver a Pregúntale",
     "hl_alt": "Página {page} de la guía con la frase citada resaltada",
     "land_title": (
-        "Una IA escribe el borrador de un informe de toxicología a partir de un estudio "
-        "público, y puedes pinchar en cada cifra para ver de qué fila del estudio sale."
+        "Una IA redacta un informe de toxicología a partir de un estudio público; "
+        "pincha en cada cifra y verás de qué fila sale."
     ),
     "land_counts": "{numbers} cifras puestas por código, {ai} por la IA",
     "land_cta": "Ver cómo se hace",
+    "land_english": "Borrador en inglés",
     "exp_title": "Pregunta al estudio",
     "exp_sub": "Elige una pregunta; cada respuesta se abre bajo su tarjeta.",
     "exp_stagebar": "Etapas",
