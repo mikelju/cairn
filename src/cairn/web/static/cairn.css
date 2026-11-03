@@ -333,3 +333,27 @@ h2 { font-size: var(--text-md); line-height: 1.2; margin: 0 0 var(--space-2); }
 .col-right h2 { display: flex; gap: var(--space-2); align-items: center; }
 .col-left .detail { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .col-left form button .cue { margin-right: var(--space-2); }
+
+/* Provenance tags (change 004 C8, C10): three kinds, each told apart by colour, underline style and glyph. */
+.prose { margin: var(--space-1) 0; font-weight: var(--weight-semibold); }
+details.prov { display: inline; position: relative; margin: 0; }
+summary.prov-chip { display: inline; list-style: none; cursor: pointer; font-size: inherit; font-weight: var(--weight-semibold); border-radius: var(--radius-sm); padding: 0 var(--space-1); border-bottom: var(--border-badge) solid; }
+summary.prov-chip::-webkit-details-marker { display: none; }
+summary.prov-chip::before { margin-right: var(--space-1); font-size: var(--text-xs); }
+details.prov[open] > summary.prov-chip { outline: var(--border-focus) solid currentColor; outline-offset: 1px; }
+.prov-data > summary.prov-chip, .prov-key.prov-data { background: var(--color-ok-tint); color: var(--color-real); border-bottom-style: solid; }
+.prov-data > summary.prov-chip::before, .prov-key.prov-data::before { content: "A3"; }
+.prov-decision > summary.prov-chip, .prov-key.prov-decision { background: var(--color-warning-tint); color: var(--color-simulated); border-bottom-style: double; border-bottom-width: 4px; }
+.prov-decision > summary.prov-chip::before, .prov-key.prov-decision::before { content: "C6"; }
+.prov-quote > summary.prov-chip, .prov-key.prov-quote { background: var(--color-fixture-tint); color: var(--color-fixture); border-bottom-style: dotted; }
+.prov-quote > summary.prov-chip::before, .prov-key.prov-quote::before { content: "½D"; }
+.prov-cite { color: var(--color-muted); font-size: var(--text-sm); font-weight: var(--weight-regular); }
+.prov-body { display: block; margin: var(--space-2) 0; padding: var(--space-3) var(--space-4); background: var(--color-surface-2); border: var(--border-1) solid var(--color-control-border); border-radius: var(--radius-md); color: var(--color-ink); font-size: var(--text-sm); font-weight: var(--weight-regular); }
+.prov-body table { margin: var(--space-2) 0; }
+.prov-body td.hit { background: var(--color-ok-tint); color: var(--color-real); font-weight: var(--weight-bold); outline: var(--border-focus) solid var(--color-real); outline-offset: -2px; }
+.prov-facts { margin: 0 0 var(--space-2); display: grid; grid-template-columns: max-content 1fr; gap: var(--space-1) var(--space-3); }
+.prov-facts dt { color: var(--color-muted); }
+.prov-facts dd { margin: 0; }
+.prov-legend { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); margin: var(--space-3) 0; padding: 0; list-style: none; font-size: var(--text-sm); }
+.prov-key { display: inline-block; padding: 0 var(--space-2); border-radius: var(--radius-sm); border-bottom: var(--border-badge) solid; font-weight: var(--weight-semibold); }
+.prov-key::before { margin-right: var(--space-1); font-size: var(--text-xs); }
