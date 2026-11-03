@@ -39,7 +39,7 @@
 {# One screen of four: the counter, the title and the lede; screen_nav closes it with Back and Next. #}
 {% macro screen_head(number, title, kind, sentence) %}
 <p class="stepcount">{{ t.step_counter.format(n=number) }}</p>
-<h1>{{ title }} {{ badge(page_badge|default(kind)) }}</h1>
+<h1>{{ title }}{% if kind %} {{ badge(page_badge|default(kind)) }}{% endif %}</h1>
 <p class="lede">{{ sentence }}</p>
 {% endmacro %}
 
@@ -62,13 +62,13 @@
 </section>
 {% endmacro %}
 
-{# headers: list of column names; rows: list of lists of cells; new: highlight every row as new. #}
-{% macro data_table(headers, rows, new=false) %}
+{# headers: list of column names; rows: list of lists of cells; new: highlight every row as new; mark: (row, column) of the used cell. #}
+{% macro data_table(headers, rows, new=false, mark=none) %}
 <table>
   <thead><tr>{% for h in headers %}<th>{{ h }}</th>{% endfor %}</tr></thead>
   <tbody>
   {% for row in rows %}
-  <tr{% if new %} class="new"{% endif %}>{% for cell in row %}<td{% if cell == "not examined" %} class="not-examined"{% endif %}>{{ cell }}</td>{% endfor %}</tr>
+  <tr{% if new %} class="new"{% endif %}>{% set ri = loop.index0 %}{% for cell in row %}<td{% if mark and mark[0] == ri and mark[1] == loop.index0 %} class="hit"{% elif cell == "not examined" %} class="not-examined"{% endif %}>{{ cell }}</td>{% endfor %}</tr>
   {% endfor %}
   </tbody>
 </table>
@@ -98,9 +98,6 @@
 {# A highlighted figure: number big, label small, an optional cue that the reading path names. #}
 {% macro tile(number, label, n=none, tone="") %}<div class="tile {{ tone }}">{% if n %}{{ cue(n) }}{% endif %}<span class="num">{{ number }}</span><span class="lbl">{{ label }}</span></div>{% endmacro %}
 
-{# How the answer is shaped, explained in one line; kind: table, text, refusal or quotes. #}
-{% macro format_line(kind, n=none) %}<p class="format-line {{ kind }}">{% if n %}{{ cue(n) }}{% endif %}<span><b>{{ t["fmt_" ~ kind ~ "_h"] }}</b> {{ t["fmt_" ~ kind] }}</span></p>{% endmacro %}
-
 {# The one folded panel at the foot of a screen: technical detail in the caller, then the In production table (rows of piece, demo, production), then version and commit. #}
 {% macro inside(prod) %}
 <details class="inside"><summary>{{ t.inside }}</summary>
@@ -120,3 +117,24 @@
 {% if r.rows %}<p>{{ r.rule }}</p>{% endif %}
 {% call callout("rules") %}<p>{{ t.exp_rules }} {{ r.rules or t.exp_none }}</p>{% endcall %}
 </div>{% endmacro %}
+
+{# Provenance: the sentence as text and tags; each tag opens the source of the piece it shows. #}
+{% macro prov_facts(rows) %}<dl class="prov-facts">{% for label, value in rows %}<dt>{{ t[label] }}</dt><dd>{{ value }}</dd>{% endfor %}</dl>{% endmacro %}
+
+{% macro prov_tag(p) %}<details class="prov prov-{{ p.kind }}"><summary class="prov-chip">{% if p.kind == "quote" %}{{ p.text.removesuffix(" (" ~ p.citation ~ ")") }} <span class="prov-cite">({{ p.citation }})</span>{% else %}{{ p.text }}{% endif %}</summary><div class="prov-body">
+{%- if p.kind == "data" -%}
+{{ prov_facts([("prov_tool", p.tool), ("prov_column", p.column), ("prov_population", p.population)]) }}
+{{ data_table(p.table.columns, p.table.rows, mark=p.table.mark) }}
+{%- if p.source_rows %}{% set cols = p.source_rows[0].keys()|list %}{% set cols = cols[:8] %}{% set grid = namespace(rows=[]) %}{% for r in p.source_rows %}{% set cells = [] %}{% for c in cols %}{% set _ = cells.append(r.get(c, "")) %}{% endfor %}{% set grid.rows = grid.rows + [cells] %}{% endfor %}{% call disclosure("source_rows", p.source_row_count, "rows") %}{{ data_table(cols, grid.rows) }}{% endcall %}{% endif %}
+{%- elif p.kind == "quote" -%}
+{{ prov_facts([("prov_guideline", p.guideline), ("prov_section", p.section), ("prov_page", p.page)]) }}
+<p class="meta">{% if p.highlight %}<a href="{{ p.highlight }}">{{ t.exp_hl }}</a> · {% endif %}<a href="{{ p.link }}">{{ t.exp_official }}</a></p>
+{%- else -%}
+{{ prov_facts([("prov_who", p.who), ("prov_role", p.role), ("prov_value", p.value)]) }}
+<p class="meta"><a href="/decide">{{ t.prov_decide }}</a></p>
+{%- endif -%}
+</div></details>{% endmacro %}
+
+{% macro prov(parts) %}{% for p in parts %}{% if p.kind is defined %}{{ prov_tag(p) }}{% else %}{{ p.text }}{% endif %}{% endfor %}{% endmacro %}
+
+{% macro prov_legend(kinds) %}{% if kinds %}<p class="prov-legend">{% for k in kinds %}<span class="prov-key prov-{{ k }}">{{ t["prov_legend_" ~ k] }}</span>{% endfor %}</p>{% endif %}{% endmacro %}

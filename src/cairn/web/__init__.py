@@ -34,6 +34,7 @@ from cairn.recording import (
 from cairn.render import quotations
 from cairn.validate import RULE_AUC, RULE_CONC, validate_study
 from cairn.web import i18n
+from cairn.web.provenance import Part, QuoteTag, TextPart, provenance_parts
 from cairn.web.threads import threads
 
 HERE = Path(__file__).parent
@@ -324,12 +325,6 @@ def _all_highlights() -> list[dict[str, Any]]:
     return [e for entries in highlights_by_sentence().values() for e in entries]
 
 
-def _with_highlight(quote: dict[str, Any]) -> dict[str, Any]:
-    """Add the viewer link when the build highlighted the first quoted sentence."""
-    first = quote["sentence_ids"][0]
-    return {**quote, "highlight": f"/highlight/{first}" if _highlighted(first) else ""}
-
-
 def _step2_context(
     question_id: str, directory: Path, t: dict[str, str] | None = None
 ) -> dict[str, Any]:
@@ -384,10 +379,24 @@ def result_context(result: LoopResult, badge: str, meta: str) -> dict[str, Any]:
             "",
         ),
         "evidence": _evidence(result),
-        "quotes": [_with_highlight(q) for q in quotations(result.sentences)]
-        if result.rendered
-        else [],
+        "parts": _answer_parts(result) if result.rendered else [],
     }
+
+
+def _answer_parts(result: LoopResult) -> list[Part]:
+    """The answer sentences as text and provenance tags, one space between sentences."""
+    parts: list[Part] = []
+    for sentence in result.sentences:
+        if parts:
+            parts.append(TextPart(" "))
+        parts.extend(provenance_parts(sentence, result.ledger))
+    return parts
+
+
+def _kinds(parts: list[Part]) -> list[str]:
+    """The tag kinds present in the parts, in legend order."""
+    present = {p.kind for p in parts if not isinstance(p, TextPart)}
+    return [k for k in ("data", "decision", "quote") if k in present]
 
 
 SHOWN_HITS = 3
@@ -439,6 +448,10 @@ def _step3_context() -> dict[str, Any]:
             verbatim += literal
             quote = {
                 "id": fixed["id"],
+                "guideline": title,
+                "section": passage.section,
+                "page": page,
+                "sentence_id": sentence.sentence_id,
                 "verbatim": literal,
                 "text": sentence.text,
                 "cite": " ".join([*row[:2], str(page)]),
@@ -497,7 +510,22 @@ ASK_TRICKS = frozenset({"Q4", "Q6", "Q7", "Q8"})  # requests the system must dec
 def _query_context(question_id: str) -> dict[str, Any]:
     """A fixed guideline query as an answer: its cached quotations, with the page they cite."""
     query = next(q for q in _step3_context()["queries"] if q["id"] == question_id)
-    quotes = [{**q, "citation": q["cite"]} for q in query["quotes"]]
+    parts: list[Part] = []
+    for q in query["quotes"]:
+        if parts:
+            parts.append(TextPart(" "))
+        parts.append(
+            QuoteTag(
+                text=f"{q['text']} ({q['cite']})",
+                guideline=q["guideline"],
+                section=q["section"],
+                page=q["page"],
+                citation=q["cite"],
+                sentence_ids=[q["sentence_id"]],
+                highlight=q["highlight"],
+                link=q["link"],
+            )
+        )
     return {
         "badge": "RECORDED",
         "meta": query["query"],
@@ -516,7 +544,7 @@ def _query_context(question_id: str) -> dict[str, Any]:
         "rows": [],
         "rule": "",
         "evidence": [],
-        "quotes": quotes,
+        "parts": parts,
     }
 
 
@@ -549,7 +577,12 @@ def ask_run(request: Request, question: Annotated[str, Form()]) -> HTMLResponse:
         return templates.TemplateResponse(
             request, "ask_answer.html", {**shell, "stale": str(error)}
         )
-    context = {**context, "id": question, "trick": question in ASK_TRICKS}
+    context = {
+        **context,
+        "id": question,
+        "trick": question in ASK_TRICKS,
+        "kinds": _kinds(context["parts"]),
+    }
     return templates.TemplateResponse(request, "ask_answer.html", {**shell, "r": context})
 
 

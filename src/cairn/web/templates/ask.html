@@ -3,7 +3,7 @@
 {% macro button(id) %}<button type="button" class="qbtn" aria-controls="result" hx-post="/ask/run" hx-vals='{"question": "{{ id }}"}' hx-target="#result"><span class="q">{{ t["q_" ~ id] }}</span>{% if id in tricks %} <span class="trick-tag">{{ t.q_trick }}</span>{% endif %}</button>{% endmacro %}
 {% block main %}
 <section class="step">
-{{ a.screen_head(2, t.step_2, "RECORDED", t.s2_lede) }}
+{{ a.screen_head(2, t.step_2, "", t.s2_lede) }}
 <div role="group" aria-label="{{ t.step_2 }}">
   <div class="qlist">{% for id in first %}{{ button(id) }}{% endfor %}</div>
   {% call a.disclosure("explore", more|length, "questions") %}<div class="qlist">{% for id in more %}{{ button(id) }}{% endfor %}</div>{% endcall %}
@@ -18,6 +18,6 @@
 <div class="slot" id="answer-live" aria-live="polite"></div>
 {% endif %}
 {{ a.screen_nav(2, screens) }}
-{% call a.inside([[t.step_2, "-", t.exp_prod]]) %}<div id="inside-trace"></div>{% endcall %}
+{% call a.inside([[t.step_2, "-", t.exp_prod]]) %}{{ a.badge_meta(page_badge, t.s2_recorded) }}<div id="inside-trace"></div>{% endcall %}
 </section>
 {% endblock %}

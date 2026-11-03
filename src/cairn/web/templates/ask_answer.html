@@ -2,16 +2,15 @@
 {% if stale %}
 {% call a.callout("stale") %}<p>{{ stale }}</p>{% endcall %}
 {% else %}
+{{ a.prov_legend(r.kinds) }}
 <article class="answer-panel answer-unit">
 {% if r.trick %}{% call a.callout("blocked") %}<p>{{ t["trick_" ~ r.id] }}</p>{% endcall %}{% endif %}
-{% if r.text and r.text.strip() %}
+{% if r.parts %}
 <div class="card answer">
-<p class="prose"><strong>{{ r.text }}</strong></p>
+{% if r.text.strip() %}<div class="prose">{{ a.prov(r.parts) }}</div>
+{% else %}<blockquote class="quote prose">{{ a.prov(r.parts) }}</blockquote>{% endif %}
 </div>
 {% endif %}
-{% for q in r.quotes %}
-<blockquote class="quote"><p>{{ q.text }}</p><p class="meta">{{ q.citation }}{% if q.highlight %} · <a href="{{ q.highlight }}">{{ t.exp_hl }}</a>{% endif %} · <a href="{{ q.link }}">{{ t.exp_official }}</a></p></blockquote>
-{% endfor %}
 {% if not r.trick and (r.message or r.failures) %}
 {% call a.callout("blocked" if (not r.answered or r.failures) else "note") %}
 {% if r.message %}<p>{{ t[r.message_key] if r.message_key else r.message }}</p>{% endif %}

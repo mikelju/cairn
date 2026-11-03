@@ -50,6 +50,8 @@ def test_every_rendered_summary_is_a_pill_that_names_content_and_size(
             label = re.sub(r"<[^>]+>", "", text).strip()
             if not attrs and label == CATALOGUES[lang]["inside"]:
                 continue  # the one Inside panel per screen has its own plain summary (C13)
+            if attrs == ' class="prov-chip"':
+                continue  # a provenance chip is the figure itself, not a disclosure pill
             seen += 1
             assert 'class="pill"' in attrs, (lang, name, label)
             match = re.fullmatch(r"(\S+) (.+?) · (\d+) (\S+)", label)

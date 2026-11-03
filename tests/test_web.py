@@ -4,6 +4,7 @@ import json
 import re
 import shutil
 import sqlite3
+from html import unescape
 from pathlib import Path
 from typing import Any
 
@@ -180,6 +181,31 @@ def _ask(
         return client.post("/ask/run", data={"question": question}).text
 
 
+PROV_BODY = re.compile(r'<div class="prov-body">.*?</div></details>', re.S)
+
+
+def _outside_sources(html: str) -> str:
+    """The answer without the sources that provenance tags open."""
+    return PROV_BODY.sub("</details>", html)
+
+
+def _prose_text(html: str) -> str:
+    """What the prose says: the text and the chips, not the sources behind them."""
+    prose = re.search(r'<div class="prose">(.*?)</div>', _outside_sources(html), re.S)
+    assert prose, "no rendered answer"
+    return " ".join(unescape(re.sub(r"<[^>]+>", "", prose.group(1))).split())
+
+
+def _model_text_toggle(html: str) -> str:
+    """The closed disclosure of the model text, whatever the locale."""
+    label = r"(?:Ver texto del modelo|Show model text)"
+    found = re.search(
+        rf'<details class="pill"><summary class="pill">{label}.*?</details>', html, re.S
+    )
+    assert found, "no model text toggle"
+    return found.group(0)
+
+
 def test_step2_page_lists_the_questions_with_the_recorded_badge() -> None:
     with TestClient(create_app()) as client:
         page = _english(client).get("/ask").text
@@ -205,9 +231,11 @@ def test_q2_replay(monkeypatch: pytest.MonkeyPatch) -> None:
     result = _ask("Q2", monkeypatch, REAL)
     assert 'class="badge fixture"' in result
     assert "Rules fired: none" in result
-    assert result.count("<tr><td>") == 9
+    assert _outside_sources(result).count("<tr><td>") == 9
     assert "not examined" in result and "0/1" in result
-    assert "9 screened findings; the clearest is GLAND, ADRENAL Vacuolization in F and M" in result
+    assert "9 screened findings; the clearest is GLAND, ADRENAL Vacuolization in F and M" in (
+        _prose_text(result)
+    )
     recorded = json.loads((REAL / "q2.json").read_text(encoding="utf-8"))
     cost = sum(call["cost_usd"] for call in recorded["calls"])
     assert f"{recorded['date']} | {recorded['region']} | opus-4-6 |" in result
@@ -222,9 +250,9 @@ def test_q2_replay_fixture(monkeypatch: pytest.MonkeyPatch) -> None:
     assert 'class="badge fixture"' in result
     assert "cost n/a" in result
     assert "Screen: a finding enters" in result
-    assert result.count("<tr><td>") == 9
+    assert _outside_sources(result).count("<tr><td>") == 9
     assert "not examined" in result
-    assert "The screen examined 80 animals" in result
+    assert "The screen examined 80 animals" in _prose_text(result)
     assert "Rules fired: none" in result
     assert "incidence, main study" in result and "n=80" in result
 
@@ -234,24 +262,23 @@ def test_step2_toggle_shows_markers_and_no_digits(
     monkeypatch: pytest.MonkeyPatch, folder: Path, marker: str
 ) -> None:
     result = _ask("Q2", monkeypatch, folder, lang="es")
-    toggle = re.search(r"<details class=\"pill\">.*?</details>", result, flags=re.S)
-    assert toggle is not None
-    assert "Ver texto del modelo" in toggle.group(0)
-    assert marker in toggle.group(0)
-    assert not re.search(r"\d", toggle.group(0).split("</summary>")[1])
+    toggle = _model_text_toggle(result)
+    assert marker in toggle
+    assert not re.search(r"\d", toggle.split("</summary>")[1])
 
 
 def test_q6_blocked(monkeypatch: pytest.MonkeyPatch) -> None:
     """Deviation D3: the real Q6 recording ends declined, which counts as correct."""
     result = _ask("Q6", monkeypatch, REAL)
     assert "It declines" in result
-    assert "<tr><td>" not in result and "<strong>" not in result
+    assert "<tr><td>" not in result and 'class="prose"' not in result
 
 
 def test_q6_blocked_by_rules_on_fixture(monkeypatch: pytest.MonkeyPatch) -> None:
     result = _ask("Q6", monkeypatch)
-    assert "Rules fired: 1, 6" in result
-    assert "<strong>" not in result
+    trace = result[result.index('<div id="inside-trace" hx-swap-oob="true">') :]
+    assert "Rules fired: 1, 6" in trace
+    assert 'class="prose"' not in result
     assert "<tr><td>" not in result
 
 
@@ -275,7 +302,7 @@ def test_step2_missing_recording_shows_the_stale_message(
 
 def test_step2_always_replays_whatever_the_mode_says(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CAIRN_LLM_MODE", "live")
-    assert "The screen examined 80 animals" in _ask("Q2", monkeypatch)
+    assert "The screen examined 80 animals" in _prose_text(_ask("Q2", monkeypatch))
 
 
 def test_step2_rejects_an_unknown_question(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -297,7 +324,7 @@ def test_q2_sentence_and_evidence_state_the_same_examined_count(
 ) -> None:
     """Sentence and evidence n are one field of one observation; the other count is labelled."""
     result = _ask("Q2", monkeypatch, FIXTURES)  # the real prose no longer states a count
-    sentence = re.search(r"examined (?:a total of )?(\d+) animals", result)
+    sentence = re.search(r"examined (?:a total of )?(\d+) animals", _prose_text(result))
     evidence = re.search(r"incidence, [^<]*?, n=(\d+), (\d+) (\w+), from ", result)
     assert sentence and evidence
     assert sentence.group(1) == evidence.group(1)
@@ -337,9 +364,7 @@ def test_q2_prose_names_the_screened_findings_by_sex_and_places_no_table_positio
     from cairn.incidence import incidence
 
     result = _ask("Q2", monkeypatch, REAL)
-    prose = re.search(r'<p class="prose"><strong>(.*?)</strong></p>', result, re.S)
-    assert prose, "no rendered answer"
-    text = prose.group(1)
+    text = _prose_text(result)
     findings = incidence().values["findings"]
     named = [f for f in findings if f["tissue"] in text and f["finding"] in text]
     assert named, f"the prose names no finding that passes the screen: {text!r}"
@@ -360,13 +385,13 @@ def test_q2_prose_counts_the_screened_findings_by_reference(
     from cairn.incidence import incidence
 
     result = _ask("Q2", monkeypatch, REAL)
-    text = re.search(r'<p class="prose"><strong>(.*?)</strong>', result, re.S).group(1)  # type: ignore[union-attr]
-    rows = result.count("<tr><td>")
+    text = _prose_text(result)
+    rows = _outside_sources(result).count("<tr><td>")
     assert re.match(rf"{rows} screened findings", text), text
     assert rows == incidence().values["n_findings"]
-    toggle = re.search(r"<details class=\"pill\">.*?</details>", result, flags=re.S)
-    assert toggle and "[n_findings]" in toggle.group(0)
-    assert not re.search(r"\d", toggle.group(0).split("</summary>")[1])
+    toggle = _model_text_toggle(result)
+    assert "[n_findings]" in toggle
+    assert not re.search(r"\d", toggle.split("</summary>")[1])
 
 
 def _explore(question: str, lang: str = "en") -> str:
@@ -416,7 +441,8 @@ def test_old_explore_routes_are_gone() -> None:
 def test_ask_guideline_questions_render_quotes_from_quoteref(question: str) -> None:
     result = _explore(question)
     assert 'class="badge recorded"' in result
-    assert "<blockquote" in result
+    assert "<blockquote" not in result
+    assert 'class="prov prov-quote"' in result
     assert "official page" in result and "#page=" in result
     assert "Rules fired: none" in result
 
@@ -447,7 +473,7 @@ def test_step3_shows_the_two_fixed_queries_without_the_passage_ranking() -> None
 
 def test_step3_counts_quotes_on_the_cited_page() -> None:
     answers = _fixed_answers()
-    assert answers.count('<blockquote class="quote">') == 6
+    assert answers.count('<details class="prov prov-quote">') == 6
     assert answers.count("#page=") >= 6
 
 
@@ -500,8 +526,8 @@ def test_explore_quotations_link_the_highlighted_page() -> None:
 
 def test_explore_guideline_quotations_sit_inside_the_answer_card() -> None:
     result = _explore("G1")
-    assert result.count("<blockquote") >= 1 and "col-right" not in result
-    assert result.index('class="card answer"') < result.index("<blockquote")
+    assert "<blockquote" not in result and "col-right" not in result
+    assert result.index('class="card answer"') < result.index('class="prov prov-quote"')
 
 
 def test_step3_quote_link_and_nav_follow_the_cited_sentence_page() -> None:
@@ -827,8 +853,6 @@ def test_explore_strings_come_from_the_active_catalogue(lang: str) -> None:
 
 def test_explore_recorded_prose_is_identical_in_both_locales() -> None:
     def prose(html: str) -> str:
-        found = re.search(r'<p class="prose">(.*?)</p>', html, re.S)
-        assert found
-        return found.group(1)
+        return _prose_text(html)
 
     assert prose(_explore("Q1", "es")) == prose(_explore("Q1", "en"))
