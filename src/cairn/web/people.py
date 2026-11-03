@@ -294,13 +294,7 @@ def _judge_rows(results: list[dict[str, str]], state: Any, t: dict[str, str]) ->
     return rows
 
 
-REPO = "https://github.com/mikelju/cairn"
-STEP7_LINKS = [
-    ("s7_link_memo", f"{REPO}/commit/7897d079c8665301821fe0e0faffdfd988b6ce82"),
-    ("s7_link_pr", f"{REPO}/pull/6"),
-    ("s7_link_rest", "/docs"),
-    ("s7_link_mcp", "/mcp"),
-]
+STEP7_LINKS = [("s7_link_rest", "/docs")]
 PRODUCTION_KEYS = ["identity", "audit", "model", "sign"]
 
 

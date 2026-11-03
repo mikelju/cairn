@@ -1,13 +1,17 @@
 """C2-C6 and C13 of change 004: four screens, one menu, redirects, a folded Inside panel."""
 
+import os
 import re
+import tempfile
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from cairn.app import create_app
-from screens import rendered_state
+from cairn.web.i18n import COOKIE
+from screens import LANGS, REAL_RECORDINGS, STATE_MARKERS, rendered_state
 
 SCREENS = ("/study", "/ask", "/decide", "/draft")
 MENU = {
@@ -241,3 +245,71 @@ def test_c13_removed_keys_are_gone_from_templates_and_catalogues() -> None:
     for key in REMOVED_KEYS:
         assert f'"{key}"' not in sources and f"t.{key}" not in sources, key
         assert all(key not in c for c in i18n.CATALOGUES.values()), key
+
+
+# C18: no link to the repository, and every link the demo renders resolves.
+EXTERNAL_ALLOWED = {
+    "www.fda.gov": "official FDA guideline PDF in data/guidelines; HTTP 200 when added",
+    "database.ich.org": "official ICH guideline PDFs in data/guidelines; HTTP 200 when added",
+}
+HREF = re.compile(r'<a\b[^>]*?\bhref="([^"]*)"')
+ID = re.compile(r'\bid="([^"]+)"')
+
+
+def _crawl(lang: str) -> int:
+    """Check every link of every page and fragment in one language; return how many were checked."""
+    saved = {k: os.environ.get(k) for k in ("CAIRN_RECORDINGS", "CAIRN_THREADS_DB")}
+    os.environ["CAIRN_RECORDINGS"] = str(REAL_RECORDINGS)
+    checked = 0
+    try:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+            os.environ["CAIRN_THREADS_DB"] = str(Path(tmp) / "threads.db")
+            with TestClient(create_app()) as client:
+                client.cookies.set(COOKIE, lang)
+                pages = {
+                    path: client.get(path).text
+                    for path in ("/", "/study", "/ask", "/decide", "/draft")
+                }
+                pages["/no-such-page"] = client.get("/no-such-page").text
+                pages["/study/run"] = client.post("/study/run").text
+                for question in ("Q2", "Q6"):
+                    pages[f"/ask/run {question}"] = client.post(
+                        "/ask/run", data={"question": question}
+                    ).text
+                    pages[f"/explore/run {question}"] = client.post(
+                        "/explore/run", data={"question": question}
+                    ).text
+                for name in STATE_MARKERS:
+                    pages[name] = rendered_state(name, lang)
+                for html in list(pages.values()):
+                    for href in HREF.findall(html):
+                        if href.startswith("/highlight/") and href not in pages:
+                            pages[href] = client.get(href).text
+                for name, html in pages.items():
+                    ids = set(ID.findall(html))
+                    for href in HREF.findall(html):
+                        where = f"{lang} {name}: {href}"
+                        assert "github.com" not in href, where
+                        checked += 1
+                        if href.startswith("#"):
+                            assert href[1:] in ids, f"dead anchor {where}"
+                        elif href.startswith(("http://", "https://")):
+                            assert href.split("/")[2] in EXTERNAL_ALLOWED, (
+                                f"unlisted external {where}"
+                            )
+                        else:
+                            reply = client.get(href.split("#")[0], follow_redirects=True)
+                            assert reply.status_code == 200, f"{reply.status_code} {where}"
+    finally:
+        for key, value in saved.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+    return checked
+
+
+def test_every_link_resolves_and_none_points_to_the_repository():
+    """C18: no github.com href, internal hrefs answer 200, anchors have ids, externals listed."""
+    for lang in LANGS:
+        assert _crawl(lang) > 50

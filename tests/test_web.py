@@ -669,12 +669,8 @@ def test_draft_closes_the_session_with_one_tool_over_mcp_and_rest() -> None:
         assert len(hashes) == 2 and hashes[0] == hashes[1]
         assert client.get("/docs").status_code == 200
         assert client.get("/mcp").status_code < 500
-        assert 'href="https://github.com/mikelju/cairn/pull/6"' in page
-        assert (
-            'href="https://github.com/mikelju/cairn/commit/7897d079c8665301821fe0e0faffdfd988b6ce82"'
-            in page
-        )
-        assert 'href="/docs"' in page and 'href="/mcp"' in page
+        assert 'href="/docs"' in page
+        assert "github.com" not in page and 'href="/mcp"' not in page
 
 
 def test_draft_rest_door_goes_through_the_http_route(monkeypatch: pytest.MonkeyPatch) -> None:
