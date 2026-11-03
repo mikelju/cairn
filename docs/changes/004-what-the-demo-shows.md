@@ -52,6 +52,7 @@ Current authorization and limits: on 2026-11-03 the user approved the change and
 - Screen 3 keeps the existing rule that people decide adversity and code computes the NOAEL (`noael_rule` in `src/cairn/decisions.py`); "decide the NOAEL" means the visitor makes the per-sex decisions that set it and confirms it.
 
 Supervisor, 2026-11-03: the 60-word cap of C14 is applied screen by screen inside I3, I4, I6, I7 and I8 (each redesign removes the text that the cap would otherwise force out twice); the global cap at 60 is asserted at I8 close. I2 is done with C13 (E13, E14).
+Supervisor, 2026-11-03, on the Jefe's question about the answer unit: C14 as frozen in commit 477f3a1 states "with the draft body and each recorded answer counted as one unit", so counting `answer-unit` as one word applies the criterion, it does not loosen it. The answer is not collapsed: it appears only after the visitor clicks a question (state `ask_before` has no answer, 58 ES / 57 EN words); after a click the answer is visible in full. Evidence: `tests/test_word_cap.py::test_rendered_counter_counts_an_answer_unit_as_one_word` and the `ask_*` states under `ASK_WORD_CAP = 60`. Counting the answer's real words would need either collapsing every answer behind a second click or a stricter criterion; that is the user's call (D8).
 
 ## Briefs
 | ID | Agent | Brief | Status | Result or blocker |
@@ -87,6 +88,7 @@ Supervisor, 2026-11-03: the 60-word cap of C14 is applied screen by screen insid
 | D4 | Language | A: ES/EN UI, plain findings, draft always English and labelled (recommended); B: translate everything, re-record answers | answered | same answer (A) |
 | D5 | Technical detail | A: folded "Inside" panel on each screen (recommended); B: separate technical page | answered | same answer (A) |
 | D7 | Links | User request, literal: "elimina los enlaces al repo y los que no funcionen"; scope: demo UI, all screens, ES and EN; remove every link to the GitHub repository and every link that does not resolve (404, dead anchor, missing route, failing external link); README and docs untouched unless rendered by the demo; a test checks every link on the screens resolves; same PR 15 | answered | added as C18 |
+| D8 | Recorded answer in the word cap | A: keep C14 as frozen, the answer shown after the visitor's click counts as one unit (recommended: the click is the visitor asking, and the answer is the point of the screen); B: show only the first sentence of the answer and fold the rest, counting real visible words; C: change C14 to count every visible word | open | |
 | D6 | Branch | Do change 004 on the PR 15 branch so it replaces 003 before merge (recommended) | answered | approved with the same answer; PR 15 stays unmerged |
 
 ## Adversarial review

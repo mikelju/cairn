@@ -31,8 +31,6 @@ def _pages(lang: str, monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
             pages[name] = client.get(name).text
         pages["ask_q2"] = client.post("/ask/run", data={"question": "Q2"}).text
         pages["ask_q6"] = client.post("/ask/run", data={"question": "Q6"}).text
-        pages["explore_q2"] = client.post("/explore/run", data={"question": "Q2"}).text
-        pages["explore_q6"] = client.post("/explore/run", data={"question": "Q6"}).text
         client.post("/decide/example")
         pages["decide_fragment"] = client.post("/decide/set", data={"t_x": "1", "a_x": "1"}).text
     # Screens that need a real thread or a run: the same states the word-cap tests render.
@@ -73,7 +71,7 @@ def test_the_disclosure_labels_come_from_the_active_catalogue(
 ) -> None:
     html = _pages(lang, monkeypatch)["/ask"]
     assert CATALOGUES[lang]["inside"] in html
-    assert CATALOGUES[lang]["disc_guides"] in html
+    assert CATALOGUES[lang]["disc_explore"] in html
 
 
 def test_the_catalogue_has_a_label_and_a_unit_for_every_disclosure() -> None:

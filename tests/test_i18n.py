@@ -103,15 +103,15 @@ def test_highlight_page_reads_the_catalogue() -> None:
 
 
 def test_generated_ui_words_follow_the_locale(monkeypatch: pytest.MonkeyPatch) -> None:
-    declined = _run("/explore/run", "Q6", REAL, monkeypatch, "es")
-    assert ES["exp_declined"] in declined and "the model declined" not in declined
+    declined = _run("/ask/run", "Q6", REAL, monkeypatch, "es")
+    assert ES["trick_Q6"] in declined and EN["trick_Q6"] not in declined
     answered = _run("/ask/run", "Q2", FIXTURES, monkeypatch, "es")
     assert ES["ev_from"] in answered and ", from " not in answered
     assert "cost n/a" not in answered and "Reglas aplicadas: none" not in answered
 
 
 def test_empty_pills_are_not_rendered(monkeypatch: pytest.MonkeyPatch) -> None:
-    for path in ("/explore/run", "/ask/run"):
+    for path in ("/ask/run",):
         page = _run(path, "Q6", REAL, monkeypatch, "es")
         assert "· 0 " not in page
 

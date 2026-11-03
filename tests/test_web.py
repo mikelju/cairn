@@ -185,7 +185,7 @@ def test_step2_page_lists_the_questions_with_the_recorded_badge() -> None:
         page = _english(client).get("/ask").text
     assert 'class="badge recorded"' in page
     assert "In production" in _inside(page)
-    assert 'value="Q2"' in page and 'value="Q6"' in page
+    assert '"question": "Q2"' in page and '"question": "Q6"' in page
 
 
 REAL = Path(__file__).parent / "fixtures" / "recordings_real_shape"
@@ -244,14 +244,13 @@ def test_step2_toggle_shows_markers_and_no_digits(
 def test_q6_blocked(monkeypatch: pytest.MonkeyPatch) -> None:
     """Deviation D3: the real Q6 recording ends declined, which counts as correct."""
     result = _ask("Q6", monkeypatch, REAL)
-    assert "the model declined" in result
+    assert "It declines" in result
     assert "<tr><td>" not in result and "<strong>" not in result
 
 
 def test_q6_blocked_by_rules_on_fixture(monkeypatch: pytest.MonkeyPatch) -> None:
     result = _ask("Q6", monkeypatch)
     assert "Rules fired: 1, 6" in result
-    assert "Rule 1" in result and "Rule 6" in result
     assert "<strong>" not in result
     assert "<tr><td>" not in result
 
@@ -372,29 +371,49 @@ def test_q2_prose_counts_the_screened_findings_by_reference(
 
 def _explore(question: str, lang: str = "en") -> str:
     with TestClient(create_app()) as client:
-        return client.post(f"/explore/run?lang={lang}", data={"question": question}).text
+        return client.post(f"/ask/run?lang={lang}", data={"question": question}).text
 
 
-def test_explore_page_has_a_button_for_every_question() -> None:
+def test_ask_page_has_a_button_for_every_question() -> None:
     from cairn.questions import QUESTIONS
 
     with TestClient(create_app()) as client:
         page = client.get("/ask?lang=en").text
-    for question_id in QUESTIONS:
+    for question_id in (*QUESTIONS, "NS1", "NS2"):
         assert f'"question": "{question_id}"' in page
     assert len(QUESTIONS) == 11
     assert "live model calls." in _inside(page) and 'class="badge recorded"' in page
 
 
-@pytest.mark.parametrize("question", ["Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8"])
-def test_explore_study_questions_replay_offline(question: str) -> None:
+@pytest.mark.parametrize(
+    "question", ["Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7", "Q8", "G1", "G2", "G3", "NS1", "NS2"]
+)
+def test_every_ask_question_replays_offline(question: str) -> None:
     result = _explore(question)
     assert 'class="badge recorded"' in result
-    assert "Rules fired:" in result
+    assert 'class="answer-panel answer-unit"' in result
+
+
+def test_ask_marks_the_trick_questions() -> None:
+    with TestClient(create_app()) as client:
+        page = client.get("/ask?lang=en").text
+    assert page.count('class="trick-tag"') == 4
+    for question in ("Q4", "Q6", "Q7", "Q8"):
+        button = re.search(rf'<button[^>]*"question": "{question}".*?</button>', page, re.S)
+        assert button and "trick-tag" in button.group(0), question
+    button = re.search(r'<button[^>]*"question": "Q2".*?</button>', page, re.S)
+    assert button and "trick-tag" not in button.group(0)
+
+
+def test_old_explore_routes_are_gone() -> None:
+    with TestClient(create_app()) as client:
+        assert client.post("/explore/run", data={"question": "Q2"}).status_code in (404, 405)
+        moved = client.get("/explore", follow_redirects=False)
+    assert moved.status_code == 303 and moved.headers["location"].startswith("/ask")
 
 
 @pytest.mark.parametrize("question", ["G1", "G2", "G3"])
-def test_explore_guideline_questions_render_quotes_from_quoteref(question: str) -> None:
+def test_ask_guideline_questions_render_quotes_from_quoteref(question: str) -> None:
     result = _explore(question)
     assert 'class="badge recorded"' in result
     assert "<blockquote" in result
@@ -402,9 +421,16 @@ def test_explore_guideline_questions_render_quotes_from_quoteref(question: str) 
     assert "Rules fired: none" in result
 
 
-def test_explore_rejects_an_unknown_question() -> None:
+def test_ask_rejects_an_unknown_question() -> None:
     with TestClient(create_app()) as client:
-        assert client.post("/explore/run", data={"question": "Q99"}).status_code == 422
+        assert client.post("/ask/run", data={"question": "Q99"}).status_code == 422
+
+
+def _fixed_answers() -> str:
+    with TestClient(create_app()) as client:
+        return "".join(
+            client.post("/ask/run?lang=en", data={"question": q}).text for q in ("NS1", "NS2")
+        )
 
 
 def test_step3_shows_the_two_fixed_queries_without_the_passage_ranking() -> None:
@@ -414,18 +440,15 @@ def test_step3_shows_the_two_fixed_queries_without_the_passage_ranking() -> None
         page = client.get("/ask?lang=en").text
     fixed = [q for q in retrieval.load_fixed_queries() if q["used_by"] == "nonclinical-summary"]
     assert len(fixed) == 2
-    assert page.count('class="guide-col"') == 2
+    assert '"question": "NS1"' in page and '"question": "NS2"' in page
     for word in ("Show passage ranking", "Show lower ranks", "<th>Lex</th>", "<th>Fused</th>"):
-        assert word not in page
+        assert word not in page + _fixed_answers()
 
 
-def test_step3_counts_quotes_verbatim_on_the_cited_page() -> None:
-    with TestClient(create_app()) as client:
-        page = client.get("/ask?lang=en").text
-    total = sum(map(int, re.findall(r"Show guideline quotes · (\d+) quotes", page)))
-    verbatim = page.count('<span class="verb">')
-    assert total == page.count('<blockquote class="quote">') == 6
-    assert verbatim == total
+def test_step3_counts_quotes_on_the_cited_page() -> None:
+    answers = _fixed_answers()
+    assert answers.count('<blockquote class="quote">') == 6
+    assert answers.count("#page=") >= 6
 
 
 def test_navigation_has_no_locked_step() -> None:
@@ -460,8 +483,8 @@ def test_highlight_route_page_shows_the_image_and_the_official_link() -> None:
 
 
 def test_highlight_route_links_every_step3_quotation() -> None:
+    page = _fixed_answers()
     with TestClient(create_app()) as client:
-        page = client.get("/ask?lang=en").text
         links = re.findall(r'href="(/highlight/[^"]+)">highlighted page', page)
         assert len(links) == 6
         for link in links:
@@ -509,9 +532,7 @@ def test_step3_quote_cite_and_links_use_the_cited_sentence_page(
     quote = next(q for q in web._step3_context()["quotes"] if q["text"] == later.text)
     assert quote["cite"].endswith(" 8") and quote["link"].endswith("#page=8")
     assert quote["highlight"] == "/highlight/M4S-2.6-01.s12"
-    with TestClient(create_app()) as client:
-        page = client.get("/ask").text
-    assert "#page=8" in page
+    assert "#page=8" in _fixed_answers()
 
 
 def test_web_parses_passages_and_highlights_once_per_process(
@@ -787,42 +808,6 @@ def test_landing_has_one_h1_a_four_stage_journey_and_one_primary_action(lang: st
         assert f'class="badge {badge}"' in page
 
 
-def test_ask_has_a_card_for_each_of_the_11_questions_posting_to_explore_run() -> None:
-    from cairn.questions import QUESTIONS
-
-    assert len(QUESTIONS) == 11
-    with TestClient(create_app()) as client:
-        page = client.get("/ask").text
-    for question in QUESTIONS:
-        card = re.search(rf'<button[^>]*"question": "{question}"[^>]*>', page)
-        assert card, question
-        assert 'hx-post="/explore/run"' in card.group(0)
-        assert 'hx-target="#answer-explore"' in card.group(0)
-    assert page.count('id="answer-explore"') == 1
-
-
-@pytest.mark.parametrize("lang", ["es", "en"])
-def test_explore_answers_have_a_format_line(lang: str) -> None:
-    from cairn.questions import QUESTIONS
-    from cairn.web.i18n import CATALOGUES
-
-    t = CATALOGUES[lang]
-    for question in QUESTIONS:
-        body = _explore(question, lang)
-        assert body.count('class="format-line') == 1
-        assert re.search(r'class="format-line[^"]*"[^>]*>.*?<b>[^<]+</b> [^<]+', body, re.S)
-        assert t["exp_en_rec"] in body or "callout blocked" in body
-
-
-def test_explore_format_line_follows_the_answer_content() -> None:
-    from cairn.web.i18n import EN
-
-    assert EN["fmt_refusal_h"] in _explore("Q6")
-    assert EN["fmt_quotes_h"] in _explore("G2")
-    assert EN["fmt_table_h"] in _explore("Q2")
-    assert EN["fmt_text_h"] in _explore("Q1")
-
-
 @pytest.mark.parametrize("lang", ["es", "en"])
 def test_explore_strings_come_from_the_active_catalogue(lang: str) -> None:
     from cairn.web.i18n import CATALOGUES
@@ -832,10 +817,10 @@ def test_explore_strings_come_from_the_active_catalogue(lang: str) -> None:
     with TestClient(create_app()) as client:
         page = client.get(f"/ask?lang={lang}").text
     answer = _explore("Q2", lang)
-    for key in ("step_2", "s2_lede", "exp_card_go", "tag_table"):
+    for key in ("step_2", "s2_lede"):
         assert own[key] in page
         assert other[key] not in page
-    for key in ("exp_en_rec", "exp_rules", "fmt_table"):
+    for key in ("exp_rules",):
         assert own[key] in answer and other[key] not in answer
     assert f"<th>{own['exp_th_sex']}</th>" in answer
 

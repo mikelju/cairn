@@ -37,22 +37,15 @@ def _extra_pages(lang: str) -> dict[str, str]:
         with TestClient(create_app()) as client:
             pages = {
                 "ask": client.get(f"/ask?lang={lang}").text,
-                "explore_q2": client.post(
-                    f"/explore/run?lang={lang}", data={"question": "Q2"}
-                ).text,
-                "explore_q6": client.post(
-                    f"/explore/run?lang={lang}", data={"question": "Q6"}
-                ).text,
-                "explore_g2": client.post(
-                    f"/explore/run?lang={lang}", data={"question": "G2"}
-                ).text,
+                "ask_q2": client.post(f"/ask/run?lang={lang}", data={"question": "Q2"}).text,
+                "ask_q6": client.post(f"/ask/run?lang={lang}", data={"question": "Q6"}).text,
+                "ask_g2": client.post(f"/ask/run?lang={lang}", data={"question": "G2"}).text,
                 "live_refusal": client.post(
                     f"/explore/live?lang={lang}", data={"question": "Q?", "code": "wrong"}
                 ).text,
             }
-            ask = client.get(f"/ask?lang={lang}").text
-            link = re.search(r'href="(/highlight/[^"]+)"', ask)
-            assert link, "the ask screen links no highlighted page"
+            link = re.search(r'href="(/highlight/[^"]+)"', pages["ask_g2"])
+            assert link, "the G2 answer links no highlighted page"
             pages["highlight"] = client.get(f"{link.group(1)}?lang={lang}").text
     finally:
         for key, value in saved.items():
@@ -66,20 +59,6 @@ def _extra_pages(lang: str) -> dict[str, str]:
 @cache
 def _screen_page(name: str, lang: str) -> str:
     return rendered_state(name, lang)
-
-
-@pytest.mark.parametrize("lang", LANGS)
-@pytest.mark.parametrize("question", ["Q2", "Q6"])
-def test_ask_answer_has_exactly_one_non_empty_format_line(
-    question: str, lang: str, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setenv("CAIRN_RECORDINGS", str(REAL_RECORDINGS))
-    with TestClient(create_app()) as client:
-        body = client.post(f"/ask/run?lang={lang}", data={"question": question}).text
-    lines = re.findall(r'<p class="format-line[^"]*">(.*?)</p>', body, re.S)
-    assert body.count('class="format-line') == 1 and len(lines) == 1, (question, lang)
-    assert re.sub(r"<[^>]+>", "", lines[0]).strip(), (question, lang)
-    assert re.search(r"<b>[^<]+</b>", lines[0]), (question, lang)
 
 
 def _foreign_values(lang: str) -> list[tuple[str, str]]:

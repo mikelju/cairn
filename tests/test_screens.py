@@ -272,12 +272,9 @@ def _crawl(lang: str) -> int:
                 }
                 pages["/no-such-page"] = client.get("/no-such-page").text
                 pages["/study/run"] = client.post("/study/run").text
-                for question in ("Q2", "Q6"):
+                for question in ("Q2", "Q6", "G2", "NS1"):
                     pages[f"/ask/run {question}"] = client.post(
                         "/ask/run", data={"question": question}
-                    ).text
-                    pages[f"/explore/run {question}"] = client.post(
-                        "/explore/run", data={"question": question}
                     ).text
                 for name in STATE_MARKERS:
                     pages[name] = rendered_state(name, lang)
