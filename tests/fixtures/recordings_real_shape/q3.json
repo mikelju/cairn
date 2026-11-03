@@ -399,6 +399,6 @@
   "prompt_version": "question-7",
   "question_id": "Q3",
   "region": "eu-west-1",
-  "source": "bedrock",
+  "source": "fixture",
   "tool_schema_sha256": "25276c34f9375fc85b9f4b6a4d798b5fe9974dbd21456c69d1a192f21dea167b"
 }

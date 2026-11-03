@@ -828,7 +828,7 @@ def test_landing_shows_one_h1_a_real_marked_sentence_and_one_primary_action(lang
     main = page.split("<main", 1)[1].split("</main>", 1)[0]
     assert page.count("<h1") == 1
     assert CATALOGUES[lang]["land_title"] in unescape(main)
-    sentence = re.search(r'<p class="lede answer">(.*?)</p>\s*<p class="meta">', main, re.S)
+    sentence = re.search(r'<p class="lede answer" lang="en">(.*?)</p>\s*<p class="meta">', main, re.S)
     assert sentence and 'class="prov prov-data"' in sentence.group(1)
     plain = re.sub(r'<details class="prov .*?</details>', " ", sentence.group(1), flags=re.S)
     assert not re.search(r"\d", re.sub(r"<[^>]+>", "", plain))  # every digit sits in a tag
@@ -848,13 +848,21 @@ def test_landing_sentence_is_the_recorded_body_weight_answer_of_ask(lang: str) -
     with TestClient(create_app()) as client:
         landing = client.get(f"/?lang={lang}").text
         ask = client.post(f"/ask/run?lang={lang}", data={"question": "Q3"}).text
-    lede = re.search(r'<p class="lede answer">(.*?)</p>\s*<p class="meta">', landing, re.S)
+    lede = re.search(r'<p class="lede answer" lang="en">(.*?)</p>\s*<p class="meta">', landing, re.S)
     assert lede
     chips = re.findall(r'<details class="prov .*?</details>', lede.group(1), re.S)
     assert len(chips) >= 5 and all(chip in ask for chip in chips)
     shown = _flat(lede.group(1)).removesuffix(" ...")
     assert shown in _flat(ask) and shown.endswith("lower than control")
     assert "9.3" not in _flat(landing)
+
+
+@pytest.mark.parametrize("lang", ["es", "en"])
+def test_landing_quote_is_english_and_labelled_en_in_both_locales(lang: str) -> None:
+    with TestClient(create_app()) as client:
+        landing = client.get(f"/?lang={lang}").text
+    assert '<span class="lang-tag">EN</span>' in landing
+    assert '<p class="lede answer" lang="en">' in landing
 
 
 @pytest.mark.parametrize("lang", ["es", "en"])
