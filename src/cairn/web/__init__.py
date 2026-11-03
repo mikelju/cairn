@@ -22,7 +22,7 @@ from cairn.ingest import build_report, load_study
 from cairn.jobs import JobRunner
 from cairn.loop import PROMPT_VERSION, STUDY_TOOLS, LoopResult, LoopStatus, ask, schema_hash
 from cairn.passages import normalize_whitespace, stored_passages
-from cairn.questions import QUESTIONS, STEP2_QUESTIONS
+from cairn.questions import QUESTIONS
 from cairn.recording import (
     RECORDINGS_DIR,
     RecordingKey,
@@ -390,21 +390,6 @@ def result_context(result: LoopResult, badge: str, meta: str) -> dict[str, Any]:
     }
 
 
-@router.post("/ask/run", response_class=HTMLResponse)
-def ask_run(request: Request, question: Annotated[str, Form()]) -> HTMLResponse:
-    if question not in QUESTIONS:
-        raise HTTPException(status_code=422, detail="unknown question")
-    try:
-        context = _step2_context(question, _recordings_dir(), i18n.context(request)["t"])
-    except StaleRecording as error:
-        return templates.TemplateResponse(
-            request, "step2_result.html", {**i18n.context(request), "stale": str(error)}
-        )
-    return templates.TemplateResponse(
-        request, "step2_result.html", {**i18n.context(request), "r": context}
-    )
-
-
 SHOWN_HITS = 3
 NS_QUERIES = "nonclinical-summary"
 
@@ -502,35 +487,68 @@ async def highlight_image(name: str) -> FileResponse:
     return FileResponse(IMAGES_DIR / name, media_type="image/png")
 
 
-EXPLORE_STAGES = (("Q1", "Q2", "Q3", "Q5"), ("Q4", "Q6", "Q7", "Q8"), ("G1", "G2", "G3"))
+# One list on screen 2: the first group is visible, the rest sits in a closed disclosure (C14 cap).
+ASK_FIRST = ("Q2", "G2", "Q7", "Q6")
+ASK_MORE = ("Q1", "Q3", "Q4", "Q5", "Q8", "G1", "G3", "NS1", "NS2")
+ASK_QUERIES = ("NS1", "NS2")  # the two fixed guideline queries, answered from the build-time cache
+ASK_TRICKS = frozenset({"Q4", "Q6", "Q7", "Q8"})  # requests the system must decline
 
 
-@lru_cache(maxsize=4)
-def _card_kinds(directory: Path) -> dict[str, str]:
-    """The answer format of every recorded question, read from the recordings themselves."""
-    kinds: dict[str, str] = {}
-    for question_id in QUESTIONS:
-        try:
-            kinds[question_id] = _step2_context(question_id, directory)["kind"]
-        except (StaleRecording, ValueError):
-            kinds[question_id] = "text"
-    return kinds
+def _query_context(question_id: str) -> dict[str, Any]:
+    """A fixed guideline query as an answer: its cached quotations, with the page they cite."""
+    query = next(q for q in _step3_context()["queries"] if q["id"] == question_id)
+    quotes = [{**q, "citation": q["cite"]} for q in query["quotes"]]
+    return {
+        "badge": "RECORDED",
+        "meta": query["query"],
+        "kind": "quotes",
+        "trace": "search_guidance",
+        "calls": 1,
+        "status": "answered",
+        "message": "",
+        "answered": True,
+        "text": " ",
+        "failures": [],
+        "rules": "",
+        "message_key": "",
+        "written": "",
+        "doses": [],
+        "rows": [],
+        "rule": "",
+        "evidence": [],
+        "quotes": quotes,
+    }
 
 
 @router.get("/ask", response_class=HTMLResponse)
 async def ask_page(request: Request) -> HTMLResponse:
-    directory = _recordings_dir()
-    kinds = _card_kinds(directory)
     return _page(
         request,
         "ask.html",
         current=2,
-        questions=STEP2_QUESTIONS,
-        cards=[(q, kinds[q]) for group in EXPLORE_STAGES for q in group],
+        first=ASK_FIRST,
+        more=ASK_MORE,
+        tricks=ASK_TRICKS,
         live=bool(os.environ.get("CAIRN_ACCESS_CODE")),
-        page_badge=_step2_badge(directory),
-        r=_step3_context(),
+        page_badge=_step2_badge(_recordings_dir()),
     )
+
+
+@router.post("/ask/run", response_class=HTMLResponse)
+def ask_run(request: Request, question: Annotated[str, Form()]) -> HTMLResponse:
+    """The recorded answer of any question of the list: study, guideline query or trick."""
+    if question not in QUESTIONS and question not in ASK_QUERIES:
+        raise HTTPException(status_code=422, detail="unknown question")
+    shell = i18n.context(request)
+    try:
+        if question in ASK_QUERIES:
+            context = _query_context(question)
+        else:
+            context = _step2_context(question, _recordings_dir(), shell["t"])
+    except StaleRecording as error:
+        return templates.TemplateResponse(request, "ask_answer.html", {**shell, "stale": str(error)})
+    context = {**context, "id": question, "trick": question in ASK_TRICKS}
+    return templates.TemplateResponse(request, "ask_answer.html", {**shell, "r": context})
 
 
 REDIRECTS = {1: "/study", 2: "/ask", 3: "/ask", 4: "/decide", 5: "/draft", 6: "/draft", 7: "/draft"}
@@ -551,21 +569,6 @@ async def old_step(request: Request, number: int) -> RedirectResponse:
 @router.get("/explore")
 async def old_explore(request: Request) -> RedirectResponse:
     return _redirect(request, "/ask")
-
-
-@router.post("/explore/run", response_class=HTMLResponse)
-def explore_run(request: Request, question: Annotated[str, Form()]) -> HTMLResponse:
-    if question not in QUESTIONS:
-        raise HTTPException(status_code=422, detail="unknown question")
-    try:
-        context = _step2_context(question, _recordings_dir(), i18n.context(request)["t"])
-    except StaleRecording as error:
-        return templates.TemplateResponse(
-            request, "explore_answer.html", {**i18n.context(request), "stale": str(error)}
-        )
-    return templates.TemplateResponse(
-        request, "explore_answer.html", {**i18n.context(request), "r": context}
-    )
 
 
 def mount_web(app: FastAPI) -> None:

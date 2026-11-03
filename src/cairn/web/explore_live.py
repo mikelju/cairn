@@ -106,5 +106,5 @@ def explore_ask_live(
     if result.status is not LoopStatus.ANSWERED:  # shown as is, never as an answer
         context["text"] = None
     return templates.TemplateResponse(
-        request, "explore_answer.html", {**i18n.context(request), "r": context}
+        request, "ask_answer.html", {**i18n.context(request), "r": context}
     )

@@ -27,8 +27,8 @@
   }
   document.addEventListener("htmx:afterRequest", function (e) {
     var card = e.detail.elt;
-    if (!card.classList || !card.classList.contains("qcard")) return;
-    card.parentNode.querySelectorAll(".qcard").forEach(function (c) { c.removeAttribute("aria-pressed"); });
+    if (!card.classList || !card.classList.contains("qbtn")) return;
+    card.parentNode.querySelectorAll(".qbtn").forEach(function (c) { c.removeAttribute("aria-pressed"); });
     card.setAttribute("aria-pressed", "true");
   });
 })();
