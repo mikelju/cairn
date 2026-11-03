@@ -1,4 +1,4 @@
-"""Smoke test for the four-screen wiring: every screen answers and the thread follows the visitor."""
+"""Smoke test for the four screens: each answers and the thread follows the visitor."""
 
 import re
 
@@ -26,7 +26,9 @@ def test_four_screens_and_thread_cookie(tmp_path, monkeypatch) -> None:  # type:
         cookie = fresh.cookies.get("cairn_thread")
         assert cookie
         assert fresh.post("/decide/example", follow_redirects=False).status_code == 303
-        confirm = fresh.post("/decide/confirm", data={"actor": "R. Reviewer"}, follow_redirects=False)
+        confirm = fresh.post(
+            "/decide/confirm", data={"actor": "R. Reviewer"}, follow_redirects=False
+        )
         assert confirm.headers["location"].startswith("/draft")
         assert fresh.get("/study").status_code == 200
         done = fresh.get("/draft")

@@ -7,9 +7,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from cairn.app import create_app
-from cairn.web import templates
 from cairn.web.i18n import CATALOGUES
-from test_word_cap import rendered_state
+from screens import STATE_MARKERS, rendered_state
 
 WEB = Path(__file__).resolve().parents[1] / "src" / "cairn" / "web"
 REAL_RECORDINGS = Path(__file__).resolve().parent / "fixtures" / "recordings_real_shape"
@@ -21,15 +20,6 @@ HELP_MARKERS = (
     "How to read this page",
     "Cómo leer esta página",
 )
-REAL_STATES = (
-    "step1_after",
-    "step5_refused",
-    "step6",
-    "step7",
-    "step6_broken",
-    "step7_broken",
-    "step7_mismatch",
-)
 
 
 def _pages(lang: str, monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
@@ -37,20 +27,16 @@ def _pages(lang: str, monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
     pages: dict[str, str] = {}
     with TestClient(create_app()) as client:
         client.get(f"/?lang={lang}")
-        thread = client.post("/api/threads").json()["thread_id"]
-        for name in ("/", "/explore", "/step/1", "/step/2", "/step/3"):
+        for name in ("/", "/study", "/ask", "/decide", "/draft"):
             pages[name] = client.get(name).text
-        pages["q2"] = client.post("/step/2/run", data={"question": "Q2"}).text
-        pages["q6"] = client.post("/step/2/run", data={"question": "Q6"}).text
-        client.post("/step/4/example", data={"thread": thread})
-        pages["/step/4"] = client.get(f"/step/4?thread={thread}").text
-        pages["step4_fragment"] = client.post(
-            "/step/4/decide", data={"thread": thread, "t_x": "1", "a_x": "1"}
-        ).text
-        client.post("/step/4/confirm", data={"thread": thread, "actor": "R. Reviewer"})
-        pages["/step/5"] = client.get(f"/step/5?thread={thread}").text
-    # Steps that need a real thread or a run: the same states the word-cap tests render.
-    for state in REAL_STATES:
+        pages["ask_q2"] = client.post("/ask/run", data={"question": "Q2"}).text
+        pages["ask_q6"] = client.post("/ask/run", data={"question": "Q6"}).text
+        pages["explore_q2"] = client.post("/explore/run", data={"question": "Q2"}).text
+        pages["explore_q6"] = client.post("/explore/run", data={"question": "Q6"}).text
+        client.post("/decide/example")
+        pages["decide_fragment"] = client.post("/decide/set", data={"t_x": "1", "a_x": "1"}).text
+    # Screens that need a real thread or a run: the same states the word-cap tests render.
+    for state in STATE_MARKERS:
         pages[state] = rendered_state(state, lang)
     return pages
 
@@ -68,7 +54,7 @@ def test_every_rendered_summary_is_a_pill_that_names_content_and_size(
             assert 'class="pill"' in attrs, (lang, name, label)
             match = re.fullmatch(r"(\S+) (.+?) · (\d+) (\S+)", label)
             assert match, (lang, name, label)
-            assert match.group(1).lower() in {"ver", "show"}, (lang, name, label)
+            assert match.group(1).lower() in {"ver", "show", "mostrar"}, (lang, name, label)
             assert match.group(2).lower() not in GENERIC, (lang, name, label)
             other = CATALOGUES["en" if lang == "es" else "es"]
             assert not any(v in label for k, v in other.items() if k.startswith("disc_")), (
@@ -83,9 +69,9 @@ def test_every_rendered_summary_is_a_pill_that_names_content_and_size(
 def test_the_disclosure_labels_come_from_the_active_catalogue(
     lang: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    html = _pages(lang, monkeypatch)["/step/3"]
+    html = _pages(lang, monkeypatch)["/ask"]
     assert CATALOGUES[lang]["disc_lower_ranks"] in html
-    assert CATALOGUES[lang]["disc_quotes"] in html
+    assert CATALOGUES[lang]["disc_guides"] in html
 
 
 def test_the_catalogue_has_a_label_and_a_unit_for_every_disclosure() -> None:
@@ -117,17 +103,6 @@ def test_no_help_panel_exists_anywhere(monkeypatch: pytest.MonkeyPatch) -> None:
     for lang in ("es", "en"):
         for name, html in _pages(lang, monkeypatch).items():
             assert not any(m in html for m in HELP_MARKERS) and "<aside" not in html, name
-
-
-def test_the_reading_path_and_cue_components_render_numbered_stages() -> None:
-    template = templates.env.from_string(
-        '{% import "_components.html" as a with context %}'
-        '{{ a.reading_path(["One", "Two", "Three"], "Path") }}{{ a.cue(2) }}'
-    )
-    html = template.render(t=CATALOGUES["en"])
-    assert html.count("<li>") == 3 and '<ol class="path" aria-label="Path">' in html
-    assert [int(n) for n in re.findall(r'class="cue solid"[^>]*>(\d)<', html)] == [1, 2, 3]
-    assert '<span class="cue" aria-hidden="true">2</span>' in html
 
 
 def test_the_new_controls_have_a_visible_focus_outline() -> None:

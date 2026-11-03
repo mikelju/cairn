@@ -1,21 +1,19 @@
-"""Per-page contract over every real state: reading path, format line, one language."""
+"""Per-page contract over every real state: format line, one language."""
 
 import html as htmllib
 import re
 from functools import cache
-from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from cairn.app import create_app
 from cairn.web.i18n import CATALOGUES
-from test_word_cap import STATE_MARKERS, rendered_state
+from screens import REAL_RECORDINGS, STATE_MARKERS, rendered_state
 
-REAL_RECORDINGS = Path(__file__).resolve().parent / "fixtures" / "recordings_real_shape"
 LANGS = ("es", "en")
-# Every step state with its real data (steps 6 and 7 with a thread), one full page each.
-STEP_STATES = [name for name in STATE_MARKERS if name != "landing"]
+# Every screen state with its real data (the draft screen with a thread), one full page each.
+SCREEN_STATES = list(STATE_MARKERS)
 MIN_LENGTH = 12  # shorter catalogue values are generic words that data may legitimately repeat
 
 
@@ -29,7 +27,7 @@ def _main(page: str) -> str:
 
 @cache
 def _extra_pages(lang: str) -> dict[str, str]:
-    """Explore with answers, a live refusal and a highlight page, as the app renders them."""
+    """Ask with answers, a live refusal and a highlight page, as the app renders them."""
     import os
 
     saved = {k: os.environ.get(k) for k in ("CAIRN_RECORDINGS", "CAIRN_ACCESS_CODE")}
@@ -38,7 +36,7 @@ def _extra_pages(lang: str) -> dict[str, str]:
     try:
         with TestClient(create_app()) as client:
             pages = {
-                "explore": client.get(f"/explore?lang={lang}").text,
+                "ask": client.get(f"/ask?lang={lang}").text,
                 "explore_q2": client.post(
                     f"/explore/run?lang={lang}", data={"question": "Q2"}
                 ).text,
@@ -52,9 +50,9 @@ def _extra_pages(lang: str) -> dict[str, str]:
                     f"/explore/live?lang={lang}", data={"question": "Q?", "code": "wrong"}
                 ).text,
             }
-            step3 = client.get(f"/step/3?lang={lang}").text
-            link = re.search(r'href="(/highlight/[^"]+)"', step3)
-            assert link, "step 3 links no highlighted page"
+            ask = client.get(f"/ask?lang={lang}").text
+            link = re.search(r'href="(/highlight/[^"]+)"', ask)
+            assert link, "the ask screen links no highlighted page"
             pages["highlight"] = client.get(f"{link.group(1)}?lang={lang}").text
     finally:
         for key, value in saved.items():
@@ -66,31 +64,18 @@ def _extra_pages(lang: str) -> dict[str, str]:
 
 
 @cache
-def _step_page(name: str, lang: str) -> str:
+def _screen_page(name: str, lang: str) -> str:
     return rendered_state(name, lang)
 
 
 @pytest.mark.parametrize("lang", LANGS)
-@pytest.mark.parametrize("name", ["landing", *STEP_STATES])
-def test_every_step_page_shows_its_reading_path(name: str, lang: str) -> None:
-    page = _step_page(name, lang)
-    assert re.search(r'<ol class="path" aria-label="[^"]+">(?:<li>.*?</li>){2,}</ol>', page), name
-
-
-@pytest.mark.parametrize("lang", LANGS)
-def test_explore_shows_its_reading_path(lang: str) -> None:
-    page = _extra_pages(lang)["explore"]
-    assert re.search(r'<ol class="path" aria-label="[^"]+">(?:<li>.*?</li>){2,}</ol>', page)
-
-
-@pytest.mark.parametrize("lang", LANGS)
 @pytest.mark.parametrize("question", ["Q2", "Q6"])
-def test_step2_answer_has_exactly_one_non_empty_format_line(
+def test_ask_answer_has_exactly_one_non_empty_format_line(
     question: str, lang: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("CAIRN_RECORDINGS", str(REAL_RECORDINGS))
     with TestClient(create_app()) as client:
-        body = client.post(f"/step/2/run?lang={lang}", data={"question": question}).text
+        body = client.post(f"/ask/run?lang={lang}", data={"question": question}).text
     lines = re.findall(r'<p class="format-line[^"]*">(.*?)</p>', body, re.S)
     assert body.count('class="format-line') == 1 and len(lines) == 1, (question, lang)
     assert re.sub(r"<[^>]+>", "", lines[0]).strip(), (question, lang)
@@ -117,7 +102,7 @@ def _foreign_values(lang: str) -> list[tuple[str, str]]:
 
 @pytest.mark.parametrize("lang", LANGS)
 def test_no_page_shows_text_from_the_other_locale(lang: str) -> None:
-    pages = {name: _step_page(name, lang) for name in ["landing", *STEP_STATES]}
+    pages = {name: _screen_page(name, lang) for name in SCREEN_STATES}
     pages.update(_extra_pages(lang))
     foreign = _foreign_values(lang)
     assert len(foreign) > 100
