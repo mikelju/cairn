@@ -1,5 +1,4 @@
 import hashlib
-import html
 import importlib
 import json
 import re
@@ -478,7 +477,7 @@ def test_web_parses_passages_and_highlights_once_per_process(
 
 
 def _filled(client: TestClient) -> str:
-    """Start the session thread on /decide, fill the example and return the thread id (the cookie)."""
+    """Start the thread on /decide, fill the example and return its id (the cookie)."""
     client.get("/decide")
     id_ = client.cookies.get("cairn_thread")
     assert id_
@@ -633,7 +632,9 @@ def test_draft_shows_rules_chain_status_and_the_production_note() -> None:
         _english(client)
         _decided(client)
         page = client.get("/draft").text
-        assert 'class="badge recorded"' in page and "passed" in page and "<td>fired</td>" not in page
+        assert (
+            'class="badge recorded"' in page and "passed" in page and "<td>fired</td>" not in page
+        )
         assert "Verified." in page and "chained entries" in page
         assert "8/8" in page and "rules passed" in page
         assert "not a validated or external log" in page

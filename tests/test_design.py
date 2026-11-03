@@ -304,14 +304,14 @@ def test_badge_recorded_keeps_its_metadata_and_simulated_its_production_line(
     recorded = json.loads((served / "q2.json").read_text(encoding="utf-8"))
     with TestClient(create_app()) as client:
         client.cookies.set("cairn_lang", "en")
-        result = client.post("/step/2/run", data={"question": "Q2"}).text
-        step1 = client.get("/step/1").text
+        result = client.post("/ask/run", data={"question": "Q2"}).text
+        study = client.get("/study").text
     meta = re.search(r'<p class="meta">(.*?)</p>', result, flags=re.S)
     assert meta is not None and 'class="badge recorded"' in meta.group(1)
     assert str(recorded["date"]) in meta.group(1) and str(recorded["region"]) in meta.group(1)
     assert "opus-4-6" in meta.group(1)
     assert re.search(r"\| \d+\.\d s \|", meta.group(1)) and "USD" in meta.group(1)
-    prod = re.search(r'<p class="prod">(.*?)</p>', step1, flags=re.S)
+    prod = re.search(r'<p class="prod">(.*?)</p>', study, flags=re.S)
     assert prod is not None
     assert 'class="badge simulated"' in prod.group(1) and "In production" in prod.group(1)
 
@@ -526,6 +526,13 @@ def test_locked_steps_are_not_told_apart_only_by_colour() -> None:
     locked = rules[".steps .locked"]
     glyph = rules.get(".steps .locked::before", "")
     assert "line-through" in locked or "content" in glyph
+
+
+def test_current_screen_link_is_told_apart_by_weight_and_underline() -> None:
+    css = _strip_comments(CSS_PATH.read_text(encoding="utf-8"))
+    rules = dict((s.strip(), b) for s, b in RULE.findall(css))
+    current = rules['.steps a[aria-current="page"]']
+    assert "font-weight: 700" in current and "text-decoration: underline" in current
 
 
 def _media_rules(css: str) -> dict[str, str]:

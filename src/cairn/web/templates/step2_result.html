@@ -8,7 +8,6 @@
 {{ a.format_line(r.kind) }}
 {% if r.text %}
 <div class="card answer">
-<p class="lang-tag">{{ t.exp_en_rec if r.badge == "RECORDED" else t.exp_en_live }}</p>
 <p class="prose"><strong>{{ r.text }}</strong></p></div>
 {% endif %}
 {% if r.message or r.failures %}
@@ -20,6 +19,7 @@
 <div class="detail">
 {% if r.written %}{% call a.disclosure("model_text", r.written.split()|length, "words") %}<p>{{ r.written }}</p>{% endcall %}{% endif %}
 {% macro trace_body() %}{{ a.badge_meta(r.badge, r.meta) }}
+<p class="lang-tag">{{ t.exp_en_rec if r.badge == "RECORDED" else t.exp_en_live }}</p>
 {{ a.trace(r.trace, t.exp_trace) }}
 {% call a.callout("rules") %}<p>{{ t.exp_rules }} {{ r.rules or t.exp_none }}</p>{% endcall %}
 {% if r.rows %}<p>{{ r.rule }}</p>{% endif %}

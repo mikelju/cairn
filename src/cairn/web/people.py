@@ -164,7 +164,8 @@ async def _fragment(request: Request, view: dict[str, Any]) -> dict[str, Any]:
 async def decide(request: Request, thread: str | None = None) -> Response:
     thread = await _session_thread(request, thread)
     view = await get_thread(request, thread)
-    response = page(request, "decide.html", current=3, actor=AUTHOR, **await _fragment(request, view))
+    fragment = await _fragment(request, view)
+    response = page(request, "decide.html", current=3, actor=AUTHOR, **fragment)
     return _remember(response, thread)
 
 
@@ -239,7 +240,12 @@ async def _undecided(request: Request, thread: str, view: dict[str, Any], actor:
     """The draft page while the decisions are still open: gaps stay visible, nothing is invented."""
     t = i18n.context(request)["t"]
     noael = [
-        [f"{t['draft_noael']} {sex}", f"{n['dose']:g} mg/kg/day" if sex in view["confirmed"] and n["dose"] is not None else t["undecided"]]
+        [
+            f"{t['draft_noael']} {sex}",
+            f"{n['dose']:g} mg/kg/day"
+            if sex in view["confirmed"] and n["dose"] is not None
+            else t["undecided"],
+        ]
         for sex, n in view["noael"].items()
     ]
     response = page(
@@ -333,9 +339,7 @@ async def _draft_page(request: Request, thread: str, actor: str, error: str = ""
         ],
         [
             t["s7_rules"],
-            t["s7_rules_value"].format(
-                a=len(RULE_REASONS) - len(failed), b=len(RULE_REASONS)
-            ),
+            t["s7_rules_value"].format(a=len(RULE_REASONS) - len(failed), b=len(RULE_REASONS)),
         ],
         [
             t["s7_chain"],

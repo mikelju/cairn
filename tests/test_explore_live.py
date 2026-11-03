@@ -105,9 +105,9 @@ def test_explore_live_box_shows_only_with_a_code(
     live_box: LiveFake, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     with TestClient(create_app()) as client:
-        assert "/explore/live" in client.get("/explore").text
+        assert "/explore/live" in client.get("/ask").text
         monkeypatch.delenv("CAIRN_ACCESS_CODE")
-        assert "/explore/live" not in client.get("/explore").text
+        assert "/explore/live" not in client.get("/ask").text
 
 
 def test_live_cap_blocks_at_the_cap_and_reopens_next_utc_day(
