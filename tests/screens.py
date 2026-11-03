@@ -5,6 +5,7 @@ import re
 import sqlite3
 import tempfile
 from functools import cache
+from html import unescape
 from pathlib import Path
 from unittest import mock
 
@@ -33,12 +34,11 @@ STATE_MARKERS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "study_injected": (("s1_head", "s1_same", "s1_undo"), ("s1_break",)),
     "study_duplicate": (("s1_head", "s1_reported"), ("s1_same",)),
     "study_dose": (("s1_head", "s1_reported"), ("s1_same",)),
-    "ask_before": (("s2_ask",), ("exp_rules",)),
-    "ask_q2": (("exp_rules",), ("fmt_refusal_h",)),
+    "ask_before": (("s2_lede", "q_Q1"), ("exp_rules",)),
+    "ask_q2": (("exp_rules",), ("trick_Q6",)),
     "ask_q2_open": (("exp_rules", "disc_model_text"), ()),
-    "ask_q6": (("fmt_refusal_h",), ()),
-    "ask_explore_q2": (("exp_rules",), ("fmt_refusal_h",)),
-    "ask_explore_q6": (("fmt_refusal_h",), ()),
+    "ask_q6": (("trick_Q6",), ()),
+    "ask_g2": (("exp_official",), ("trick_Q6",)),
     "decide_empty": (("s4_example",), ()),
     "decide_filled": (("s4_example",), ()),
     "decide_confirmed": (("s4_example",), ()),
@@ -56,7 +56,7 @@ def assert_expected_page(name: str, html: str) -> None:
     lang = re.search(r'<html lang="(\w+)"', html)
     t = CATALOGUES[lang.group(1) if lang else "es"]
     present, absent = STATE_MARKERS[name]
-    text = " ".join(re.sub(r"<[^>]+>", " ", html).split())
+    text = " ".join(unescape(re.sub(r"<[^>]+>", " ", html)).split())
     for key in present:
         marker = _literal(t[key])
         assert marker and marker in text, f"{name} does not render {marker!r}"
@@ -103,17 +103,12 @@ def _ask(client: TestClient, name: str) -> str:
     page = client.get("/ask").text
     if name == "ask_before":
         return page
-    question = "Q6" if name.endswith("q6") else "Q2"
-    if name.startswith("ask_explore_"):
-        result = client.post("/explore/run", data={"question": question}).text
-        target = "answer-explore"
-    else:
-        result = client.post("/ask/run", data={"question": question}).text
-        target = "result"
+    question = {"ask_q6": "Q6", "ask_g2": "G2"}.get(name, "Q2")
+    result = client.post("/ask/run", data={"question": question}).text
     assert STALE_NOTICE not in result, f"{name} rendered a stale recording"
     if name == "ask_q2_open":
         result = open_toggle(result)
-    return with_result(page, result, target)
+    return with_result(page, result, "result")
 
 
 def _render(client: TestClient, db: Path, name: str) -> str:

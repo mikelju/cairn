@@ -114,10 +114,11 @@ def main() -> int:
         if failed:
             print("a route did not answer 200")
             return 1
-        _, ask = get("/ask")
-        link = re.search(rb'href="(/highlight/[^"]+)"', ask)
+        with http.urlopen(http.Request(BASE + "/ask/run", data=b"question=G2")) as response:
+            answer = response.read()
+        link = re.search(rb'href="(/highlight/[^"]+)"', answer)
         if link is None:
-            print("/ask has no highlighted page link")
+            print("the G2 answer has no highlighted page link")
             return 1
         status, page = get(link.group(1).decode())
         print(link.group(1).decode(), status)

@@ -11,6 +11,7 @@ from screens import STALE_NOTICE, STATE_MARKERS, open_toggle, rendered_state, wi
 
 STEP_WORD_CAP = 93
 STUDY_WORD_CAP = 60  # change 004 C14: set screen by screen as each one is redesigned
+ASK_WORD_CAP = 60
 SENTENCE_WORD_CAP = 25
 
 
@@ -37,7 +38,8 @@ class _MainCounter(HTMLParser):
         if tag == "main":
             self.in_main = True
         hide = tag in DROPPED_TAGS
-        if tag == "tbody" and self.in_main and not self._hidden():
+        unit = "answer-unit" in (values.get("class") or "").split()
+        if (tag == "tbody" or unit) and self.in_main and not self._hidden():
             self.words += 1
             hide = True
         if self.stack and self.stack[-1][0] == "details-closed" and tag != "summary":
@@ -112,6 +114,12 @@ def test_rendered_counter_counts_a_table_body_as_one_word() -> None:
     assert rendered_words(_page(table, lede="Lede.")) == 1 + 2 + 1
 
 
+def test_rendered_counter_counts_an_answer_unit_as_one_word() -> None:
+    text = " ".join(["ans"] * 50)
+    unit = f'<article class="answer-panel answer-unit"><p>{text}</p></article>'
+    assert rendered_words(_page(unit, lede="Lede.")) == 1 + 1
+
+
 def test_rendered_counter_counts_a_closed_details_by_its_summary() -> None:
     inner = "<p>" + " ".join(["hidden"] * 40) + "</p>"
     closed = f"<details><summary>Show more</summary>{inner}</details>"
@@ -138,7 +146,9 @@ def test_result_fragment_lands_inside_the_result_element() -> None:
 
 
 def _cap(state: str) -> int:
-    return STUDY_WORD_CAP if state.startswith("study_") else STEP_WORD_CAP
+    if state.startswith("study_"):
+        return STUDY_WORD_CAP
+    return ASK_WORD_CAP if state.startswith("ask_") else STEP_WORD_CAP
 
 
 @pytest.mark.parametrize("state", list(STATE_MARKERS))

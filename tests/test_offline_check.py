@@ -124,7 +124,7 @@ def test_offline_check_passes_against_the_app(
 
 
 def test_offline_check_fails_without_a_highlight_link(run_check: Callable[..., int]) -> None:
-    assert run_check(lambda path: (200, b"<html></html>") if path == "/ask" else None) == 1
+    assert run_check(lambda path: (200, b"<html></html>") if path == "/ask/run" else None) == 1
 
 
 def test_offline_check_fails_without_a_png(run_check: Callable[..., int]) -> None:

@@ -546,7 +546,9 @@ def ask_run(request: Request, question: Annotated[str, Form()]) -> HTMLResponse:
         else:
             context = _step2_context(question, _recordings_dir(), shell["t"])
     except StaleRecording as error:
-        return templates.TemplateResponse(request, "ask_answer.html", {**shell, "stale": str(error)})
+        return templates.TemplateResponse(
+            request, "ask_answer.html", {**shell, "stale": str(error)}
+        )
     context = {**context, "id": question, "trick": question in ASK_TRICKS}
     return templates.TemplateResponse(request, "ask_answer.html", {**shell, "r": context})
 
