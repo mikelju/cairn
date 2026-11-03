@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% import "_components.html" as a with context %}
+{% block main %}
+<section class="step">
+{{ a.screen_head(4, t.step_4, "RECORDED", t.s5_lede) }}
+{% if undecided %}
+{{ a.data_table([t.draft_noael, ""], noael) }}
+{% call a.callout("note") %}<p><a href="/decide">{{ t.draft_decide }}</a></p>{% endcall %}
+{% call a.disclosure("final_text", text.split()|length, "words") %}<div class="card answer"><p>{{ text }}</p></div>{% endcall %}
+{% else %}
+<div class="detail">
+{% call a.disclosure("final_text", text.split()|length, "words") %}<div class="card answer"><p>{{ text }}</p></div>{% endcall %}
+</div>
+{% if error %}{% call a.callout("blocked") %}<p>{{ error }}</p>{% endcall %}{% endif %}
+{% if approved_by %}{% call a.callout("rules") %}<p>{{ t.s5_approved }} {{ approved_by }}.</p>{% endcall %}
+{% else %}
+<form method="post" action="/draft/approve" class="controls"><input type="hidden" name="thread" value="{{ thread }}">
+<button type="submit" name="actor" value="A. Author">{{ t.s5_approve_as }} A. Author</button>
+<button type="submit" name="actor" value="R. Reviewer">{{ t.s5_approve_as }} R. Reviewer</button></form>
+{% endif %}
+{% call a.disclosure("checks", 3, "items") %}
+<h2>{{ t.s5_judge_h }}</h2>
+{{ a.badge_meta("RECORDED", meta) }}
+<p class="meta">{{ a.badge("RECORDED") }} {{ judge_meta }}</p>
+<div class="tiles">
+{{ a.tile(judged ~ "/" ~ total, t.s5_tile_judged) }}
+{{ a.tile(passed ~ "/" ~ rule_total, t.s5_tile_rules, tone="ok") }}
+</div>
+<p class="meta">{{ t.s5_never }}</p>
+{{ a.data_table([t.s5_th_sentence, t.s5_th_judge, t.s5_th_reason], judge_rows) }}
+<h2>{{ t.step_6 }}</h2>
+<div class="tiles">
+{{ a.tile(passed ~ "/" ~ rule_total, t.s6_tile_passed, tone="ok") }}
+{{ a.tile(fired, t.s6_tile_fired) }}
+</div>
+{{ a.data_table([t.s6_th_rule, t.s6_th_result, t.s6_th_note], rules) }}
+<h2>{{ t.s6_chain_h }}</h2>
+<div class="tiles">
+{{ a.tile(entries, t.s6_tile_entries, tone="ok" if chain_ok else "") }}
+</div>
+{% call a.callout("rules" if chain_ok else "blocked") %}<p>{{ chain }} {{ t.s6_chain_note }}</p>{% endcall %}
+<h2>{{ t.step_7 }}</h2>
+<div class="tiles">
+{{ a.tile(numbers, t.s7_tile_numbers ~ " (" ~ t.s7_by_model.format(n=by_model) ~ ")", tone="ok") }}
+{{ a.tile(quotes, t.s7_tile_quotes) }}
+{{ a.tile(decisions, t.s7_tile_decisions) }}
+</div>
+{{ a.data_table([t.s7_th_item, t.s7_th_value], session) }}
+<h2>{{ t.s7_doors_h }}</h2>
+{{ a.data_table([t.s7_th_door, t.s7_th_hash], doors) }}
+{% if same %}{% call a.callout("rules") %}<p>{{ t.s7_same }}</p>{% endcall %}
+{% else %}{% call a.callout("blocked") %}<p>{{ t.s7_differ }}</p>{% endcall %}{% endif %}
+<p>{% for text, href in links %}<a href="{{ href }}">{{ text }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</p>
+{% call a.disclosure("production", production|length, "rows") %}{{ a.data_table([t.s7_th_piece, t.s7_th_demo, t.s7_th_prod], production) }}{% endcall %}
+{% endcall %}
+{{ a.in_production(t.s5_prod, label=t.exp_prod_label) }}
+{% endif %}
+{{ a.screen_nav(4, screens) }}
+</section>
+{% endblock %}

@@ -6,7 +6,7 @@
 <div class="page-images">
 {% for e in pages %}
 <figure>
-<p class="meta">{{ t.hl_page }} {{ e.page }} · <a href="{{ e.link }}">{{ t.hl_official }}</a> · <a href="/step/3">{{ t.hl_back }}</a></p>
+<p class="meta">{{ t.hl_page }} {{ e.page }} · <a href="{{ e.link }}">{{ t.hl_official }}</a> · <a href="/ask">{{ t.hl_back }}</a></p>
 <a href="/{{ e.image }}"><img class="page-image" src="/{{ e.image }}" alt="{{ t.hl_alt.format(page=e.page) }}"></a>
 </figure>
 {% endfor %}

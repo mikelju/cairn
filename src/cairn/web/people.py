@@ -1,4 +1,4 @@
-"""Steps 4 and 5: thin HTMX handlers over the thread API functions (no model call here)."""
+"""Screens 3 and 4: thin HTMX handlers over the thread API functions (no model call here)."""
 
 import json
 import re
@@ -67,9 +67,33 @@ def _actor(actor: str) -> Actor:
     return actor
 
 
-def _current(thread: str, actor: str) -> RedirectResponse:
+COOKIE = "cairn_thread"
+COOKIE_MAX_AGE = 60 * 60 * 24
+
+
+def _current(actor: str) -> RedirectResponse:
     """After a 409: the page for the state the thread is really in, not the raw JSON."""
-    return RedirectResponse(f"/step/5?thread={thread}&actor={actor}", status_code=303)
+    return RedirectResponse(f"/draft?actor={actor}", status_code=303)
+
+
+def _remember(response: Response, thread: str) -> Response:
+    response.set_cookie(COOKIE, thread, max_age=COOKIE_MAX_AGE, samesite="lax", path="/")
+    return response
+
+
+async def _session_thread(request: Request, explicit: str | None = None) -> str:
+    """The visitor's thread: the query or form value, else the cookie, else a new one."""
+    for candidate in (explicit, request.cookies.get(COOKIE)):
+        if not candidate:
+            continue
+        try:
+            await get_thread(request, candidate)
+        except HTTPException as missing:
+            if missing.status_code != 404:
+                raise
+        else:
+            return candidate
+    return str((await start(request))["thread_id"])
 
 
 async def _draft(request: Request, thread: str) -> Markup:
@@ -136,21 +160,18 @@ async def _fragment(request: Request, view: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-@people.get("/step/4", response_class=HTMLResponse)
-async def step4(request: Request, thread: str | None = None) -> Response:
-    if thread is None:
-        view = await start(request)
-        return RedirectResponse(f"/step/4?thread={view['thread_id']}", status_code=303)
+@people.get("/decide", response_class=HTMLResponse)
+async def decide(request: Request, thread: str | None = None) -> Response:
+    thread = await _session_thread(request, thread)
     view = await get_thread(request, thread)
-    return page(request, "step4.html", current=4, actor=AUTHOR, **await _fragment(request, view))
+    response = page(request, "decide.html", current=3, actor=AUTHOR, **await _fragment(request, view))
+    return _remember(response, thread)
 
 
-@people.post("/step/4/decide", response_class=HTMLResponse)
-async def step4_decide(request: Request) -> HTMLResponse:
+@people.post("/decide/set", response_class=HTMLResponse)
+async def decide_set(request: Request) -> HTMLResponse:
     form = await request.form()
-    if "thread" not in form:
-        raise HTTPException(status_code=422, detail="thread is required")
-    thread = str(form["thread"])
+    thread = await _session_thread(request, str(form["thread"]) if "thread" in form else None)
     items = []
     for slot in (await get_thread(request, thread))["slots"]:
         t, a = str(form.get("t_" + slot["slot"], "")), str(form.get("a_" + slot["slot"], ""))
@@ -166,16 +187,20 @@ async def step4_decide(request: Request) -> HTMLResponse:
         if refusal.status_code != 409:
             raise
         return HTMLResponse(
-            status_code=204, headers={"HX-Redirect": _current(thread, AUTHOR).headers["location"]}
+            status_code=204, headers={"HX-Redirect": _current(AUTHOR).headers["location"]}
         )
     fragment = await _fragment(request, view)
-    return templates.TemplateResponse(
-        request, "step4_result.html", {**i18n.context(request), **fragment}
+    response = templates.TemplateResponse(
+        request, "decide_result.html", {**i18n.context(request), **fragment}
     )
+    return _remember(response, thread)  # type: ignore[return-value]
 
 
-@people.post("/step/4/example")
-async def step4_example(request: Request, thread: Annotated[str, Form()]) -> RedirectResponse:
+@people.post("/decide/example")
+async def decide_example(
+    request: Request, thread: Annotated[str | None, Form()] = None
+) -> RedirectResponse:
+    thread = await _session_thread(request, thread)
     slots = (await get_thread(request, thread))["slots"]
     items = [
         DecisionIn(
@@ -190,54 +215,44 @@ async def step4_example(request: Request, thread: Annotated[str, Form()]) -> Red
     except HTTPException as refusal:
         if refusal.status_code != 409:
             raise
-        return _current(thread, AUTHOR)
-    return RedirectResponse(f"/step/4?thread={thread}", status_code=303)
+        return _remember(_current(AUTHOR), thread)  # type: ignore[return-value]
+    return _remember(RedirectResponse("/decide", status_code=303), thread)  # type: ignore[return-value]
 
 
-@people.post("/step/4/confirm")
-async def step4_confirm(
-    request: Request, thread: Annotated[str, Form()], actor: Annotated[str, Form()]
+@people.post("/decide/confirm")
+async def decide_confirm(
+    request: Request,
+    actor: Annotated[str, Form()],
+    thread: Annotated[str | None, Form()] = None,
 ) -> RedirectResponse:
     who = _actor(actor)
+    thread = await _session_thread(request, thread)
     try:
         await confirm(request, thread, Confirm(actor=who, confirmed=["F", "M"]))
     except HTTPException as refusal:
         if refusal.status_code != 409:
             raise
-        return _current(thread, who)
-    return RedirectResponse(f"/step/5?thread={thread}&actor={actor}", status_code=303)
+    return _remember(_current(who), thread)  # type: ignore[return-value]
 
 
-async def _step5(request: Request, thread: str, actor: str, error: str = "") -> Response:
-    state, waiting, view = await load_view(request, thread)
-    if waiting == "await_decisions":
-        return RedirectResponse(f"/step/4?thread={thread}", status_code=303)
+async def _undecided(request: Request, thread: str, view: dict[str, Any], actor: str) -> Response:
+    """The draft page while the decisions are still open: gaps stay visible, nothing is invented."""
     t = i18n.context(request)["t"]
-    model = recorded_model(RECORDINGS_DIR, "DRAFT", DEFAULT_MODEL)
-    recording = ReplayClient.load(RECORDINGS_DIR, draft_key(model)).recording
-    cost = total_cost(recording)
-    latency = sum(float(call.get("latency_s", 0.0)) for call in recording["calls"])
-    failed = set(verify_final(state).rules)
-    return page(
+    noael = [
+        [f"{t['draft_noael']} {sex}", f"{n['dose']:g} mg/kg/day" if sex in view["confirmed"] and n["dose"] is not None else t["undecided"]]
+        for sex, n in view["noael"].items()
+    ]
+    response = page(
         request,
-        "step5.html",
-        current=5,
+        "draft.html",
+        current=4,
         actor=actor,
         thread=thread,
-        error=error,
-        text=view["final"]["text"],
-        approved_by=view["approved_by"],
-        meta=(
-            f"{recording['date']} | {recording['region']} | {recording['model']} | "
-            f"{latency:.1f} s | " + (t["s5_cost_na"] if cost is None else f"{cost:.2f} USD")
-        ),
-        passed=len(RULE_REASONS) - len(failed),
-        rule_total=len(RULE_REASONS),
-        judge_meta=_judge_meta(),
-        judge_rows=_judge_rows(view["judge"], state, t),
-        judged=sum(r["verdict"] != NOT_JUDGED for r in view["judge"]),
-        total=len(view["judge"]),
+        undecided=True,
+        noael=noael,
+        text=await _draft(request, thread),
     )
+    return _remember(response, thread)
 
 
 def _judge_meta() -> str:
@@ -273,45 +288,6 @@ def _judge_rows(results: list[dict[str, str]], state: Any, t: dict[str, str]) ->
     return rows
 
 
-@people.get("/step/5", response_class=HTMLResponse)
-async def step5(request: Request, thread: str | None = None, actor: str = REVIEWER) -> Response:
-    if thread is None:
-        return RedirectResponse("/step/4", status_code=303)
-    return await _step5(request, thread, _actor(actor))
-
-
-@people.get("/step/6", response_class=HTMLResponse)
-async def step6(request: Request, thread: str | None = None, actor: str = REVIEWER) -> Response:
-    if thread is None:
-        return RedirectResponse("/step/4", status_code=303)
-    state, waiting, _ = await load_view(request, thread)
-    if waiting == "await_decisions":
-        return RedirectResponse(f"/step/4?thread={thread}", status_code=303)
-    t = i18n.context(request)["t"]
-    failed = {f.rule: f.reason for f in verify_final(state).failures}
-    chain = await verify_audit(request, thread)
-    return page(
-        request,
-        "step6.html",
-        current=6,
-        actor=_actor(actor),
-        rules=[
-            [n, t["s6_fired"] if n in failed else t["s6_passed"], failed.get(n, reason)]
-            for n, reason in RULE_REASONS.items()
-        ],
-        fired=len(failed),
-        passed=len(RULE_REASONS) - len(failed),
-        rule_total=len(RULE_REASONS),
-        entries=chain["count"],
-        chain=(
-            t["s6_chain_ok"]
-            if chain["ok"]
-            else t["s6_chain_broken"].format(n=chain["first_broken"])
-        ),
-        chain_ok=chain["ok"],
-    )
-
-
 REPO = "https://github.com/mikelju/cairn"
 STEP7_LINKS = [
     ("s7_link_memo", f"{REPO}/commit/7897d079c8665301821fe0e0faffdfd988b6ce82"),
@@ -336,24 +312,20 @@ async def _two_doors(request: Request) -> tuple[str, str]:
     return str(over_mcp["content_sha256"]), str(over_rest or f"HTTP {reply.status_code}")
 
 
-@people.get("/step/7", response_class=HTMLResponse)
-async def step7(request: Request, thread: str | None = None, actor: str = REVIEWER) -> Response:
-    if thread is None:
-        return RedirectResponse("/step/4", status_code=303)
+async def _draft_page(request: Request, thread: str, actor: str, error: str = "") -> Response:
     state, waiting, view = await load_view(request, thread)
     if waiting == "await_decisions":
-        return RedirectResponse(f"/step/4?thread={thread}", status_code=303)
-    parts = [p for s in sections_of(state) for p in s.parts]
-    by_model = sum(c.isdigit() for p in parts if isinstance(p, Text) for c in p.text)
+        return await _undecided(request, thread, view, actor)
+    t = i18n.context(request)["t"]
     model = recorded_model(RECORDINGS_DIR, "DRAFT", DEFAULT_MODEL)
     recording = ReplayClient.load(RECORDINGS_DIR, draft_key(model)).recording
     cost = total_cost(recording)
     latency = sum(float(call.get("latency_s", 0.0)) for call in recording["calls"])
+    failed = {f.rule: f.reason for f in verify_final(state).failures}
     chain = await verify_audit(request, thread)
-    failed = len(verify_final(state).failures)
+    parts = [p for s in sections_of(state) for p in s.parts]
+    by_model = sum(c.isdigit() for p in parts if isinstance(p, Text) for c in p.text)
     over_mcp, over_rest = await _two_doors(request)
-    t = i18n.context(request)["t"]
-    code_numbers = sum(isinstance(p, ValueRef) for p in parts)
     session = [
         [
             t["s7_draft"],
@@ -361,7 +333,9 @@ async def step7(request: Request, thread: str | None = None, actor: str = REVIEW
         ],
         [
             t["s7_rules"],
-            t["s7_rules_value"].format(a=len(RULE_REASONS) - failed, b=len(RULE_REASONS)),
+            t["s7_rules_value"].format(
+                a=len(RULE_REASONS) - len(failed), b=len(RULE_REASONS)
+            ),
         ],
         [
             t["s7_chain"],
@@ -371,17 +345,43 @@ async def step7(request: Request, thread: str | None = None, actor: str = REVIEW
         ],
         [t["s7_approval"], view["approved_by"] or t["s7_not_yet"]],
     ]
-    return page(
+    response = page(
         request,
-        "step7.html",
-        current=7,
-        actor=_actor(actor),
+        "draft.html",
+        current=4,
+        actor=actor,
+        thread=thread,
+        undecided=False,
+        error=error,
+        text=view["final"]["text"],
+        approved_by=view["approved_by"],
+        meta=(
+            f"{recording['date']} | {recording['region']} | {recording['model']} | "
+            f"{latency:.1f} s | " + (t["s5_cost_na"] if cost is None else f"{cost:.2f} USD")
+        ),
+        passed=len(RULE_REASONS) - len(failed),
+        rule_total=len(RULE_REASONS),
+        judge_meta=_judge_meta(),
+        judge_rows=_judge_rows(view["judge"], state, t),
+        judged=sum(r["verdict"] != NOT_JUDGED for r in view["judge"]),
+        total=len(view["judge"]),
+        rules=[
+            [n, t["s6_fired"] if n in failed else t["s6_passed"], failed.get(n, reason)]
+            for n, reason in RULE_REASONS.items()
+        ],
+        fired=len(failed),
+        entries=chain["count"],
+        chain=(
+            t["s6_chain_ok"]
+            if chain["ok"]
+            else t["s6_chain_broken"].format(n=chain["first_broken"])
+        ),
+        chain_ok=chain["ok"],
         session=session,
-        numbers=code_numbers,
+        numbers=sum(isinstance(p, ValueRef) for p in parts),
         by_model=by_model,
         quotes=sum(isinstance(p, QuoteRef) for p in parts),
         decisions=len(view["decisions"]),
-        confirmed=len(view["confirmed"]),
         doors=[["MCP", over_mcp[:16]], ["REST", over_rest[:16]]],
         same=over_mcp == over_rest,
         links=[(t[key], href) for key, href in STEP7_LINKS],
@@ -389,21 +389,31 @@ async def step7(request: Request, thread: str | None = None, actor: str = REVIEW
             [t[f"s7_p_{k}"], t[f"s7_p_{k}_demo"], t[f"s7_p_{k}_prod"]] for k in PRODUCTION_KEYS
         ],
     )
+    return _remember(response, thread)
 
 
-@people.post("/step/5/approve", response_class=HTMLResponse)
-async def step5_approve(
-    request: Request, thread: Annotated[str, Form()], actor: Annotated[str, Form()]
+@people.get("/draft", response_class=HTMLResponse)
+async def draft(request: Request, thread: str | None = None, actor: str = REVIEWER) -> Response:
+    thread = await _session_thread(request, thread)
+    return await _draft_page(request, thread, _actor(actor))
+
+
+@people.post("/draft/approve", response_class=HTMLResponse)
+async def draft_approve(
+    request: Request,
+    actor: Annotated[str, Form()],
+    thread: Annotated[str | None, Form()] = None,
 ) -> Response:
     who = _actor(actor)
+    thread = await _session_thread(request, thread)
     error = ""
     try:
         await approve(request, thread, Approve(actor=who))
     except HTTPException as refusal:
         if refusal.status_code == 409:
-            return _current(thread, who)
+            return _remember(_current(who), thread)
         if refusal.status_code != 403:
             raise
         t = i18n.context(request)["t"]
         error = t["s5_refused"].format(detail=refusal.detail)
-    return await _step5(request, thread, who, error)
+    return await _draft_page(request, thread, who, error)

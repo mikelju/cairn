@@ -9,7 +9,7 @@ from typing import Annotated, Any
 
 import pandas as pd
 from fastapi import APIRouter, FastAPI, Form, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -39,7 +39,7 @@ from cairn.web.threads import threads
 HERE = Path(__file__).parent
 templates = Jinja2Templates(directory=HERE / "templates")
 router = APIRouter()
-STEP_COUNT = 7
+SCREENS = ((1, "/study"), (2, "/ask"), (3, "/decide"), (4, "/draft"))
 
 
 def _commit() -> str:
@@ -71,7 +71,7 @@ def _page(request: Request, name: str, **context: Any) -> HTMLResponse:
     }
     keep = {k: str(context[k]) for k in ("thread", "actor") if context.get(k)}
     shell = i18n.context(request, context.get("current"), keep)
-    base = {"steps": range(1, STEP_COUNT + 1), "footer": footer, **shell, **context}
+    base = {"steps": SCREENS, "screens": SCREENS, "footer": footer, **shell, **context}
     return templates.TemplateResponse(request, name, base)
 
 
@@ -165,13 +165,13 @@ async def landing(request: Request) -> HTMLResponse:
     return _page(request, "landing.html", current=0)
 
 
-@router.get("/step/1", response_class=HTMLResponse)
-async def step1(request: Request) -> HTMLResponse:
-    return _page(request, "step1.html", current=1)
+@router.get("/study", response_class=HTMLResponse)
+async def study(request: Request) -> HTMLResponse:
+    return _page(request, "study.html", current=1)
 
 
-@router.post("/step/1/run", response_class=HTMLResponse)
-async def step1_run(request: Request, switch: Annotated[str, Form()] = "none") -> HTMLResponse:
+@router.post("/study/run", response_class=HTMLResponse)
+async def study_run(request: Request, switch: Annotated[str, Form()] = "none") -> HTMLResponse:
     extra: list[dict[str, Any]] = []
     if switch not in (*SWITCHES, "none"):
         raise HTTPException(status_code=422, detail="unknown switch")
@@ -345,14 +345,8 @@ def result_context(result: LoopResult, badge: str, meta: str) -> dict[str, Any]:
     }
 
 
-@router.get("/step/2", response_class=HTMLResponse)
-async def step2(request: Request) -> HTMLResponse:
-    badge = _step2_badge(_recordings_dir())
-    return _page(request, "step2.html", current=2, questions=STEP2_QUESTIONS, page_badge=badge)
-
-
-@router.post("/step/2/run", response_class=HTMLResponse)
-def step2_run(request: Request, question: Annotated[str, Form()]) -> HTMLResponse:
+@router.post("/ask/run", response_class=HTMLResponse)
+def ask_run(request: Request, question: Annotated[str, Form()]) -> HTMLResponse:
     if question not in QUESTIONS:
         raise HTTPException(status_code=422, detail="unknown question")
     try:
@@ -440,11 +434,6 @@ def _step3_context() -> dict[str, Any]:
     }
 
 
-@router.get("/step/3", response_class=HTMLResponse)
-async def step3(request: Request) -> HTMLResponse:
-    return _page(request, "step3.html", current=3, r=_step3_context())
-
-
 @router.get("/highlight/{sentence_id}", response_class=HTMLResponse)
 async def highlight_view(request: Request, sentence_id: str) -> HTMLResponse:
     entries = _highlighted(sentence_id)
@@ -483,14 +472,40 @@ def _card_kinds(directory: Path) -> dict[str, str]:
     return kinds
 
 
-@router.get("/explore", response_class=HTMLResponse)
-async def explore(request: Request) -> HTMLResponse:
+@router.get("/ask", response_class=HTMLResponse)
+async def ask_page(request: Request) -> HTMLResponse:
     directory = _recordings_dir()
-    badge = _step2_badge(directory)
-    live = bool(os.environ.get("CAIRN_ACCESS_CODE"))
     kinds = _card_kinds(directory)
-    stages = [[(q, kinds[q]) for q in group] for group in EXPLORE_STAGES]
-    return _page(request, "explore.html", current=0, stages=stages, page_badge=badge, live=live)
+    return _page(
+        request,
+        "ask.html",
+        current=2,
+        questions=STEP2_QUESTIONS,
+        cards=[(q, kinds[q]) for group in EXPLORE_STAGES for q in group],
+        live=bool(os.environ.get("CAIRN_ACCESS_CODE")),
+        page_badge=_step2_badge(directory),
+        r=_step3_context(),
+    )
+
+
+REDIRECTS = {1: "/study", 2: "/ask", 3: "/ask", 4: "/decide", 5: "/draft", 6: "/draft", 7: "/draft"}
+
+
+def _redirect(request: Request, target: str) -> RedirectResponse:
+    query = request.url.query
+    return RedirectResponse(f"{target}?{query}" if query else target, status_code=303)
+
+
+@router.get("/step/{number}")
+async def old_step(request: Request, number: int) -> RedirectResponse:
+    if number not in REDIRECTS:
+        raise HTTPException(status_code=404, detail="no such step")
+    return _redirect(request, REDIRECTS[number])
+
+
+@router.get("/explore")
+async def old_explore(request: Request) -> RedirectResponse:
+    return _redirect(request, "/ask")
 
 
 @router.post("/explore/run", response_class=HTMLResponse)
