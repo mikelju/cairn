@@ -28,11 +28,11 @@ def _literal(text: str) -> str:
 # Per state: catalogue entries the page must show, and entries it must not (a fall-through fails).
 STATE_MARKERS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "landing": (("land_cta",), ()),
-    "study_before": (("s1_run",), ("s1_th_rule",)),
-    "study_after": (("s1_tile_q",), ("s1_tile_inj",)),
-    "study_injected": (("s1_tile_inj",), ()),
-    "study_duplicate": (("s1_tile_q",), ("s1_tile_inj",)),
-    "study_dose": (("s1_tile_q",), ("s1_tile_inj",)),
+    "study_before": (("s1_lede",), ("s1_head",)),
+    "study_after": (("s1_head", "s1_break"), ("s1_same", "s1_reported")),
+    "study_injected": (("s1_head", "s1_same", "s1_undo"), ("s1_break",)),
+    "study_duplicate": (("s1_head", "s1_reported"), ("s1_same",)),
+    "study_dose": (("s1_head", "s1_reported"), ("s1_same",)),
     "ask_before": (("s2_ask",), ("exp_rules",)),
     "ask_q2": (("exp_rules",), ("fmt_refusal_h",)),
     "ask_q2_open": (("exp_rules", "disc_model_text"), ()),

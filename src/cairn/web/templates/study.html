@@ -3,15 +3,12 @@
 {% block main %}
 <section class="step">
 {{ a.screen_head(1, t.step_1, "REAL", t.s1_lede) }}
-<form class="controls card" hx-post="/study/run" hx-target="#result" hx-trigger="submit, change">
-  <button type="submit">{{ t.s1_run }}</button>
-  {% for value in ("none", "negative", "duplicate", "dose") %}
-  <label><input type="radio" name="switch" value="{{ value }}"{% if loop.first %} checked{% endif %}> {{ t["s1_sw_" ~ value] }}</label>
-  {% endfor %}
-</form>
-
-<div id="result" class="result"></div>
+<div class="tiles two">
+  {{ a.tile(animals, t.s1_animals) }}
+  {{ a.tile(n_doses, t.s1_doses.format(doses=doses)) }}
+</div>
+<div id="result" class="result" hx-post="/study/run" hx-trigger="load"></div>
 {{ a.screen_nav(1, screens) }}
-{% call a.inside([[t.step_1, t.s1_prod_lead, t.s1_prod]]) %}{% endcall %}
+{% call a.inside([[t.step_1, t.s1_prod_lead, t.s1_prod]]) %}<div id="inside-trace"></div>{% endcall %}
 </section>
 {% endblock %}

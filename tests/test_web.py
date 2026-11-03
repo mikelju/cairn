@@ -16,6 +16,7 @@ from cairn.fetch import VENDORED_DIR
 from cairn.ingest import DEFAULT_DB, ingest
 from cairn.web import HERE
 from cairn.web.i18n import COOKIE
+from screens import rendered_state
 
 
 def test_healthz_and_landing_page() -> None:
@@ -44,15 +45,73 @@ def _english(client: TestClient) -> TestClient:
     return client
 
 
+def _text(html: str) -> str:
+    return " ".join(re.sub(r"<[^>]+>", " ", html).split())
+
+
+def _main_outside_inside(page: str) -> str:
+    main = re.search(r"<main.*?</main>", page, re.S)
+    assert main, "no main"
+    return re.sub(r'<details class="inside">.*?</details>', "", main.group(0), flags=re.S)
+
+
+def test_step1_summary_comes_from_the_data() -> None:
+    with TestClient(create_app()) as client:
+        _english(client)
+        page = client.get("/study").text
+    assert 'class="num">124<' in page and 'class="num">4<' in page
+    assert "doses: 0, 20, 200, 400 mg/kg/day" in page
+    assert "job runner: in process." in _inside(page)
+
+
 def test_step1_run_shows_quarantine_and_computed_means() -> None:
     with TestClient(create_app()) as client:
         _english(client)
-        assert "job runner: in process." in _inside(client.get("/study").text)
         result = client.post("/study/run").text
-    assert 'class="num">12<' in result and "quarantined" in result
-    assert result.count("pp_auc_positive") == 12
-    assert 'class="num">2,821<' in result and "with the bad value, n=3" in result
-    assert 'class="num">15,956<' in result and "without it, n=2" in result
+    assert "Impossible values set apart: 12" in result
+    assert result.count('class="new"') == 3 + 12  # the short table and the full list
+    assert "Show all values · 12 rows" in result
+    assert "-23,450 h*ng/mL" in result and "exposure (AUC), day 1" in result
+    assert "Values set apart: 12" in result and "males, 20 mg/kg, day 1" in result
+    assert "h*ng/mL: 2,821 with" in result and "(n=3)" in result
+    assert "15,956 without" in result and "(n=2)" in result
+
+
+def test_step1_without_injection_every_count_is_twelve() -> None:
+    page = rendered_state("study_after", "en")
+    shown = _text(_main_outside_inside(page))
+    assert "Impossible values set apart: 12" in shown and "· 12 rows" in shown
+    assert _text(_inside(page)).count("Values set apart: 12") == 1
+    assert "13" not in re.sub(r"PDS2014-\d+", "", shown)
+    assert "New value set apart" not in shown and "injected" not in _text(page).lower()
+
+
+def test_step1_injection_is_one_value_with_one_animal_everywhere() -> None:
+    page = rendered_state("study_injected", "en")
+    shown = _text(_main_outside_inside(page))
+    inside = _text(_inside(page))
+    assert "Impossible values set apart: 13" in shown and "· 13 rows" in shown
+    assert "Values set apart: 13." in inside and "Values set apart: 12" not in inside
+    animal = re.search(r"Injected value: animal (PDS2014-\d+)", inside)
+    assert animal, "the Inside panel does not name the injected animal"
+    first_row = re.search(
+        r"<tr class=\"new\"><td>(PDS2014-\d+)</td><td>concentration, day 1</td>", page
+    )
+    assert first_row and first_row.group(1) == animal.group(1)
+    assert "-1 ng/mL" in page
+    # the full list holds 13 rows and the injected animal is the only one with a concentration
+    assert page.count("concentration, day") == 2  # short table and full list
+    assert "New value set apart: mean AUC (males, 20 mg/kg, day 1) stays 15,956 h*ng/mL" in shown
+
+
+def test_step1_main_has_no_upper_case_send_terms() -> None:
+    allowed = {"AUC", "FDA", "REAL"}
+    for state in ("study_before", "study_after", "study_injected"):
+        for lang in ("es", "en"):
+            shown = re.sub(
+                r"PDS2014-\d+", "", _text(_main_outside_inside(rendered_state(state, lang)))
+            )
+            assert set(re.findall(r"[A-Z]{3,}", shown)) <= allowed, (state, lang)
 
 
 def test_step1_switches_fire_their_rule_without_touching_the_sources(tmp_path: Path) -> None:
@@ -62,25 +121,26 @@ def test_step1_switches_fire_their_rule_without_touching_the_sources(tmp_path: P
     watched = [db, *vendored] + ([DEFAULT_DB] if DEFAULT_DB.exists() else [])
     before = [hashlib.sha256(p.read_bytes()).hexdigest() for p in watched]
     expected = {
-        "negative": ("pc_concentration_positive", "injected row"),
-        "duplicate": ("dm_usubjid_unique", "repeated"),
-        "dose": ("dm_setcd_in_tx", "99"),
+        "negative": "concentration",
+        "duplicate": "animal ID repeated",
+        "dose": "dose group missing",
     }
     with TestClient(create_app()) as client:
         _english(client)
         plain = client.post("/study/run", data={"switch": "none"}).text
-        for switch, (rule, shown) in expected.items():
+        for switch, shown in expected.items():
             result = client.post("/study/run", data={"switch": switch}).text
             if switch == "negative":
-                assert 'class="num">13<' in result and "with the injected row" in result
+                assert "Impossible values set apart: 13" in result and "Undo" in result
             else:  # the validator reports these rules and does not quarantine them
-                assert 'class="num">12<' in result and "Reported, not quarantined" in result
-                assert "injected row" not in result
-            assert 'class="new"' in result and rule in result and shown in result
-            assert all(other not in result for other, _ in expected.values() if other != rule)
-            assert rule not in plain
+                assert "Impossible values set apart: 12" in result
+                assert "Also reported, not set apart:" in result
+                assert "Undo" not in result
+            assert shown in result
+            assert all(other not in result for o, other in expected.items() if o != switch)
+            assert shown not in plain
         assert client.post("/study/run", data={"switch": "bogus"}).status_code == 422
-    assert 'class="num">12<' in plain
+    assert "Impossible values set apart: 12" in plain
     assert [hashlib.sha256(p.read_bytes()).hexdigest() for p in watched] == before
 
 

@@ -1,16 +1,19 @@
 {% import "_components.html" as a with context %}
-<div class="tiles">
-  {{ a.tile(r.total, t.s1_tile_q ~ (" · " ~ t.s1_tile_inj if r.injected else ""), 2, "warn") }}
-  {{ a.tile(r.with_bad, t.s1_tile_with.format(n=r.n_with)) }}
-  {{ a.tile(r.without_bad, t.s1_tile_without.format(n=r.n_without), tone="ok") }}
+{% set g = r.group %}
+{% set heads = [t.s1_th_animal, t.s1_th_test, t.s1_th_value] %}
+{% macro lines(items) %}{% set out = namespace(rows=[]) %}{% for q in items %}{% set out.rows = out.rows + [[q.animal, t[q.measure] ~ (t.s1_day.format(day=q.day) if q.day != "-" else ""), q.value]] %}{% endfor %}{{ a.data_table(heads, out.rows, new=true) }}{% endmacro %}
+<h2>{{ t.s1_head }}{{ r.total }}</h2>
+{% if not r.injected and not r.reported %}<p class="figure">{{ t.s1_why }}</p>{% endif %}
+{{ lines(r.short) }}
+<div class="detail">{% call a.disclosure("quarantined", r.total, "rows") %}{{ lines(r.rows) }}{% endcall %}</div>
+{% if r.reported %}<p class="figure">{{ t.s1_reported }} {{ r.reported[0].animal }}, {{ t[r.reported[0].measure] }}</p>{% endif %}
+{% if r.injected %}<p class="figure">{{ t.s1_same.format(sex=t["s1_sex_" ~ g.sex], dose=g.dose|int, day=g.day|int, mean=r.without_bad, unit=r.unit) }}</p>{% endif %}
+<form hx-post="/study/run" hx-target="#result">
+  <input type="hidden" name="switch" value="{{ 'none' if r.injected else 'negative' }}">
+  <button type="submit" class="btn-secondary">{{ t.s1_undo if r.injected else t.s1_break }}</button>
+</form>
+<div id="inside-trace" hx-swap-oob="true">
+  <p>{{ t.s1_in_total.format(n=r.total) }}</p>
+  <p>{{ t.s1_in_mean.format(sex=t["s1_sex_" ~ g.sex], dose=g.dose|int, day=g.day|int, unit=r.unit, with_bad=r.with_bad, n_with=r.n_with, without_bad=r.without_bad, n_without=r.n_without) }}</p>
+  {% if r.injected %}<p>{{ t.s1_in_injected.format(animal=r.injected_animal) }}</p>{% endif %}
 </div>
-{% set heads = [t.s1_th_rule, t.s1_th_animal, t.s1_th_test] %}
-{% if r.fired %}
-{% if r.reported %}<p class="figure">{{ t.s1_reported }}</p>{% endif %}
-{% set fired = namespace(rows=[]) %}
-{% for f in r.fired %}{% set fired.rows = fired.rows + [[f.rule, f.usubjid, f.test, f.value]] %}{% endfor %}
-{{ a.data_table(heads + [t.s1_th_value], fired.rows, new=true) }}
-{% endif %}
-{% set held = namespace(rows=[]) %}
-{% for q in r.rows %}{% set held.rows = held.rows + [[q.rule, q.usubjid, q.test, q.visit_day|int, q.value]] %}{% endfor %}
-<div class="detail">{% call a.disclosure("quarantined", r.rows|length, "rows") %}{{ a.data_table(heads + [t.s1_th_day, t.s1_th_value], held.rows) }}{% endcall %}</div>

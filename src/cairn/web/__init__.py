@@ -75,22 +75,67 @@ def _page(request: Request, name: str, **context: Any) -> HTMLResponse:
     return templates.TemplateResponse(request, name, base)
 
 
+@lru_cache(maxsize=1)
+def _study_facts() -> dict[str, Any]:
+    """What the study is, read from the data: animal count, doses and the AUC unit."""
+    frames, _, _ = load_study()
+    tx, pp = frames["TX"], frames["PP"]
+    doses = sorted({float(v) for v in tx.loc[tx["TXPARMCD"] == "TRTDOS", "TXVAL"]})
+    unit = str(pp.loc[pp["PPTESTCD"] == "AUCTAU", "PPSTRESU"].dropna().iloc[0])
+    return {
+        "animals": len(frames["DM"]),
+        "doses": ", ".join(f"{d:g}" for d in doses),
+        "n_doses": len(doses),
+        "unit": unit,
+    }
+
+
+MEASURES = {
+    RULE_AUC: "s1_m_auc",
+    RULE_CONC: "s1_m_conc",
+    "dm_usubjid_unique": "s1_m_dup",
+    "dm_setcd_in_tx": "s1_m_set",
+}
+
+
+def _shown(value: Any, unit: Any) -> str:
+    if isinstance(value, str):
+        return value if value.isdigit() else "-"
+    text = f"{value:,.0f}" if float(value).is_integer() else f"{value:,.2f}"
+    return f"{text} {unit}" if unit else text
+
+
+def _row(r: dict[str, Any]) -> dict[str, Any]:
+    day = r.get("visit_day")
+    return {
+        "animal": r["usubjid"],
+        "measure": MEASURES[r["rule"]],
+        "day": "-" if day is None else int(day),
+        "value": _shown(r["value"], r.get("unit")),
+        "rule": r["rule"],
+    }
+
+
 def _result(
     report: dict[str, Any], injected: bool, extra: list[dict[str, Any]] | None = None
 ) -> dict[str, Any]:
     naive = report["naive_mean_auctau"]
-    rows = report["quarantine"]["rows"]
-    extra = extra or []
+    # one list for every count shown: the injected concentration comes first
+    held = sorted(report["quarantine"]["rows"], key=lambda q: q["rule"] != RULE_CONC)
+    rows = [_row(q) for q in held]
     return {
+        **_study_facts(),
         "injected": injected,
-        "reported": bool(extra),
-        "total": report["quarantine"]["total"],
-        "rows": [r for r in rows if r["rule"] == RULE_AUC],
-        "fired": [r for r in rows if r["rule"] == RULE_CONC] + extra,
+        "total": len(rows),
+        "rows": rows,
+        "short": rows[:3],
+        "reported": [_row(q) for q in extra or []],
+        "group": naive["group"],
         "with_bad": _number(naive["with_quarantined"]["mean"]),
         "n_with": naive["with_quarantined"]["n"],
         "without_bad": _number(naive["without_quarantined"]["mean"]),
         "n_without": naive["without_quarantined"]["n"],
+        "injected_animal": next((q["animal"] for q in rows if q["rule"] == RULE_CONC), ""),
     }
 
 
@@ -167,7 +212,7 @@ async def landing(request: Request) -> HTMLResponse:
 
 @router.get("/study", response_class=HTMLResponse)
 async def study(request: Request) -> HTMLResponse:
-    return _page(request, "study.html", current=1)
+    return _page(request, "study.html", current=1, **_study_facts())
 
 
 @router.post("/study/run", response_class=HTMLResponse)

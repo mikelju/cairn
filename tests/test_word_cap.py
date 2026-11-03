@@ -10,6 +10,7 @@ from cairn.app import create_app
 from screens import STALE_NOTICE, STATE_MARKERS, open_toggle, rendered_state, with_result
 
 STEP_WORD_CAP = 93
+STUDY_WORD_CAP = 60  # change 004 C14: set screen by screen as each one is redesigned
 SENTENCE_WORD_CAP = 25
 
 
@@ -80,9 +81,9 @@ def rendered_lede(html: str) -> str:
     return " ".join(counter.lede.split())
 
 
-def rendered_problems(html: str) -> list[str]:
+def rendered_problems(html: str, cap: int = STEP_WORD_CAP) -> list[str]:
     problems = []
-    if rendered_words(html) > STEP_WORD_CAP:
+    if rendered_words(html) > cap:
         problems.append("step words")
     lede = rendered_lede(html)
     sentences = [s for s in re.split(r"(?<=[.!?])\s+", lede) if s]
@@ -136,11 +137,15 @@ def test_result_fragment_lands_inside_the_result_element() -> None:
     assert rendered_words(with_result(page, "<p>a b</p>")) == rendered_words(page) + 2
 
 
+def _cap(state: str) -> int:
+    return STUDY_WORD_CAP if state.startswith("study_") else STEP_WORD_CAP
+
+
 @pytest.mark.parametrize("state", list(STATE_MARKERS))
 def test_word_cap_rendered(state: str) -> None:
     html = rendered_state(state)
     print(state, rendered_words(html), rendered_lede(html))
-    assert rendered_problems(html) == [], state
+    assert rendered_problems(html, _cap(state)) == [], state
 
 
 @pytest.mark.parametrize("lang", ["es", "en"])
@@ -149,7 +154,7 @@ def test_screens_are_within_the_cap_in_both_locales(state: str, lang: str) -> No
     html = rendered_state(state, lang)
     print(state, lang, rendered_words(html))
     assert f'<html lang="{lang}"' in html
-    assert rendered_problems(html) == [], (state, lang)
+    assert rendered_problems(html, _cap(state)) == [], (state, lang)
 
 
 def test_with_result_fails_when_there_is_no_result_element() -> None:
