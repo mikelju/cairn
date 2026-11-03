@@ -309,7 +309,7 @@ def _crawl(lang: str) -> int:
     return checked
 
 
-def test_every_link_resolves_and_none_points_to_the_repository():
+def test_every_link_resolves_and_none_points_to_the_repository() -> None:
     """C18: no github.com href, internal hrefs answer 200, anchors have ids, externals listed."""
     for lang in LANGS:
         assert _crawl(lang) > 50
