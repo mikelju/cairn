@@ -72,6 +72,12 @@ Supervisor, 2026-11-03: the 60-word cap of C14 is applied screen by screen insid
 | E13 | ejecutor (sonnet) | I2a: Inside panel per screen (C13) | done | Commit d0c6428: closed `details.inside` on the 4 screens with trace, cost, model, hashes, chain, judge, production table; ranking and mini-guide keys removed; 8 tests red on `/ask` (word cap for `ask_q2`/`ask_q2_open`, C13 recorded note) |
 | E14 | ejecutor (sonnet) | I2b: fix the 8 red `/ask` tests and run the remaining suites | done | Commit 01d793e: screening-rule paragraph moved into the Inside slot, `fmt_table` shortened; C13 test expected RECORDED where the fixture badge is FIXTURE; 9 files 257 passed before the one-line test fix, ruff green |
 
+| E15 | ejecutor (sonnet) | I2c links (C18) | done | Commit f54b42a; 3 links removed; crawler test; 167 passed |
+| E16 | ejecutor (sonnet) | I3 screen 1 (C15, C12, cap 60 on `/study`) | done | Commits 593e2a2, e981e0e; counts 12/13 consistent, animal PDS2014-0031 everywhere, AUC with h*ng/mL and group; `/study` 28-60 words; duplicate-ID and missing-dose toggles dropped from the UI per mockup (routes kept); 246 passed, ruff and mypy green |
+| E17 | ejecutor (sonnet) | I4 screen 2 (C7, C12, cap 60 on `/ask`) | failed | Context; WIP 99cb081 (src only, never run): one POST `/ask/run` for Q1-Q8, G1-G3, NS1-NS2; `/explore/run` and old partials removed; 4 questions visible, 9 in a closed disclosure (accepted: 13 buttons do not fit 60 words) |
+| E18 | ejecutor (sonnet) | I4b: app boots, answer-unit counter, screens states, word cap, offline check | done | Commit 39dfbc1; all ask ids 200, unknown 422; `/ask` 57-59 words; 89 passed, ruff and mypy green |
+| E19 | ejecutor (sonnet) | I4c: migrate remaining suites to the single `/ask/run`, C7 tests | in progress | |
+
 ## User decisions
 | ID | Question | Options and recommendation | Status | User's answer |
 |---|---|---|---|---|
