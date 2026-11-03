@@ -65,6 +65,9 @@ Current authorization and limits: on 2026-11-03 the user approved the change and
 | E12 | ejecutor (sonnet) | I1 close: C2-C6 tests, mark I1, full check | done | `tests/test_screens.py` 10 passed |
 | E2 | explorador (opus) | Stranger test, recruiter persona | done | Gets the headline but not the problem or audience; jargon from step 1; both navigation bugs reproduced: menu 03 goes to /step/3, menu links drop `thread` so /step/5-7 redirect to /step/4 with a new thread and lost progress; step 6 has no link to 7 |
 
+| E13 | ejecutor (sonnet) | I2a: Inside panel per screen (C13) | done | Commit d0c6428: closed `details.inside` on the 4 screens with trace, cost, model, hashes, chain, judge, production table; ranking and mini-guide keys removed; 8 tests red on `/ask` (word cap for `ask_q2`/`ask_q2_open`, C13 recorded note) |
+| E14 | ejecutor (sonnet) | I2b: fix the 8 red `/ask` tests and run the remaining suites | done | Commit 01d793e: screening-rule paragraph moved into the Inside slot, `fmt_table` shortened; C13 test expected RECORDED where the fixture badge is FIXTURE; 9 files 257 passed before the one-line test fix, ruff green |
+
 ## User decisions
 | ID | Question | Options and recommendation | Status | User's answer |
 |---|---|---|---|---|
