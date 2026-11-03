@@ -24,13 +24,11 @@ def test_healthz_and_landing_page() -> None:
     with TestClient(create_app()) as client:
         assert client.get("/healthz").status_code == 200
         page = client.get("/?lang=en").text
-    for badge in ("REAL", "RECORDED", "SIMULATED"):
-        assert f'class="badge {badge.lower()}"' in page
     assert "Public sample data · fictional compound · not GxP-validated" in page
     assert "Role: Study toxicologist (simulated)" in page
     assert re.search(r"v0\.1\.0 · commit \S+ · snapshot [0-9a-f]{12}", page)
     assert page.count('class="locked"') == 0
-    assert 'href="/ask"' in page and 'href="/ask"' in page
+    assert 'href="/study"' in page
     assert "/static/vendor/htmx.min.js" in page
 
 
@@ -822,18 +820,23 @@ def test_draft_says_where_the_chain_is_broken(
 
 
 @pytest.mark.parametrize("lang", ["es", "en"])
-def test_landing_has_one_h1_a_four_stage_journey_and_one_primary_action(lang: str) -> None:
+def test_landing_shows_one_h1_a_real_marked_sentence_and_one_primary_action(lang: str) -> None:
+    from cairn.web.i18n import CATALOGUES
+
     with TestClient(create_app()) as client:
         page = client.get(f"/?lang={lang}").text
+    main = page.split("<main", 1)[1].split("</main>", 1)[0]
     assert page.count("<h1") == 1
-    assert len(re.findall(r'<ol class="journey"[^>]*>', page)) == 1
-    journey = re.search(r'<ol class="journey".*?</ol>', page, re.S)
-    assert journey and len(re.findall(r"<li\b", journey.group(0))) == 4
-    assert len(re.findall(r'class="btn-primary"', page)) == 1
-    assert 'class="btn-primary" href="/study"' in page
-    assert 'class="path"' in page and 'class="cue' in page
-    for badge in ("real", "recorded", "simulated"):
-        assert f'class="badge {badge}"' in page
+    assert CATALOGUES[lang]["land_title"] in unescape(main)
+    sentence = re.search(r'<p class="lede answer">(.*?)</p>\s*<p class="meta">', main, re.S)
+    assert sentence and 'class="prov prov-data"' in sentence.group(1)
+    plain = re.sub(r'<details class="prov .*?</details>', " ", sentence.group(1), flags=re.S)
+    assert not re.search(r"\d", re.sub(r"<[^>]+>", "", plain))  # every digit sits in a tag
+    assert len(re.findall(r'class="btn-primary"', main)) == 1
+    assert 'class="btn-primary" href="/study"' in main
+    for gone in ('class="journey"', 'class="path"', 'class="cue', 'class="legend"', 'class="badge'):
+        assert gone not in main
+    assert "aria-current" not in main and 'aria-current="page"' not in page
 
 
 @pytest.mark.parametrize("lang", ["es", "en"])

@@ -86,10 +86,10 @@ def test_toggle_on_a_post_page_keeps_the_thread() -> None:
         assert client.cookies.get("cairn_thread") == thread  # the thread travels in the cookie
 
 
-def test_landing_secondary_link_needs_no_thread() -> None:
+def test_landing_primary_link_goes_to_the_study() -> None:
     with TestClient(create_app()) as client:
         page = client.get("/?lang=en").text
-    assert 'class="btn-secondary" href="/ask"' in page
+    assert 'class="btn-primary" href="/study"' in page and "btn-secondary" not in page
 
 
 def test_highlight_page_reads_the_catalogue() -> None:

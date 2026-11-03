@@ -206,11 +206,6 @@ async def healthz() -> JSONResponse:
     return JSONResponse({"status": "ok"})
 
 
-@router.get("/", response_class=HTMLResponse)
-async def landing(request: Request) -> HTMLResponse:
-    return _page(request, "landing.html", current=0)
-
-
 @router.get("/study", response_class=HTMLResponse)
 async def study(request: Request) -> HTMLResponse:
     return _page(request, "study.html", current=1, **_study_facts())

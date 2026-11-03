@@ -9,11 +9,7 @@ from fastapi.testclient import TestClient
 from cairn.app import create_app
 from screens import STALE_NOTICE, STATE_MARKERS, open_toggle, rendered_state, with_result
 
-STEP_WORD_CAP = 93
-STUDY_WORD_CAP = 60  # change 004 C14: set screen by screen as each one is redesigned
-ASK_WORD_CAP = 60
-DECIDE_WORD_CAP = 60
-DRAFT_WORD_CAP = 60
+WORD_CAP = 60  # change 004 C14: every state of every page
 SENTENCE_WORD_CAP = 25
 
 
@@ -85,7 +81,7 @@ def rendered_lede(html: str) -> str:
     return " ".join(counter.lede.split())
 
 
-def rendered_problems(html: str, cap: int = STEP_WORD_CAP) -> list[str]:
+def rendered_problems(html: str, cap: int = WORD_CAP) -> list[str]:
     problems = []
     if rendered_words(html) > cap:
         problems.append("step words")
@@ -106,7 +102,7 @@ def test_rendered_counter_ignores_header_and_footer() -> None:
 
 
 def test_rendered_counter_fails_an_over_cap_main_area() -> None:
-    body = "<p>" + " ".join(["word"] * STEP_WORD_CAP) + "</p>"
+    body = "<p>" + " ".join(["word"] * WORD_CAP) + "</p>"
     assert rendered_problems(_page(body)) == ["step words"]
 
 
@@ -147,21 +143,11 @@ def test_result_fragment_lands_inside_the_result_element() -> None:
     assert rendered_words(with_result(page, "<p>a b</p>")) == rendered_words(page) + 2
 
 
-def _cap(state: str) -> int:
-    if state.startswith("study_"):
-        return STUDY_WORD_CAP
-    if state.startswith("decide_"):
-        return DECIDE_WORD_CAP
-    if state.startswith("draft_"):
-        return DRAFT_WORD_CAP
-    return ASK_WORD_CAP if state.startswith("ask_") else STEP_WORD_CAP
-
-
 @pytest.mark.parametrize("state", list(STATE_MARKERS))
 def test_word_cap_rendered(state: str) -> None:
     html = rendered_state(state)
     print(state, rendered_words(html), rendered_lede(html))
-    assert rendered_problems(html, _cap(state)) == [], state
+    assert rendered_problems(html, WORD_CAP) == [], state
 
 
 @pytest.mark.parametrize("lang", ["es", "en"])
@@ -170,7 +156,7 @@ def test_screens_are_within_the_cap_in_both_locales(state: str, lang: str) -> No
     html = rendered_state(state, lang)
     print(state, lang, rendered_words(html))
     assert f'<html lang="{lang}"' in html
-    assert rendered_problems(html, _cap(state)) == [], (state, lang)
+    assert rendered_problems(html, WORD_CAP) == [], (state, lang)
 
 
 def test_with_result_fails_when_there_is_no_result_element() -> None:
@@ -203,4 +189,4 @@ def test_landing_is_within_the_cap_in_both_locales(lang: str) -> None:
     with TestClient(create_app()) as client:
         html = client.get(f"/?lang={lang}").text
     print("landing", lang, rendered_words(html))
-    assert rendered_problems(html) == [], lang
+    assert rendered_problems(html, WORD_CAP) == [], lang

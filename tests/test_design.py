@@ -14,6 +14,8 @@ from cairn.app import create_app
 from cairn.web import HERE, templates
 from test_word_cap import rendered_lede, rendered_problems, rendered_words
 
+MOCKUP_WORD_CAP = 93  # the static mockups keep the cap they were drawn under
+
 STATIC = HERE / "static"
 REAL_RECORDINGS = Path(__file__).parent / "fixtures" / "recordings_real_shape"
 CSS_PATH = STATIC / "cairn.css"
@@ -594,7 +596,7 @@ def mockup_problems(html: str) -> list[str]:
     stylesheets = [m for m in RESOURCE_LINK.findall(html) if "stylesheet" in m.lower()]
     if len(stylesheets) != 1 or REAL_STYLESHEET not in stylesheets[0]:
         problems.append("stylesheet")
-    problems += rendered_problems(html)
+    problems += rendered_problems(html, MOCKUP_WORD_CAP)
     return problems
 
 

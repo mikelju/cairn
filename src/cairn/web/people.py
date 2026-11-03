@@ -26,7 +26,7 @@ from cairn.render import render
 from cairn.verify import RULE_REASONS
 from cairn.web import _page as page
 from cairn.web import i18n, provenance
-from cairn.web.provenance import DecisionInfo, stray_digits, tag_counts
+from cairn.web.provenance import DecisionInfo, TextPart, stray_digits, tag_counts
 from cairn.web.threads import (
     AUTHOR,
     REVIEWER,
@@ -485,6 +485,30 @@ async def _draft_page(request: Request, thread: str, actor: str, error: str = ""
             [t[f"s7_p_{k}"], t[f"s7_p_{k}_demo"], t[f"s7_p_{k}_prod"]] for k in PRODUCTION_KEYS
         ],
     )
+    return _remember(response, thread)
+
+
+def _landing_sentence(state: Any) -> list[provenance.Part]:
+    """The shortest recorded draft sentence made of text and data tags only, rendered by code."""
+    ledger = final_ledger(state)
+    options = [provenance.provenance_parts(s, ledger) for s in sections_of(state)]
+    plain = [
+        parts
+        for parts in options
+        if tag_counts(parts)["data"] >= 2
+        and tag_counts(parts)["data"] == sum(not isinstance(p, TextPart) for p in parts)
+    ]
+    return min(plain, key=lambda parts: len(provenance.joined(parts).split()))
+
+
+@people.get("/", response_class=HTMLResponse)
+async def landing(request: Request) -> Response:
+    """The result first: one real draft sentence with its numbers marked, then one button."""
+    thread = await _session_thread(request)
+    parts = _landing_sentence((await load_view(request, thread))[0])
+    t = i18n.context(request)["t"]
+    counts = t["land_counts"].format(numbers=tag_counts(parts)["data"], ai=len(stray_digits(parts)))
+    response = page(request, "landing.html", current=0, parts=parts, counts_line=counts)
     return _remember(response, thread)
 
 
