@@ -57,7 +57,12 @@ Current authorization and limits: on 2026-11-03 the user approved the change and
 | E4 | ejecutor (opus) | Criteria C1-C17 and increments I1-I9 | done | Commit 477f3a1; supervisor keeps C11 reading (visitor decides per-sex adversity, code proposes the NOAEL, person confirms) and the no-re-recording fallback for the recovery flag (explain in one line) |
 | E5 | ejecutor (sonnet) | I1 shell and routes | failed | Context exhausted; WIP commit 3bdf584 (catalogue, menu macros, new screen templates, old step1-3 and explore templates removed); app broken until routes are wired. Accepted: reading paths removed now (C2 wins), badges stay until I5, `/explore/run` and `/explore/live` POST move in I4 |
 | E6 | ejecutor (sonnet) | I1 part 2: wire routes, session thread, draft screen, CSS; app boots | done | Commit 8b81ecc; `tests/test_screens_smoke.py` 1 passed (4 screens 200 ES/EN, 303 redirects keep query, thread cookie survives menu navigation); old test suite and offline check not yet migrated |
-| E7 | ejecutor (sonnet) | I1 part 3a: migrate offline check and web/contract/disclosure tests, add C2-C6 tests | in progress | |
+| E7 | ejecutor (sonnet) | I1 part 3a: migrate offline check and web/contract/disclosure tests, add C2-C6 tests | failed | Context exhausted; commit 5ae4c48 migrates the first half of `tests/test_web.py`; remainder split into E8-E11 |
+| E8 | ejecutor (sonnet) | I1 3b: rest of `tests/test_web.py` (decide/draft, landing, explore) | done | Commit cbb7aa9, `tests/test_web.py` 70 passed; role guarantees kept; dropped asserts on badges and the chain production note (`s6_prod`), which return in I2 inside the Inside panel (C13) |
+| E9 | ejecutor (sonnet) | I1 3c: shared screens helper for word cap, page contract and disclosure tests | done | Commit 354e10b, `tests/screens.py` with 21 states; 89 passed, 3 failed: `/ask` with Q2 model text open is 103 words ES / 100 EN over the cap 93 (cap not touched; to fix in app) |
+| E10 | ejecutor (sonnet) | I1 3d: migrate `offline_check.py` and its test | done | Commit 2980be6; 14 passed; real run against local uvicorn all 200 and 8 decide-draft checks ok |
+| E11 | ejecutor (sonnet) | I1 3e: `/ask` word overflow in app, test_web leftovers, i18n/design/explore_live migration | done | Commit 4458ce0; `ask_q2_open` 93 ES / 91 EN; all touched test files and ruff green; landing reading path stays until I8 |
+| E12 | ejecutor (sonnet) | I1 close: C2-C6 tests, mark I1, full check | in progress | |
 | E2 | explorador (opus) | Stranger test, recruiter persona | done | Gets the headline but not the problem or audience; jargon from step 1; both navigation bugs reproduced: menu 03 goes to /step/3, menu links drop `thread` so /step/5-7 redirect to /step/4 with a new thread and lost progress; step 6 has no link to 7 |
 
 ## User decisions
@@ -75,4 +80,4 @@ Current authorization and limits: on 2026-11-03 the user approved the change and
 |---|---|---|---|---|---|
 
 ## Delivery
-The stop-gate `npm run check` times out mid-suite; a full standalone run on 2026-11-03 finished with exit code 0 ("Todos los casos correctos"). The only change so far is this record.
+The stop-gate `npm run check` times out mid-suite; a full standalone run on 2026-11-03 finished with exit code 0 ("Todos los casos correctos"). Pending during I1 (expected until the I1 closing brief): `npm run check` fails on lint (E501 in `tests/test_screens_smoke.py` and others) and on tests not yet migrated to the 4-screen routes; the closing brief must leave lint, types and tests green.
