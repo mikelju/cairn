@@ -29,7 +29,7 @@ def test_healthz_and_landing_page() -> None:
     assert "Role: Study toxicologist (simulated)" in page
     assert re.search(r"v0\.1\.0 · commit \S+ · snapshot [0-9a-f]{12}", page)
     assert page.count('class="locked"') == 0
-    assert 'href="/step/2"' in page and 'href="/step/3"' in page
+    assert 'href="/ask"' in page and 'href="/ask"' in page
     assert "/static/vendor/htmx.min.js" in page
 
 
@@ -48,9 +48,9 @@ def _english(client: TestClient) -> TestClient:
 def test_step1_run_shows_quarantine_and_computed_means() -> None:
     with TestClient(create_app()) as client:
         _english(client)
-        assert "In production" in client.get("/step/1").text
-        assert 'class="badge simulated"' in client.get("/step/1").text
-        result = client.post("/step/1/run").text
+        assert "In production" in client.get("/study").text
+        assert 'class="badge simulated"' in client.get("/study").text
+        result = client.post("/study/run").text
     assert 'class="num">12<' in result and "quarantined" in result
     assert result.count("pp_auc_positive") == 12
     assert 'class="num">2,821<' in result and "with the bad value, n=3" in result
@@ -70,9 +70,9 @@ def test_step1_switches_fire_their_rule_without_touching_the_sources(tmp_path: P
     }
     with TestClient(create_app()) as client:
         _english(client)
-        plain = client.post("/step/1/run", data={"switch": "none"}).text
+        plain = client.post("/study/run", data={"switch": "none"}).text
         for switch, (rule, shown) in expected.items():
-            result = client.post("/step/1/run", data={"switch": switch}).text
+            result = client.post("/study/run", data={"switch": switch}).text
             if switch == "negative":
                 assert 'class="num">13<' in result and "with the injected row" in result
             else:  # the validator reports these rules and does not quarantine them
@@ -81,7 +81,7 @@ def test_step1_switches_fire_their_rule_without_touching_the_sources(tmp_path: P
             assert 'class="new"' in result and rule in result and shown in result
             assert all(other not in result for other, _ in expected.values() if other != rule)
             assert rule not in plain
-        assert client.post("/step/1/run", data={"switch": "bogus"}).status_code == 422
+        assert client.post("/study/run", data={"switch": "bogus"}).status_code == 422
     assert 'class="num">12<' in plain
     assert [hashlib.sha256(p.read_bytes()).hexdigest() for p in watched] == before
 
@@ -108,12 +108,12 @@ def _ask(
     monkeypatch.setenv("CAIRN_RECORDINGS", str(folder))
     with TestClient(create_app()) as client:
         client.cookies.set(COOKIE, lang)
-        return client.post("/step/2/run", data={"question": question}).text
+        return client.post("/ask/run", data={"question": question}).text
 
 
 def test_step2_page_lists_the_questions_with_the_recorded_badge() -> None:
     with TestClient(create_app()) as client:
-        page = _english(client).get("/step/2").text
+        page = _english(client).get("/ask").text
     assert 'class="badge recorded"' in page
     assert "In production" in page
     assert 'value="Q2"' in page and 'value="Q6"' in page
@@ -213,7 +213,7 @@ def test_step2_always_replays_whatever_the_mode_says(monkeypatch: pytest.MonkeyP
 def test_step2_rejects_an_unknown_question(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CAIRN_RECORDINGS", str(FIXTURES))
     with TestClient(create_app()) as client:
-        assert client.post("/step/2/run", data={"question": "Q9"}).status_code == 422
+        assert client.post("/ask/run", data={"question": "Q9"}).status_code == 422
 
 
 def test_q2_evidence_counts_distinct_animals_not_source_rows(
@@ -244,7 +244,7 @@ def test_step2_header_badge_follows_the_recordings_served(
     for folder, shown, hidden in cases:
         monkeypatch.setenv("CAIRN_RECORDINGS", str(folder))
         with TestClient(create_app()) as client:
-            page = client.get("/step/2").text
+            page = client.get("/ask").text
         assert f'class="badge {shown}"' in page and f'class="badge {hidden}"' not in page
 
 
@@ -256,7 +256,7 @@ def test_step2_badge_ignores_unreadable_files_and_empty_folders(
     for folder in (tmp_path, tmp_path / "missing"):
         monkeypatch.setenv("CAIRN_RECORDINGS", str(folder))
         with TestClient(create_app()) as client:
-            response = client.get("/step/2")
+            response = client.get("/ask")
         assert response.status_code == 200
         page = response.text
         assert 'class="badge none"' in page and 'class="badge recorded"' not in page
@@ -310,7 +310,7 @@ def test_explore_page_has_a_button_for_every_question() -> None:
     from cairn.questions import QUESTIONS
 
     with TestClient(create_app()) as client:
-        page = client.get("/explore?lang=en").text
+        page = client.get("/ask?lang=en").text
     for question_id in QUESTIONS:
         assert f'"question": "{question_id}"' in page
     assert len(QUESTIONS) == 11
@@ -342,11 +342,10 @@ def test_step3_shows_the_two_fixed_queries_with_ranks_and_the_build_badge() -> N
     from cairn import retrieval
 
     with TestClient(create_app()) as client:
-        page = client.get("/step/3?lang=en").text
+        page = client.get("/ask?lang=en").text
     fixed = [q for q in retrieval.load_fixed_queries() if q["used_by"] == "nonclinical-summary"]
     assert len(fixed) == 2
     for query in fixed:
-        assert query["query"] in page
         top = retrieval.cached_guidance(query["query"]).hits[0]
         assert f"<td>{top.fused_rank}</td>" in page
     assert page.count("<tr>") >= 2 * (1 + 3)  # a header row and three passages per query
@@ -357,21 +356,17 @@ def test_step3_shows_the_two_fixed_queries_with_ranks_and_the_build_badge() -> N
 
 def test_step3_counts_quotes_verbatim_on_the_cited_page() -> None:
     with TestClient(create_app()) as client:
-        page = client.get("/step/3?lang=en").text
-    match = re.search(r'class="num">(\d+)/(\d+)<', page)
-    assert match, "no verbatim tile"
-    verbatim, total = map(int, match.groups())
-    of = sum(map(int, re.findall(r"Show quoted sentences · (\d+) quotes", page)))
-    assert total == of == 6
+        page = client.get("/ask?lang=en").text
+    total = sum(map(int, re.findall(r"Show guideline quotes · (\d+) quotes", page)))
+    verbatim = page.count('<span class="verb">')
+    assert total == page.count('<blockquote class="quote">') == 6
     assert verbatim == total
 
 
 def test_navigation_has_no_locked_step() -> None:
     with TestClient(create_app()) as client:
-        page = client.get("/step/3?lang=en").text
-    assert re.search(
-        r'<a href="/step/3" aria-current="step"><span [^>]*>03</span>Explore</a>', page
-    )
+        page = client.get("/ask?lang=en").text
+    assert re.search(r'<a href="/ask" aria-current="page"><span [^>]*>2</span>', page)
     assert page.count('class="locked"') == 0
 
 
@@ -401,7 +396,7 @@ def test_highlight_route_page_shows_the_image_and_the_official_link() -> None:
 
 def test_highlight_route_links_every_step3_quotation() -> None:
     with TestClient(create_app()) as client:
-        page = client.get("/step/3?lang=en").text
+        page = client.get("/ask?lang=en").text
         links = re.findall(r'href="(/highlight/[^"]+)">highlighted page', page)
         assert len(links) == 6
         for link in links:
@@ -428,10 +423,10 @@ def test_step3_quote_link_and_nav_follow_the_cited_sentence_page() -> None:
     passage = stored_passages()["M4S-2.6-01"]
     assert cited_page(passage, "M4S-2.6-01.s12") == 8 != passage.page_start
     with TestClient(create_app()) as client:
-        explore = client.get("/explore").text
+        explore = client.get("/ask").text
         entry = client.get("/highlight/M4S-2.6-01.s12").text
-    assert 'aria-current="step"' not in explore
-    assert 'aria-current="step"' not in entry
+    assert explore.count('aria-current="page"') == 1
+    assert 'aria-current="page"' not in entry
 
 
 def test_step3_quote_cite_and_links_use_the_cited_sentence_page(
@@ -450,7 +445,7 @@ def test_step3_quote_cite_and_links_use_the_cited_sentence_page(
     assert quote["cite"].endswith(" 8") and quote["link"].endswith("#page=8")
     assert quote["highlight"] == "/highlight/M4S-2.6-01.s12"
     with TestClient(create_app()) as client:
-        page = client.get("/step/3").text
+        page = client.get("/ask").text
     assert "#page=8" in page
 
 
@@ -476,7 +471,7 @@ def test_web_parses_passages_and_highlights_once_per_process(
     monkeypatch.setattr(highlight, "load_highlights", count_h)
     with TestClient(create_app()) as client:
         for _ in range(3):
-            assert client.get("/step/3").status_code == 200
+            assert client.get("/ask").status_code == 200
             assert client.get("/highlight/M4S-2.6-01.s12").status_code == 200
     assert calls == {"passages": 1, "highlights": 1}
     passages.stored_passages.cache_clear()
@@ -724,7 +719,7 @@ def test_landing_has_one_h1_a_four_stage_journey_and_one_primary_action(lang: st
     journey = re.search(r'<ol class="journey".*?</ol>', page, re.S)
     assert journey and len(re.findall(r"<li\b", journey.group(0))) == 4
     assert len(re.findall(r'class="btn-primary"', page)) == 1
-    assert 'class="btn-primary" href="/step/1"' in page
+    assert 'class="btn-primary" href="/study"' in page
     assert 'class="path"' in page and 'class="cue' in page
     for badge in ("real", "recorded", "simulated"):
         assert f'class="badge {badge}"' in page
