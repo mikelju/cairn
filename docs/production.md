@@ -5,7 +5,7 @@ This is what would change to run it for real; nothing here is built.
 
 ## Deployment
 - Today: one Lightsail container service (`make deploy`), one instance, no autoscaling, state in the image; threads and their pauses live in memory unless `CAIRN_THREADS_DB` points to a SQLite file, and a restart loses what is in memory.
-- `make deploy` passes `CAIRN_ACCESS_CODE` and `CAIRN_LIVE_CAP_USD` to the container only if they are set in the environment (use `$env:` first, never the command line); values may only have letters, digits and hyphens.
+- `make deploy` keeps the environment of the active deployment (keys set by hand in the console survive) and overrides `CAIRN_ACCESS_CODE` and `CAIRN_LIVE_CAP_USD` only when set in the shell (use `$env:` first, never the command line); `make deploy-dry-run` shows names only.
 - It does not pass AWS credentials: give the container its own IAM user limited to `bedrock:InvokeModel` on the model used, entered in the Lightsail console (not through the CLI or the shell history); production would use a role instead.
 - Production: managed database for threads, decisions and the audit chain; at least two instances behind a load balancer; deploy from CI with a rollback.
 - Offline mode (`make demo`) stays as the fallback and as the check that the recordings still replay.

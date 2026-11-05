@@ -8,7 +8,7 @@ SERVICE ?= cairn
 REGION ?= eu-west-1
 POWER ?= medium
 
-.PHONY: build changelog demo demo-offline-check deploy guidance guidance-check weights
+.PHONY: build changelog demo demo-offline-check deploy deploy-dry-run guidance guidance-check weights
 
 build:
 	docker build --platform $(PLATFORM) --build-arg COMMIT=$$(git rev-parse --short HEAD 2>/dev/null || echo unknown) -t $(IMAGE) .
@@ -31,22 +31,18 @@ demo-offline-check: build
 # Needs the AWS CLI with Lightsail permissions and the lightsailctl plugin on PATH.
 # MSYS_NO_PATHCONV stops Git Bash from rewriting /healthz into a Windows path; exported by make so cmd runs it too.
 deploy: export MSYS_NO_PATHCONV := 1
-# Only the variables already set in make's environment go to the container (set them with $env: or export, never on the command line).
-# Values may only have letters, digits and hyphens (make and the shell would reinterpret $, commas and spaces). The deployment line is silent so make does not print them.
-comma := ,
-space := $(empty) $(empty)
-DEPLOY_VARS = CAIRN_ACCESS_CODE CAIRN_LIVE_CAP_USD
-DEPLOY_ENV = $(subst $(space),$(comma),$(strip $(foreach v,$(DEPLOY_VARS),$(if $($(v)),$(v)=$($(v))))))
+# The deployment line is run by cairn.deploy_env: it reads the active deployment's environment, merges the variables set locally
+# (CAIRN_ACCESS_CODE, CAIRN_LIVE_CAP_USD; set them with $env: or export, never on the command line) and passes the result in a temporary file.
+# Keys set by hand in the console survive; only names are printed. `make deploy-dry-run` shows the names and changes nothing.
 deploy: $(if $(SKIP_BUILD),,build)
-	aws lightsail get-container-services --service-name $(SERVICE) --region $(REGION) > /dev/null 2>&1 \
-		|| aws lightsail create-container-service --service-name $(SERVICE) --power $(POWER) --scale 1 --region $(REGION)
+	aws lightsail get-container-services --service-name $(SERVICE) --region $(REGION) > /dev/null 2>&1 \n		|| aws lightsail create-container-service --service-name $(SERVICE) --power $(POWER) --scale 1 --region $(REGION)
 	aws lightsail push-container-image --service-name $(SERVICE) --label app --image $(IMAGE) --region $(REGION)
-	@echo "deploying with environment variables: $(foreach v,$(DEPLOY_VARS),$(if $($(v)),$(v)))"
-	@aws lightsail create-container-service-deployment --service-name $(SERVICE) --region $(REGION) \
-		--containers "app={image=$$(aws lightsail get-container-images --service-name $(SERVICE) --region $(REGION) --query 'containerImages[0].image' --output text),$(if $(DEPLOY_ENV),environment={$(DEPLOY_ENV)}$(comma))ports={8000=HTTP}}" \
-		--public-endpoint "containerName=app,containerPort=8000,healthCheck={path=/healthz}"
+	@uv run python -m cairn.deploy_env $(SERVICE) $(REGION)
 	uv run python -m cairn.wait_running $(SERVICE) $(REGION)
 	aws lightsail get-container-services --service-name $(SERVICE) --region $(REGION) --query 'containerServices[0].[state,url]' --output text
+
+deploy-dry-run:
+	@uv run python -m cairn.deploy_env $(SERVICE) $(REGION) --dry-run
 
 # Laptop-only commands that call Bedrock (decision D8). Each prints its estimated spending ceiling first.
 # Usage: make smoke AWS_PROFILE=<profile>; make record AWS_PROFILE=<profile> [MODEL=sonnet-4-6 QUESTIONS=Q6]
