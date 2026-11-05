@@ -830,7 +830,7 @@ def test_landing_shows_one_h1_a_real_marked_sentence_and_one_primary_action(lang
     assert page.count("<h1") == 1
     assert CATALOGUES[lang]["land_title"] in unescape(main)
     sentence = re.search(
-        r'<p class="lede answer" lang="en">(.*?)</p>\s*<p class="meta">', main, re.S
+        r'<div class="lede answer" lang="en">(.*?)</div>\s*<p class="meta">', main, re.S
     )
     assert sentence and 'class="prov prov-data"' in sentence.group(1)
     plain = re.sub(r'<details class="prov .*?</details>', " ", sentence.group(1), flags=re.S)
@@ -852,7 +852,7 @@ def test_landing_sentence_is_the_recorded_body_weight_answer_of_ask(lang: str) -
         landing = client.get(f"/?lang={lang}").text
         ask = client.post(f"/ask/run?lang={lang}", data={"question": "Q3"}).text
     lede = re.search(
-        r'<p class="lede answer" lang="en">(.*?)</p>\s*<p class="meta">', landing, re.S
+        r'<div class="lede answer" lang="en">(.*?)</div>\s*<p class="meta">', landing, re.S
     )
     assert lede
     chips = re.findall(r'<details class="prov .*?</details>', lede.group(1), re.S)
@@ -867,7 +867,7 @@ def test_landing_quote_is_english_and_labelled_en_in_both_locales(lang: str) -> 
     with TestClient(create_app()) as client:
         landing = client.get(f"/?lang={lang}").text
     assert '<span class="lang-tag">EN</span>' in landing
-    assert '<p class="lede answer" lang="en">' in landing
+    assert '<div class="lede answer" lang="en">' in landing
 
 
 @pytest.mark.parametrize("lang", ["es", "en"])

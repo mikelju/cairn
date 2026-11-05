@@ -48,7 +48,7 @@ def _draft(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, lang: str) -> tuple[
 
 def _strip_tags(html: str) -> str:
     """The text of the draft body with every provenance tag removed."""
-    body = html.split('<div class="card answer"><p class="answer-unit">', 1)[1].split(
+    body = html.split('<div class="card answer"><div class="answer-unit">', 1)[1].split(
         '<p class="prov-legend">'
     )[0]
     while (tag := re.search(r'<details class="prov ', body)) is not None:
