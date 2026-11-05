@@ -553,8 +553,8 @@ async def highlight_image(name: str) -> FileResponse:
 
 
 # One list on screen 2: the first group is visible, the rest sits in a closed disclosure (C14 cap).
-ASK_FIRST = ("Q2", "G2", "Q7", "Q6")
-ASK_MORE = ("Q1", "Q3", "Q4", "Q5", "Q8", "G1", "G3", "NS1", "NS2")
+ASK_FIRST = ("Q2", "Q6")
+ASK_MORE = ("Q1", "Q3", "Q4", "Q5", "Q7", "Q8", "G1", "G2", "G3", "NS1", "NS2")
 ASK_QUERIES = ("NS1", "NS2")  # the two fixed guideline queries, answered from the build-time cache
 ASK_TRICKS = frozenset({"Q4", "Q6", "Q7", "Q8"})  # requests the system must decline
 

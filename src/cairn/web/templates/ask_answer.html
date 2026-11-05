@@ -6,10 +6,13 @@
 <article class="answer-panel">
 {% if r.trick %}{% call a.callout("blocked") %}<p>{{ t["trick_" ~ r.id] }}</p>{% endcall %}{% endif %}
 {% if r.parts %}
+{% if r.written %}<div class="answer-pair">{% endif %}
 <div class="card answer">
+{% if r.written %}<h3 class="pair-head">{{ t.ask_col_answer }}</h3>{% endif %}
 {% if r.text.strip() %}<div class="prose answer-unit">{{ a.prov(r.parts) }}</div>
 {% else %}<blockquote class="quote prose answer-unit">{{ a.prov(r.parts) }}</blockquote>{% endif %}
 </div>
+{% if r.written %}<div class="card answer"><h3 class="pair-head">{{ t.ask_col_ai }}</h3><p class="answer-unit">{{ r.written }}</p></div></div>{% endif %}
 {% endif %}
 {% if not r.trick and (r.message or r.failures) %}
 {% call a.callout("blocked" if (not r.answered or r.failures) else "note") %}
@@ -25,7 +28,6 @@
 {% endif %}
 {{ a.evidence_list(r.evidence) }}
 {% endcall %}{% endif %}
-{% if r.written %}{% call a.disclosure("model_text", r.written.split()|length, "words") %}<p class="answer-unit">{{ r.written }}</p>{% endcall %}{% endif %}
 </article>
 {{ a.inside_trace(r) }}
 {% endif %}

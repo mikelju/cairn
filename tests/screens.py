@@ -41,8 +41,7 @@ STATE_MARKERS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "study_duplicate": (("s1_head", "s1_reported"), ("s1_same",)),
     "study_dose": (("s1_head", "s1_reported"), ("s1_same",)),
     "ask_before": (("s2_lede", "q_Q1"), ("exp_rules",)),
-    "ask_q2": (("exp_rules",), ("trick_Q6",)),
-    "ask_q2_open": (("exp_rules", "disc_model_text"), ()),
+    "ask_q2": (("exp_rules", "ask_col_answer", "ask_col_ai"), ("trick_Q6",)),
     "ask_q6": (("trick_Q6",), ()),
     "ask_g2": (("exp_official",), ("trick_Q6",)),
     "decide_empty": (("s4_decide", "disc_examples"), ("s4_confirm",)),
@@ -91,15 +90,6 @@ def with_result(page: str, fragment: str, target: str = "result") -> str:
     return placed
 
 
-def open_toggle(html: str) -> str:
-    """Mark the model-text disclosure open, as a visitor does."""
-    labels = "|".join(re.escape(c["disc_model_text"]) for c in CATALOGUES.values())
-    closed = re.compile(rf'<details class="pill">(?=<summary class="pill">(?:{labels}))')
-    opened, count = closed.subn('<details class="pill" open>', html, count=1)
-    assert count == 1, "no closed model-text toggle to open"
-    return opened
-
-
 def _break_chain(db: Path, thread: str) -> None:
     with sqlite3.connect(db) as conn:
         conn.execute("UPDATE audit SET actor = 'X' WHERE thread_id = ? AND seq = 3", (thread,))
@@ -112,8 +102,6 @@ def _ask(client: TestClient, name: str) -> str:
     question = {"ask_q6": "Q6", "ask_g2": "G2"}.get(name, "Q2")
     result = client.post("/ask/run", data={"question": question}).text
     assert STALE_NOTICE not in result, f"{name} rendered a stale recording"
-    if name == "ask_q2_open":
-        result = open_toggle(result)
     return with_result(page, result, "result")
 
 

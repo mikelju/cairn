@@ -248,6 +248,10 @@ td.not-examined { background: repeating-linear-gradient(45deg, var(--color-not-e
 .questions { margin: var(--space-1) 0; padding-left: var(--space-5); font-size: var(--text-sm); color: var(--color-muted); }
 .answer { margin: var(--space-2) 0; }
 .answer p { margin: var(--space-1) 0; }
+.answer-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); align-items: start; }
+.answer-pair .answer { margin: var(--space-2) 0; min-width: 0; overflow-wrap: anywhere; }
+.pair-head { margin: 0 0 var(--space-2); font-size: 0.85rem; font-weight: 600; color: var(--color-muted, inherit); }
+@media (max-width: 600px) { .answer-pair { grid-template-columns: minmax(0, 1fr); } }
 details { margin: var(--space-1) 0; }
 details.about a { color: var(--color-accent); }
 summary { cursor: pointer; color: var(--color-accent); font-size: var(--text-sm); }

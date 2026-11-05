@@ -244,14 +244,14 @@ def _prose_text(html: str) -> str:
     return " ".join(unescape(re.sub(r"<[^>]+>", "", prose.group(1))).split())
 
 
-def _model_text_toggle(html: str) -> str:
-    """The closed disclosure of the model text, whatever the locale."""
-    label = r"(?:Ver texto generado|Show model text)"
+def _ai_column(html: str) -> str:
+    """The right column of the answer pair: the text the model wrote, whatever the locale."""
+    label = r"(?:Lo que escribió la IA|What the AI wrote)"
     found = re.search(
-        rf'<details class="pill"><summary class="pill">{label}.*?</details>', html, re.S
+        rf'<h3 class="pair-head">{label}</h3><p class="answer-unit">(.*?)</p>', html, re.S
     )
-    assert found, "no model text toggle"
-    return found.group(0)
+    assert found, "no model text column"
+    return found.group(1)
 
 
 def test_step2_page_lists_the_questions_with_the_recorded_badge() -> None:
@@ -311,9 +311,9 @@ def test_step2_toggle_shows_markers_and_no_digits(
     monkeypatch: pytest.MonkeyPatch, folder: Path, marker: str
 ) -> None:
     result = _ask("Q2", monkeypatch, folder, lang="es")
-    toggle = _model_text_toggle(result)
-    assert marker in toggle
-    assert not re.search(r"\d", toggle.split("</summary>")[1])
+    column = _ai_column(result)
+    assert marker in column
+    assert not re.search(r"\d", column)
 
 
 def test_q6_blocked(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -444,9 +444,18 @@ def test_q2_prose_counts_the_screened_findings_by_reference(
     rows = _outside_sources(result).count("<tr><td>")
     assert re.match(rf"{rows} screened findings", text), text
     assert rows == incidence().values["n_findings"]
-    toggle = _model_text_toggle(result)
-    assert "[n_findings]" in toggle
-    assert not re.search(r"\d", toggle.split("</summary>")[1])
+    column = _ai_column(result)
+    assert "[n_findings]" in column
+    assert not re.search(r"\d", column)
+
+
+def test_ask_page_shows_two_questions_and_folds_the_rest() -> None:
+    with TestClient(create_app()) as client:
+        page = client.get("/ask?lang=en").text
+    visible, folded = page.split('<details class="pill">', 1)
+    assert '"question": "Q2"' in visible and '"question": "Q6"' in visible
+    assert '"question": "Q7"' not in visible and '"question": "Q7"' in folded
+    assert "Show questions" in folded.split("</summary>")[0]
 
 
 def _explore(question: str, lang: str = "en") -> str:

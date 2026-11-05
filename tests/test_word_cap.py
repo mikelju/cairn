@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from cairn.app import create_app
-from screens import STALE_NOTICE, STATE_MARKERS, open_toggle, rendered_state, with_result
+from screens import STALE_NOTICE, STATE_MARKERS, rendered_state, with_result
 
 WORD_CAP = 60  # change 004 C14: every state of every page
 SENTENCE_WORD_CAP = 25
@@ -168,15 +168,7 @@ def test_with_result_fails_when_there_is_no_result_element() -> None:
         with_result(_page("<p>no result here</p>"), "<p>a b</p>")
 
 
-def test_open_toggle_fails_when_there_is_no_closed_toggle() -> None:
-    with pytest.raises(AssertionError):
-        open_toggle("<p>stale recording: run make record</p>")
-    assert '<details class="pill" open>' in open_toggle(
-        '<details class="pill"><summary class="pill">Show model text · 2 words</summary></details>'
-    )
-
-
-@pytest.mark.parametrize("state", ["ask_q2", "ask_q2_open", "ask_q6"])
+@pytest.mark.parametrize("state", ["ask_q2", "ask_q6"])
 def test_ask_states_replay_the_real_recordings_whatever_the_environment_says(
     state: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
