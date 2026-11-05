@@ -836,7 +836,12 @@ def test_landing_shows_one_h1_a_real_marked_sentence_and_one_primary_action(lang
         page = client.get(f"/?lang={lang}").text
     main = page.split("<main", 1)[1].split("</main>", 1)[0]
     assert page.count("<h1") == 1
-    assert CATALOGUES[lang]["land_title"] in unescape(main)
+    cat = CATALOGUES[lang]
+    assert f"<h1>{cat['land_title']}</h1>" in unescape(main)
+    assert f'<p class="lede">{cat["land_goal"]}</p>' in unescape(main)
+    assert cat["land_steps"] in unescape(main)
+    assert cat["land_counts"].split("{ai}")[1] in unescape(main)  # ends with the click hint
+    assert '<div class="answer-unit">' in main
     sentence = re.search(
         r'<div class="lede answer" lang="en">(.*?)</div>\s*</div>\s*<p class="meta">', main, re.S
     )
