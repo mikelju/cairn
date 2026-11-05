@@ -11,7 +11,7 @@ This is what would change to run it for real; nothing here is built.
 - Offline mode (`make demo`) stays as the fallback and as the check that the recordings still replay.
 
 ## Live question
-- Today: a shared access code (`CAIRN_ACCESS_CODE`, compared in constant time, never logged), one live question at a time, and a daily cap on spend (`CAIRN_LIVE_CAP_USD`, 2 USD per UTC day) kept in process memory.
+- Today: a shared access code (`CAIRN_ACCESS_CODE`, compared in constant time, never logged), one live question at a time, and a daily cap on spend (`CAIRN_LIVE_CAP_USD`, 2 USD per UTC day) kept in process memory, so it resets if the container restarts.
 - Production: per-user sign-in instead of a shared code, the cap and the spend ledger in the database (a restart resets the memory counter), per-user rate limits, and the other public endpoints (jobs, tools) behind the same sign-in.
 
 ## Secrets

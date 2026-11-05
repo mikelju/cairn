@@ -2,9 +2,11 @@
 
 This is the only web module that reaches Bedrock (decision D8 reversed for this one route).
 Without the code, with a wrong code, over the length limit or at the cap it makes no model call.
+The daily spend counter lives in process memory: it resets if the container restarts.
 """
 
 import hmac
+import logging
 import math
 import os
 import threading
@@ -14,13 +16,14 @@ from typing import Annotated
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse
 
-from cairn import live
+from cairn import live, tools
 from cairn.gateway import DEFAULT_MODEL, REGION
 from cairn.loop import LoopStatus
 from cairn.pricing import call_cost
 from cairn.tools import LIVE_SEARCH
 from cairn.web import i18n, result_context, templates
 
+log = logging.getLogger(__name__)
 explore_live = APIRouter()
 MAX_QUESTION_CHARS = 500
 DEFAULT_CAP_USD = 2.0
@@ -81,7 +84,7 @@ def explore_ask_live(
         return _refused(request, "live_budget")
     if not _busy.acquire(blocking=False):
         return _refused(request, "live_busy")
-    try:
+    try:  # whatever happens, the lock is released and the visitor gets a 200 with a message
         if spent_today() >= daily_cap():  # a question that just finished may have used it up
             return _refused(request, "live_budget")
         gateway: live.SpendGateway | None = None
@@ -96,15 +99,37 @@ def explore_ask_live(
             LIVE_SEARCH.reset(token)
         cost = call_cost(DEFAULT_MODEL, result.input_tokens, result.output_tokens)
         _add_spend(cost)
+        meta = (
+            f"{utc_today().isoformat()} | {REGION} | {DEFAULT_MODEL} | "
+            f"{result.latency_s:.1f} s | {cost:.2f} USD"
+        )
+        context = result_context(result, "REAL", meta)
+        if result.status is not LoopStatus.ANSWERED:  # shown as is, never as an answer
+            context["text"] = None
+        return templates.TemplateResponse(
+            request, "ask_answer.html", {**i18n.context(request), "r": context}
+        )
+    except Exception as error:  # building the answer failed: still a message, never a 500
+        return _refused(request, "live_failed", error=type(error).__name__)
     finally:
         _busy.release()
-    meta = (
-        f"{utc_today().isoformat()} | {REGION} | {DEFAULT_MODEL} | "
-        f"{result.latency_s:.1f} s | {cost:.2f} USD"
-    )
-    context = result_context(result, "REAL", meta)
-    if result.status is not LoopStatus.ANSWERED:  # shown as is, never as an answer
-        context["text"] = None
-    return templates.TemplateResponse(
-        request, "ask_answer.html", {**i18n.context(request), "r": context}
-    )
+
+
+def _warm_index() -> None:
+    try:
+        tools._live_index()
+    except Exception:  # a failed warm-up is only logged; the first question retries the build
+        log.exception("live index warm-up failed")
+
+
+def start_warmup() -> threading.Thread | None:
+    """Build the guideline index in a daemon thread when live is on, so no question pays for it.
+
+    The first live question once built it inline, /healthz stopped answering and the host restarted
+    the container. Without CAIRN_ACCESS_CODE nothing is built.
+    """
+    if not os.environ.get("CAIRN_ACCESS_CODE"):
+        return None
+    thread = threading.Thread(target=_warm_index, name="live-index-warmup", daemon=True)
+    thread.start()
+    return thread
