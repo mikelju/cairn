@@ -62,11 +62,13 @@ EN: dict[str, str] = {
     "hl_official": "official page",
     "hl_back": "back to Ask it",
     "hl_alt": "Guideline page {page} with the quoted sentence highlighted",
-    "land_title": (
-        "An AI drafts a toxicology report from a public study; "
-        "click any number to see its study row."
+    "land_title": "An AI drafts the nonclinical report of a public study",
+    "land_goal": (
+        "Writing it takes long even once the data exist; "
+        "here the AI drafts, code places every number and a person decides."
     ),
-    "land_counts": "{numbers} numbers placed by code, {ai} by the AI",
+    "land_steps": "Four steps: the study, questions, your decision and the draft.",
+    "land_counts": "{numbers} numbers placed by code, {ai} by the AI (click them)",
     "land_cta": "See how it is made",
     "exp_title": "Ask the study",
     "exp_sub": "Pick a question; each answer opens under its card.",
@@ -338,11 +340,13 @@ ES: dict[str, str] = {
     "hl_official": "página oficial",
     "hl_back": "volver a Pregúntale",
     "hl_alt": "Página {page} de la guía con la frase citada resaltada",
-    "land_title": (
-        "Una IA redacta un informe de toxicología desde un estudio público; "
-        "pincha una cifra y verás su fila."
+    "land_title": "Una IA redacta el informe no clínico de un estudio público",
+    "land_goal": (
+        "Redactarlo lleva mucho tiempo aunque los datos ya estén; "
+        "aquí la IA redacta, el código pone cada cifra y una persona decide."
     ),
-    "land_counts": "{numbers} cifras puestas por código, {ai} por la IA",
+    "land_steps": "En cuatro pasos: estudio, preguntas, tu decisión y borrador.",
+    "land_counts": "{numbers} cifras puestas por código, {ai} por la IA (púlsalas)",
     "land_cta": "Ver cómo se hace",
     "exp_title": "Pregunta al estudio",
     "exp_sub": "Elige una pregunta; cada respuesta se abre bajo su tarjeta.",
