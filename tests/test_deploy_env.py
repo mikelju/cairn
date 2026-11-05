@@ -83,3 +83,32 @@ def test_dry_run_prints_names_only_and_creates_nothing() -> None:
     assert aws.file is None
     assert "old-code" not in "".join(logged)
     assert "CAIRN_ACCESS_CODE (kept)" in logged[0]
+
+
+MAKEFILE = Path(__file__).resolve().parent.parent / "Makefile"
+
+
+def test_makefile_has_no_literal_backslash_n_and_continuations_are_clean() -> None:
+    lines = MAKEFILE.read_text(encoding="utf-8").splitlines()
+    for number, line in enumerate(lines, start=1):
+        if line.startswith("\t") and "\\n" in line:
+            outside = line.replace('"', "'")
+            quoted = any(part for part in outside.split("'")[1::2] if "\\n" in part)
+            assert quoted or "$$" in line, f"Makefile:{number} has a literal backslash-n"
+        if line.endswith("\\"):
+            assert lines[number].startswith("\t"), (
+                f"Makefile:{number} continuation is not followed by a tab line"
+            )
+
+
+def test_deploy_recipe_joins_get_and_create_with_or() -> None:
+    lines = MAKEFILE.read_text(encoding="utf-8").splitlines()
+    start = next(i for i, line in enumerate(lines) if line.startswith("deploy: $("))
+    first = [lines[start + 1].lstrip("\t")]
+    while first[-1].endswith("\\"):
+        first.append(lines[start + len(first) + 1].lstrip("\t"))
+    command = " ".join(part.removesuffix("\\").strip() for part in first)
+    check, _, create = command.partition("||")
+    assert "get-container-services" in check and "create-container-service" not in check
+    assert "create-container-service" in create and "get-container-services" not in create
+    assert " n " not in check

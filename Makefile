@@ -35,7 +35,8 @@ deploy: export MSYS_NO_PATHCONV := 1
 # (CAIRN_ACCESS_CODE, CAIRN_LIVE_CAP_USD; set them with $env: or export, never on the command line) and passes the result in a temporary file.
 # Keys set by hand in the console survive; only names are printed. `make deploy-dry-run` shows the names and changes nothing.
 deploy: $(if $(SKIP_BUILD),,build)
-	aws lightsail get-container-services --service-name $(SERVICE) --region $(REGION) > /dev/null 2>&1 \n		|| aws lightsail create-container-service --service-name $(SERVICE) --power $(POWER) --scale 1 --region $(REGION)
+	aws lightsail get-container-services --service-name $(SERVICE) --region $(REGION) > /dev/null 2>&1 \
+		|| aws lightsail create-container-service --service-name $(SERVICE) --power $(POWER) --scale 1 --region $(REGION)
 	aws lightsail push-container-image --service-name $(SERVICE) --label app --image $(IMAGE) --region $(REGION)
 	@uv run python -m cairn.deploy_env $(SERVICE) $(REGION)
 	uv run python -m cairn.wait_running $(SERVICE) $(REGION)
