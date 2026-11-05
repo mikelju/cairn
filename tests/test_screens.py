@@ -255,7 +255,9 @@ def test_c13_removed_keys_are_gone_from_templates_and_catalogues() -> None:
 EXTERNAL_ALLOWED = {
     "www.fda.gov": "official FDA guideline PDF in data/guidelines; HTTP 200 when added",
     "database.ich.org": "official ICH guideline PDFs in data/guidelines; HTTP 200 when added",
+    "github.com": "public source of the study (phuse-org), D14; only PUBLIC_SOURCE links pass",
 }
+PUBLIC_SOURCE = "https://github.com/phuse-org/"
 HREF = re.compile(r'<a\b[^>]*?\bhref="([^"]*)"')
 ID = re.compile(r'\bid="([^"]+)"')
 
@@ -290,7 +292,9 @@ def _crawl(lang: str) -> int:
                     ids = set(ID.findall(html))
                     for href in HREF.findall(html):
                         where = f"{lang} {name}: {href}"
-                        assert "github.com" not in href, where
+                        # D14: the public study source (github.com/phuse-org) is allowed;
+                        # any other github.com link, notably the Cairn repository, is not.
+                        assert "github.com" not in href or href.startswith(PUBLIC_SOURCE), where
                         checked += 1
                         if href.startswith("#"):
                             assert href[1:] in ids, f"dead anchor {where}"
