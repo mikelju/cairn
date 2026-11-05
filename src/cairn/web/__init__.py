@@ -92,7 +92,9 @@ def _study_facts() -> dict[str, Any]:
     tx, pp = frames["TX"], frames["PP"]
     doses = sorted({float(v) for v in tx.loc[tx["TXPARMCD"] == "TRTDOS", "TXVAL"]})
     unit = str(pp.loc[pp["PPTESTCD"] == "AUCTAU", "PPSTRESU"].dropna().iloc[0])
+    dosing = str(frames["TS"].loc[frames["TS"]["TSPARMCD"] == "DOSDUR", "TSVAL"].iloc[0])
     return {
+        "days": int(dosing.strip("PD")),
         "animals": len(frames["DM"]),
         "doses": ", ".join(f"{d:g}" for d in doses),
         "n_doses": len(doses),

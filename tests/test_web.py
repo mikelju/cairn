@@ -64,6 +64,26 @@ def test_step1_summary_comes_from_the_data() -> None:
     assert "job runner: in process." in _inside(page)
 
 
+@pytest.mark.parametrize("lang", LANGS)
+def test_step1_about_the_public_study_is_a_closed_details_with_the_exact_link(lang: str) -> None:
+    from cairn.web import _study_facts
+
+    facts = _study_facts()
+    with TestClient(create_app()) as client:
+        client.cookies.set(COOKIE, lang)
+        page = client.get("/study").text
+    found = re.search(r'<details class="about"[^>]*>(.*?)</details>', page, re.S)
+    assert found, lang
+    assert '<details class="about" id="about-study">' in page  # closed: no open attribute
+    body = unescape(found.group(1))
+    assert "PhUSE PDS2014" in body and "SEND" in body and "FDA" in body
+    assert 'href="https://github.com/phuse-org/phuse-scripts/tree/master/data/send/PDS"' in body
+    assert 'rel="noopener"' in body
+    numbers = re.findall(r"\d+", re.sub(r"PDS2014|<[^>]+>|https?://\S+", " ", body))
+    assert numbers == [str(facts["days"]), str(facts["animals"])]
+    assert (facts["days"], facts["animals"]) == (30, 124)
+
+
 def test_step1_run_shows_quarantine_and_computed_means() -> None:
     with TestClient(create_app()) as client:
         _english(client)
@@ -134,7 +154,7 @@ def test_step1_means_table_before_and_after_the_injection() -> None:
 
 
 def test_step1_main_has_no_upper_case_send_terms() -> None:
-    allowed = {"AUC", "FDA"}
+    allowed = {"AUC", "FDA", "SEND"}  # SEND: the format named in the PDS2014 note (E48)
     for state in ("study_before", "study_after", "study_injected"):
         for lang in ("es", "en"):
             shown = re.sub(
@@ -1099,7 +1119,7 @@ def test_noael_unit_is_per_day_on_decide_and_draft() -> None:
 
 def test_no_screen_has_upper_case_send_terms_outside_the_prose() -> None:
     """The landing and the four screens, every state: only AUC and FDA stay in capitals."""
-    allowed = {"AUC", "FDA", "NOAEL"}
+    allowed = {"AUC", "FDA", "NOAEL", "SEND"}  # SEND: the format named in the PDS2014 note (E48)
     for state in STATE_MARKERS:
         for lang in LANGS:
             shown = re.sub(r"PDS2014-\d+", "", main_copy(rendered_state(state, lang), prose=False))

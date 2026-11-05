@@ -249,6 +249,7 @@ td.not-examined { background: repeating-linear-gradient(45deg, var(--color-not-e
 .answer { margin: var(--space-2) 0; }
 .answer p { margin: var(--space-1) 0; }
 details { margin: var(--space-1) 0; }
+details.about a { color: var(--color-accent); }
 summary { cursor: pointer; color: var(--color-accent); font-size: var(--text-sm); }
 details.pill { margin: var(--space-3) 0 0; }
 summary.pill { list-style: none; display: inline-flex; align-items: center; gap: var(--space-2); font-weight: var(--weight-semibold); color: var(--color-ink); background: var(--color-surface-2); border: var(--border-1) solid var(--color-control-border); border-radius: var(--radius-pill); padding: 6px var(--space-4) 6px var(--space-2); }

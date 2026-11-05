@@ -142,6 +142,18 @@ EN: dict[str, str] = {
     "disc_quarantined": "Show all values",
     "s1_prod": "a queue with workers.",
     "s1_prod_lead": "job runner: in process.",
+    "s1_about": "PDS2014",
+    "s1_about_what": (
+        "PhUSE PDS2014 is a public, fictional dataset from PhUSE in SEND format, "
+        "the FDA standard for nonclinical data. "
+        "It is a rat oral gavage toxicity study: {days} days of dosing plus recovery, "
+        "{animals} animals."
+    ),
+    "s1_about_why": (
+        "The demo uses it because the data are public and in the real format, "
+        "so anyone can check them, and nobody's data is used."
+    ),
+    "s1_about_link": "See the public data (PhUSE, GitHub)",
     "s2_lede": "Pick a question; open any figure.",
     "s2_recorded": "Answers replay recorded runs.",
     "prov_legend_data": "study data",
@@ -422,6 +434,18 @@ ES: dict[str, str] = {
     "disc_quarantined": "Ver todos los valores",
     "s1_prod": "una cola con trabajadores.",
     "s1_prod_lead": "ejecutor de trabajos: en proceso.",
+    "s1_about": "PDS2014",
+    "s1_about_what": (
+        "PhUSE PDS2014 es un conjunto de datos público y ficticio de PhUSE, en formato SEND, "
+        "el estándar de la FDA para datos no clínicos. "
+        "Es un estudio de toxicidad oral por sonda en rata: {days} días de dosis más "
+        "recuperación, {animals} animales."
+    ),
+    "s1_about_why": (
+        "La demo lo usa porque los datos son públicos y están en el formato real, "
+        "así que cualquiera puede comprobarlos, y no se usan datos de nadie."
+    ),
+    "s1_about_link": "Ver los datos públicos (PhUSE, GitHub)",
     "s2_lede": "Elige una pregunta; abre cualquier cifra.",
     "s2_recorded": "Las respuestas repiten ejecuciones grabadas.",
     "prov_legend_data": "dato del estudio",

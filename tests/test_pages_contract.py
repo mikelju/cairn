@@ -88,5 +88,13 @@ def test_no_page_shows_text_from_the_other_locale(lang: str) -> None:
     leaks = []
     for name, page in pages.items():
         text = _main(page)
-        leaks += [(name, key) for key, literal in foreign if literal in text]
+        # D4/D13: the recorded prose and the draft always show the study terms in English
+        # (as the study records them); only the English term names are allowed there, in
+        # the draft states, and every other text of the page still has to be one language.
+        allowed = name.startswith("draft") and lang == "es"
+        leaks += [
+            (name, key)
+            for key, literal in foreign
+            if literal in text and not (allowed and key.startswith("term_"))
+        ]
     assert not leaks, leaks
