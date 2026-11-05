@@ -117,7 +117,7 @@ def test_the_counts_line_equals_the_rendered_tags(
     for kind in counts:
         assert counts[kind] == sum(t["kind"] == kind for t in shown)
     with_digits = sum(t["kind"] == "data" and bool(re.search(r"\d", t["chip"])) for t in shown)
-    assert 0 < with_digits < counts["data"]  # names and units are data tags without a number
+    assert with_digits > 0 and with_digits == counts["data"]  # only figures carry a source label
     outside = _strip_tags(page)
     for word in FIXED_DIGIT_WORDS:
         outside = outside.replace(word, "")
@@ -130,6 +130,31 @@ def test_the_counts_line_equals_the_rendered_tags(
     assert example > 0
     assert numbers == [with_digits, stray, counts["decision"] - example, example, counts["quote"]]
     assert tail in line
+
+
+@pytest.mark.parametrize(
+    ("lang", "words"), [("en", ("female", "male", "rat")), ("es", ("hembra", "macho", "rata"))]
+)
+def test_ask_shows_sex_and_species_as_words_not_chips(lang: str, words: tuple[str, ...]) -> None:
+    with TestClient(create_app()) as client:
+        page = client.post(f"/ask/run?lang={lang}", data={"question": "Q3"}).text
+    chips = [t["chip"] for t in _parse(page).tags if t["kind"] == "data"]
+    assert chips and all(re.search(r"\d", c) for c in chips), chips
+    assert not {"F", "M", "RAT"} & {c.strip() for c in chips}
+    plain = unescape(re.sub(r"<[^>]+>", " ", page))
+    assert words[0] in plain and words[2] in plain
+
+
+@pytest.mark.parametrize("lang", ["en", "es"])
+def test_draft_shows_sex_and_species_as_english_words_not_chips(
+    lang: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    page, parts = _draft(monkeypatch, tmp_path, lang)
+    chips = [t["chip"] for t in _parse(page).tags if t["kind"] == "data"]
+    assert not {"F", "M", "RAT"} & {c.strip() for c in chips}
+    text = "".join(p.text for p in parts if isinstance(p, TextPart))
+    assert re.search(r"\brat\b", text) and "oral gavage" in text and "Sprague-Dawley" in text
+    assert not re.search(r"\b(?:F|M|RAT)\b", text)
 
 
 def test_a_refused_choice_is_an_html_page_with_a_plain_message(

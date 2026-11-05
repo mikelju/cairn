@@ -18,9 +18,11 @@ from cairn.content import (
     UnresolvedRef,
     ValueRef,
 )
+from cairn.decisions import finding_key
 from cairn.highlight import highlights_by_sentence
 from cairn.observation import Observation
 from cairn.render import format_value, quote_data, render_parts
+from cairn.web.i18n import CATALOGUES
 
 MAX_ROWS = 12
 MAX_COLUMNS = 8
@@ -238,6 +240,59 @@ def provenance_parts(
     return parts
 
 
+def _word(tag: DataTag, t: Mapping[str, str]) -> str:
+    """The plain word of a non-numeric value: the catalogue term, else the value as it is."""
+    key = f"term_{tag.column}_{re.sub(r'\W+', '_', tag.text)}"
+    return t.get(key, tag.text)
+
+
+def _is_number(tag: Part) -> bool:
+    return isinstance(tag, DataTag) and bool(re.search(r"\d", tag.text))
+
+
+def plain_terms(parts: list[Part], t: Mapping[str, str]) -> list[Part]:
+    """Show controlled terms (sex, species, route, tissue, finding) as plain words, not tags.
+
+    Only a figure keeps its source chip. This is presentation: the sentence and its checks are
+    untouched, and the words come from the catalogue `t` of the interface language.
+    """
+    out: list[Part] = []
+
+    def add(text: str) -> None:
+        if out and isinstance(out[-1], TextPart):
+            out[-1] = TextPart(out[-1].text + text)
+        else:
+            out.append(TextPart(text))
+
+    i = 0
+    while i < len(parts):
+        part = parts[i]
+        if not isinstance(part, DataTag) or _is_number(part):
+            if isinstance(part, TextPart):
+                add(part.text)
+            else:
+                out.append(part)
+            i += 1
+            continue
+        nxt = parts[i + 2] if i + 2 < len(parts) else None
+        gap = parts[i + 1] if i + 1 < len(parts) else None
+        if (
+            part.column == "tissue"
+            and isinstance(gap, TextPart)
+            and gap.text.startswith(" ")
+            and isinstance(nxt, DataTag)
+            and nxt.column == "finding"
+        ):
+            name = t.get(finding_key(f"{part.text} {nxt.text}"))
+            add(name.lower() if name else f"{part.text} {nxt.text}".lower())
+            add(gap.text[1:])
+            i += 3
+            continue
+        add(_word(part, t))
+        i += 1
+    return out
+
+
 def joined(parts: list[Part]) -> str:
     """The plain text of the parts."""
     return "".join(p.text for p in parts)
@@ -252,13 +307,16 @@ def draft_parts(
     ledger: ObservationLedger,
     decisions: Mapping[str, DecisionInfo] | None = None,
 ) -> list[Part]:
-    """The draft body as parts: every sentence tagged, one space between sentences."""
+    """The draft body as parts: every sentence tagged, one space between sentences.
+
+    The draft is always English, so its controlled terms use the English words.
+    """
     parts: list[Part] = []
     for index, sentence in enumerate(sentences):
         if index:
             parts.append(TextPart(" "))
         parts.extend(provenance_parts(sentence, ledger, decisions))
-    return parts
+    return plain_terms(parts, CATALOGUES["en"])
 
 
 def stray_digits(parts: list[Part]) -> str:

@@ -20,7 +20,7 @@
 {% if r.rows or r.evidence %}{% call a.disclosure("evidence", r.evidence|length + (1 if r.rows else 0), "items") %}
 {% if r.rows %}
 {% set screen = namespace(rows=[]) %}
-{% for row in r.rows %}{% set screen.rows = screen.rows + [[row.sex, t[row.fkey] if row.fkey in t else ((row.tissue ~ " " ~ row.finding)|lower)] + row.cells] %}{% endfor %}
+{% for row in r.rows %}{% set screen.rows = screen.rows + [[t["s1_sex_" ~ row.sex] if ("s1_sex_" ~ row.sex) in t else row.sex, t[row.fkey] if row.fkey in t else ((row.tissue ~ " " ~ row.finding)|lower)] + row.cells] %}{% endfor %}
 {{ a.data_table([t.exp_th_sex, t.exp_th_finding] + r.doses, screen.rows) }}
 {% endif %}
 {{ a.evidence_list(r.evidence) }}

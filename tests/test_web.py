@@ -13,9 +13,10 @@ from fastapi.testclient import TestClient
 
 from cairn import app as app_module
 from cairn.app import create_app
+from cairn.decisions import finding_key
 from cairn.fetch import VENDORED_DIR
 from cairn.ingest import DEFAULT_DB, ingest
-from cairn.web import HERE
+from cairn.web import HERE, i18n
 from cairn.web.i18n import COOKIE
 from screens import LANGS, STATE_MARKERS, main_copy, rendered_state
 
@@ -231,8 +232,9 @@ def test_q2_replay(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "Rules fired: none" in result
     assert _outside_sources(result).count("<tr><td>") == 9
     assert "not examined" in result and "0/1" in result
-    assert "9 screened findings; the clearest is GLAND, ADRENAL Vacuolization in F and M" in (
-        _prose_text(result)
+    assert (
+        "9 screened findings; the clearest is adrenal gland, vacuolization in female and male"
+        in (_prose_text(result))
     )
     recorded = json.loads((REAL / "q2.json").read_text(encoding="utf-8"))
     cost = sum(call["cost_usd"] for call in recorded["calls"])
@@ -364,7 +366,12 @@ def test_q2_prose_names_the_screened_findings_by_sex_and_places_no_table_positio
     result = _ask("Q2", monkeypatch, REAL)
     text = _prose_text(result)
     findings = incidence().values["findings"]
-    named = [f for f in findings if f["tissue"] in text and f["finding"] in text]
+    names = i18n.CATALOGUES["en"]
+    named = [
+        f
+        for f in findings
+        if names.get(finding_key(f"{f['tissue']} {f['finding']}"), "").lower() in text
+    ]
     assert named, f"the prose names no finding that passes the screen: {text!r}"
     for finding in named:
         sexes = {
@@ -372,7 +379,8 @@ def test_q2_prose_names_the_screened_findings_by_sex_and_places_no_table_positio
             for f in findings
             if (f["tissue"], f["finding"]) == (finding["tissue"], finding["finding"])
         }
-        assert all(re.search(rf"\b{sex}\b", text) for sex in sexes), text
+        words = {"F": "female", "M": "male"}
+        assert all(re.search(rf"\b{words[sex]}\b", text) for sex in sexes), text
     assert not re.search(r"\b(above|below)\b", text)
 
 
@@ -856,7 +864,7 @@ def test_landing_sentence_is_the_recorded_body_weight_answer_of_ask(lang: str) -
     )
     assert lede
     chips = re.findall(r'<details class="prov .*?</details>', lede.group(1), re.S)
-    assert len(chips) >= 5 and all(chip in ask for chip in chips)
+    assert len(chips) >= 4 and all(chip in ask for chip in chips)  # figures only, no terms
     shown = _flat(lede.group(1)).removesuffix(" ...")
     assert shown in _flat(ask) and shown.endswith("lower than control")
     assert "9.3" not in _flat(landing)
@@ -891,7 +899,8 @@ def test_explore_recorded_prose_is_identical_in_both_locales() -> None:
     def prose(html: str) -> str:
         return _prose_text(html)
 
-    assert prose(_explore("Q1", "es")) == prose(_explore("Q1", "en"))
+    # D13: controlled terms are plain words of the interface language; the rest is identical
+    assert prose(_explore("Q1", "es")).replace("macho", "male") == prose(_explore("Q1", "en"))
 
 
 def test_decide_first_render_shows_incidence_examples_and_no_noael() -> None:
