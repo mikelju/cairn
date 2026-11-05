@@ -37,9 +37,9 @@
 {% endmacro %}
 
 {# One screen of four: the counter, the title and the lede; screen_nav closes it with Back and Next. #}
-{% macro screen_head(number, title, kind, sentence) %}
+{% macro screen_head(number, title, sentence) %}
 <p class="stepcount">{{ t.step_counter.format(n=number) }}</p>
-<h1>{{ title }}{% if kind %} {{ badge(page_badge|default(kind)) }}{% endif %}</h1>
+<h1>{{ title }}</h1>
 <p class="lede">{{ sentence }}</p>
 {% endmacro %}
 
@@ -76,12 +76,12 @@
 
 {% macro trace(steps, label="Trace") %}<p class="trace">{{ label }}: {{ steps }}</p>{% endmacro %}
 
-{% macro evidence_panel(items) %}
-{% if items %}{% call disclosure("evidence", items|length, "items") %}<div class="evidence">
+{% macro evidence_list(items) %}
+{% if items %}<div class="evidence">
 {% for e in items %}
 <p>{{ e.tool }}, {{ e.population }}, n={{ e.n }}, {% if e.count %}{{ e.count }} {{ t[e.label] }}, {{ t.ev_from }} {{ e.first }}{% else %}{{ t.exp_none }}{% endif %}</p>
 {% endfor %}
-</div>{% endcall %}{% endif %}
+</div>{% endif %}
 {% endmacro %}
 
 {# kind: rules, blocked, stale or note. #}

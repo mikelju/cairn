@@ -2,13 +2,13 @@
 {% import "_components.html" as a with context %}
 {% block main %}
 <section class="step">
-{{ a.screen_head(1, t.step_1, "REAL", t.s1_lede) }}
+{{ a.screen_head(1, t.step_1, t.s1_lede) }}
 <div class="tiles two">
   {{ a.tile(animals, t.s1_animals) }}
   {{ a.tile(n_doses, t.s1_doses.format(doses=doses)) }}
 </div>
 <div id="result" class="result" hx-post="/study/run" hx-trigger="load"></div>
 {{ a.screen_nav(1, screens) }}
-{% call a.inside([[t.step_1, t.s1_prod_lead, t.s1_prod]]) %}<div id="inside-trace"></div>{% endcall %}
+{% call a.inside([[t.step_1, t.s1_prod_lead, t.s1_prod]]) %}{{ a.badge_meta("REAL", "") }}<div id="inside-trace"></div>{% endcall %}
 </section>
 {% endblock %}

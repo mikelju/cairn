@@ -184,3 +184,27 @@ def rendered_state(name: str, lang: str | None = None) -> str:
     html = _all_states(lang or "es")[name]
     assert_expected_page(name, html)
     return html
+
+
+def _drop(html: str, opener: re.Pattern[str], tag: str) -> str:
+    """Remove every element that starts like `opener`, matching nested tags of the same name."""
+    while (start := opener.search(html)) is not None:
+        depth, end = 0, len(html)
+        for found in re.finditer(rf"<{tag}\b|</{tag}>", html[start.start() :]):
+            depth += 1 if found.group().startswith("<" + tag) else -1
+            if depth == 0:
+                end = start.start() + found.end()
+                break
+        html = html[: start.start()] + " " + html[end:]
+    return html
+
+
+def main_copy(html: str, prose: bool = True) -> str:
+    """The text of <main> outside the Inside panel; prose=False also drops tags and answer units."""
+    main = html.split("<main", 1)[1].split("</main>", 1)[0]
+    main = _drop(main, re.compile(r'<details class="inside"'), "details")
+    if not prose:
+        main = _drop(main, re.compile(r'<details class="prov '), "details")
+        for tag in ("div", "blockquote", "p"):
+            main = _drop(main, re.compile(rf'<{tag} class="[^"]*\banswer-unit\b'), tag)
+    return " ".join(unescape(re.sub(r"<[^>]+>", " ", main)).split())

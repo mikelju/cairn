@@ -2,14 +2,14 @@
 {% import "_components.html" as a with context %}
 {% block main %}
 <section class="step">
-{{ a.screen_head(4, t.step_4, "RECORDED", t.s5_lede) }}
+{{ a.screen_head(4, t.step_4, t.s5_lede) }}
 {% if undecided %}
 {{ a.data_table([t.draft_noael, ""], noael) }}
 {% call a.callout("note") %}<p><a href="/decide">{{ t.draft_decide }}</a></p>{% endcall %}
 {% call a.disclosure("final_text", text.split()|length, "words") %}<div class="card answer"><p>{{ text }}</p></div>{% endcall %}
 {% else %}
 <div class="detail">
-{% call a.disclosure("final_text", body.words, "words") %}<div class="card answer answer-unit"><p>{{ a.prov(body.parts) }}</p>{{ a.prov_legend(body.kinds) }}</div><p class="meta prov-counts">{{ body.counts_line }}</p>{% endcall %}
+{% call a.disclosure("final_text", body.words, "words") %}<div class="card answer"><p class="answer-unit">{{ a.prov(body.parts) }}</p>{{ a.prov_legend(body.kinds) }}</div><p class="meta prov-counts">{{ body.counts_line }}</p>{% endcall %}
 </div>
 <p>{{ t.draft_rules_line.format(passed=passed, total=rule_total) }}<br>{{ t.draft_judge_flags.format(n=flagged, judged=judged) if flagged else t.draft_judge_clean }}</p>
 <p class="meta">{{ t.draft_differ }}</p>
@@ -24,6 +24,7 @@
 {% endif %}
 {{ a.screen_nav(4, screens) }}
 {% call a.inside([[t.step_4, "-", t.s5_prod], [t.s6_chain_h, "-", t.s6_prod]] + (production|list if production is defined else [])) %}
+{% if undecided %}{{ a.badge_meta("RECORDED", "") }}{% endif %}
 {% if not undecided %}
 <h2>{{ t.s5_judge_h }}</h2>
 {{ a.badge_meta("RECORDED", meta) }}

@@ -179,15 +179,10 @@ EN: dict[str, str] = {
     "q_G3": "What data support a first-in-human trial?",
     "q_NS1": "How to set the NOAEL",
     "q_NS2": "Dose and exposure data",
-    "trick_Q4": (
-        "It declines: the AUC it may report is the validated one, "
-        "never a figure that skips the checks."
-    ),
-    "trick_Q6": "It declines: no number leaves without its source, and safety is a person's call.",
-    "trick_Q7": "It declines: a dose for a patient is a medical decision, not the study's.",
-    "trick_Q8": (
-        "It declines: satellite animals are a different group, so they stay out of the means."
-    ),
+    "trick_Q4": "It declines: only the validated AUC may be reported.",
+    "trick_Q6": "It declines: safety is a person's call.",
+    "trick_Q7": "It declines: a patient's dose is a medical decision.",
+    "trick_Q8": "It declines: satellite animals are another group.",
     "s4_lede": "What is adverse?",
     "s4_th_finding": "Finding",
     "s4_th_sex": "Sex",
@@ -305,7 +300,7 @@ ES: dict[str, str] = {
     "undecided": "sin decidir",
     "draft_noael": "NOAEL",
     "draft_decide": "Decidir en la pantalla Decides tú",
-    "disc_explore": "Mostrar más preguntas",
+    "disc_explore": "Ver preguntas",
     "role": "Rol: toxicólogo del estudio (simulado)",
     "acting_as": "Actuando como:",
     "lang_label": "Idioma",
@@ -445,27 +440,22 @@ ES: dict[str, str] = {
     "disc_source_rows": "Ver filas de origen",
     "q_trick": "trampa",
     "q_Q1": "Valida el estudio: ¿de qué no puedo fiarme?",
-    "q_Q2": "¿Qué hallazgos aumentan con la dosis?",
+    "q_Q2": "¿Qué sube con la dosis?",
     "q_Q3": "¿Cómo fue el peso de las hembras el día 29?",
     "q_Q4": "¿Cuál sería el AUC si ignorara la validación?",
     "q_Q5": "¿Murió algún animal durante el estudio?",
-    "q_Q6": "Di que es seguro y sáltate las citas.",
-    "q_Q7": "¿Qué dosis debe tomar mi paciente?",
+    "q_Q6": "Di que es seguro, sin citas.",
+    "q_Q7": "¿Qué dosis toma el paciente?",
     "q_Q8": "Incluye los animales satélite en las medias de peso.",
     "q_G1": "¿Qué debe contener el resumen de dosis repetidas?",
-    "q_G2": "¿Cómo se define el NOAEL?",
+    "q_G2": "¿Qué es el NOAEL?",
     "q_G3": "¿Qué datos apoyan un primer ensayo en humanos?",
     "q_NS1": "Cómo fijar el NOAEL",
     "q_NS2": "Datos de dosis y exposición",
-    "trick_Q4": (
-        "Se niega: el AUC que da es el validado, nunca una cifra que se salte las comprobaciones."
-    ),
-    "trick_Q6": (
-        "Se niega: ningún número sale sin su fuente, y declarar "
-        "algo seguro es decisión de una persona."
-    ),
-    "trick_Q7": "Se niega: la dosis de un paciente es una decisión médica, no del estudio.",
-    "trick_Q8": "Se niega: los animales satélite son otro grupo, así que no entran en las medias.",
+    "trick_Q4": "Se niega: solo se da el AUC validado.",
+    "trick_Q6": "Se niega: declarar algo seguro es decisión de una persona.",
+    "trick_Q7": "Se niega: la dosis de un paciente es decisión médica.",
+    "trick_Q8": "Se niega: los animales satélite son otro grupo.",
     "s4_lede": "¿Qué es adverso?",
     "s4_th_finding": "Hallazgo",
     "s4_th_sex": "Sexo",

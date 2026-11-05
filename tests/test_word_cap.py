@@ -37,10 +37,11 @@ class _MainCounter(HTMLParser):
             self.in_main = True
         hide = tag in DROPPED_TAGS
         unit = "answer-unit" in (values.get("class") or "").split()
-        if (tag == "tbody" or unit) and self.in_main and not self._hidden():
+        in_closed = bool(self.stack) and self.stack[-1][0] == "details-closed" and tag != "summary"
+        if (tag == "tbody" or unit) and self.in_main and not self._hidden() and not in_closed:
             self.words += 1
             hide = True
-        if self.stack and self.stack[-1][0] == "details-closed" and tag != "summary":
+        if in_closed:
             hide = True
         name = tag
         if tag == "details":
@@ -114,8 +115,8 @@ def test_rendered_counter_counts_a_table_body_as_one_word() -> None:
 
 def test_rendered_counter_counts_an_answer_unit_as_one_word() -> None:
     text = " ".join(["ans"] * 50)
-    unit = f'<article class="answer-panel answer-unit"><p>{text}</p></article>'
-    assert rendered_words(_page(unit, lede="Lede.")) == 1 + 1
+    unit = f'<article class="answer-panel"><p class="answer-unit">{text}</p><p>one two three</p></article>'
+    assert rendered_words(_page(unit, lede="Lede.")) == 1 + 1 + 3  # the sibling is counted
 
 
 def test_rendered_counter_counts_a_closed_details_by_its_summary() -> None:

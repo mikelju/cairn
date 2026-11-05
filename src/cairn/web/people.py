@@ -33,7 +33,7 @@ from cairn.render import render
 from cairn.verify import RULE_REASONS
 from cairn.web import _page as page
 from cairn.web import _recordings_dir, _step2_context, i18n, provenance
-from cairn.web.provenance import DecisionInfo, TextPart, stray_digits, tag_counts
+from cairn.web.provenance import DecisionInfo, TextPart, number_tags, stray_numbers, tag_counts
 from cairn.web.threads import (
     AUTHOR,
     REVIEWER,
@@ -141,8 +141,8 @@ def _body(state: Any, t: dict[str, str]) -> dict[str, Any]:
     kinds = [k for k in ("data", "quote", "decision") if counts[k]]
     example = sum(getattr(p, "who", "") == t["prov_example"] for p in parts)
     line = t["draft_counts"].format(
-        numbers=counts["data"],
-        ai=len(stray_digits(parts)),
+        numbers=number_tags(parts),
+        ai=stray_numbers(parts),
         decisions=counts["decision"] - example,
         example=example,
         quotes=counts["quote"],
@@ -546,7 +546,7 @@ async def landing(request: Request) -> Response:
     thread = await _session_thread(request)
     t = i18n.context(request)["t"]
     parts = _landing_sentence(t)
-    counts = t["land_counts"].format(numbers=tag_counts(parts)["data"], ai=len(stray_digits(parts)))
+    counts = t["land_counts"].format(numbers=number_tags(parts), ai=stray_numbers(parts))
     response = page(request, "landing.html", current=0, parts=parts, counts_line=counts)
     return _remember(response, thread)
 

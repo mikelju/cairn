@@ -4,6 +4,7 @@ The text is exactly what `render_parts` produces; tags only add the source of ea
 (a study value, a guideline quotation or a person's decision). Nothing here changes the sentence.
 """
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -266,6 +267,22 @@ def stray_digits(parts: list[Part]) -> str:
     for word in FIXED_DIGIT_WORDS:
         text = text.replace(word, "")
     return "".join(c for c in text if c.isdigit())
+
+
+NUMBER = re.compile(r"\d+(?:[.,]\d+)*")
+
+
+def stray_numbers(parts: list[Part]) -> int:
+    """How many numbers (tokens, not digits) stay in the plain text outside every tag."""
+    text = "".join(p.text for p in parts if isinstance(p, TextPart))
+    for word in FIXED_DIGIT_WORDS:
+        text = text.replace(word, "")
+    return len(NUMBER.findall(text))
+
+
+def number_tags(parts: list[Part]) -> int:
+    """How many data tags show a number; a name or a unit such as RAT or mg/kg is not one."""
+    return sum(isinstance(p, DataTag) and bool(re.search(r"\d", p.text)) for p in parts)
 
 
 def tag_counts(parts: list[Part]) -> dict[str, int]:

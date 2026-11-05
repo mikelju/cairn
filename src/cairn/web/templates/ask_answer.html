@@ -3,12 +3,12 @@
 {% call a.callout("stale") %}<p>{{ stale }}</p>{% endcall %}
 {% else %}
 {{ a.prov_legend(r.kinds) }}
-<article class="answer-panel answer-unit">
+<article class="answer-panel">
 {% if r.trick %}{% call a.callout("blocked") %}<p>{{ t["trick_" ~ r.id] }}</p>{% endcall %}{% endif %}
 {% if r.parts %}
 <div class="card answer">
-{% if r.text.strip() %}<div class="prose">{{ a.prov(r.parts) }}</div>
-{% else %}<blockquote class="quote prose">{{ a.prov(r.parts) }}</blockquote>{% endif %}
+{% if r.text.strip() %}<div class="prose answer-unit">{{ a.prov(r.parts) }}</div>
+{% else %}<blockquote class="quote prose answer-unit">{{ a.prov(r.parts) }}</blockquote>{% endif %}
 </div>
 {% endif %}
 {% if not r.trick and (r.message or r.failures) %}
@@ -17,13 +17,15 @@
 {% if r.failures %}<ul>{% for f in r.failures %}<li>{{ f }}</li>{% endfor %}</ul>{% endif %}
 {% endcall %}
 {% endif %}
+{% if r.rows or r.evidence %}{% call a.disclosure("evidence", r.evidence|length + (1 if r.rows else 0), "items") %}
 {% if r.rows %}
 {% set screen = namespace(rows=[]) %}
-{% for row in r.rows %}{% set screen.rows = screen.rows + [[row.sex, row.tissue, row.finding] + row.cells] %}{% endfor %}
-{{ a.data_table([t.exp_th_sex, t.exp_th_tissue, t.exp_th_finding] + r.doses, screen.rows) }}
+{% for row in r.rows %}{% set screen.rows = screen.rows + [[row.sex, t[row.fkey] if row.fkey in t else ((row.tissue ~ " " ~ row.finding)|lower)] + row.cells] %}{% endfor %}
+{{ a.data_table([t.exp_th_sex, t.exp_th_finding] + r.doses, screen.rows) }}
 {% endif %}
-{% if r.written %}{% call a.disclosure("model_text", r.written.split()|length, "words") %}<p>{{ r.written }}</p>{% endcall %}{% endif %}
-{{ a.evidence_panel(r.evidence) }}
+{{ a.evidence_list(r.evidence) }}
+{% endcall %}{% endif %}
+{% if r.written %}{% call a.disclosure("model_text", r.written.split()|length, "words") %}<p class="answer-unit">{{ r.written }}</p>{% endcall %}{% endif %}
 </article>
 {{ a.inside_trace(r) }}
 {% endif %}

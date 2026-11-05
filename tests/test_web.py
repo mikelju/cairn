@@ -17,7 +17,7 @@ from cairn.fetch import VENDORED_DIR
 from cairn.ingest import DEFAULT_DB, ingest
 from cairn.web import HERE
 from cairn.web.i18n import COOKIE
-from screens import rendered_state
+from screens import STATE_MARKERS, main_copy, rendered_state
 
 
 def test_healthz_and_landing_page() -> None:

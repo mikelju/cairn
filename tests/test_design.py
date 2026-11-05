@@ -225,7 +225,7 @@ def test_shared_components_exist_and_replace_anatomy() -> None:
         "badge_meta",
         "data_table",
         "trace",
-        "evidence_panel",
+        "evidence_list",
         "callout",
         "disclosure",
         "inside",

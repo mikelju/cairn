@@ -15,6 +15,7 @@ from fastapi.templating import Jinja2Templates
 
 from cairn import __version__, retrieval
 from cairn.content import Text, ValueRef
+from cairn.decisions import finding_key
 from cairn.gateway import DEFAULT_MODEL, LLMGateway, Mode
 from cairn.guidelines import load_manifest
 from cairn.highlight import IMAGES_DIR, cited_page, highlights_by_sentence
@@ -280,6 +281,7 @@ def _screen(result: LoopResult) -> tuple[list[str], list[dict[str, Any]]]:
         rows = [
             {
                 "sex": f["sex"],
+                "fkey": finding_key(f"{f['tissue']} {f['finding']}"),
                 "tissue": f["tissue"],
                 "finding": f["finding"],
                 "cells": [
