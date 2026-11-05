@@ -55,8 +55,12 @@ def design_token_violations(css: str) -> list[str]:
     return problems
 
 
+# D14 allows linking to the public PhUSE repository; an anchor loads nothing.
+PHUSE_ANCHOR = re.compile(r'<a href="https://github\.com/phuse-org/[^"\s]*"')
+
+
 def external_references(text: str) -> list[str]:
-    return EXTERNAL.findall(text)
+    return EXTERNAL.findall(PHUSE_ANCHOR.sub("<a", text))
 
 
 def unresolved_css_urls(css: str, client: TestClient) -> list[str]:
@@ -131,6 +135,9 @@ def test_no_external_resources_in_templates_and_css() -> None:
 def test_no_external_resources_failing_sample() -> None:
     assert external_references('<link href="https://cdn.example/x.css">')
     assert external_references("@import url(http://fonts.example/x.css);")
+    assert external_references('<img src="https://github.com/phuse-org/x.png">')
+    assert external_references('<a href="https://example.com/phuse-org/">x</a>')
+    assert external_references('<a href="https://github.com/phuse-org/p">x</a>') == []
 
 
 def test_no_external_resources_css_urls_resolve_to_served_static_files() -> None:

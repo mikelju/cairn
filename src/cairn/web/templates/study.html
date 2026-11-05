@@ -7,10 +7,11 @@
   {{ a.tile(animals, t.s1_animals) }}
   {{ a.tile(n_doses, t.s1_doses.format(doses=doses)) }}
 </div>
-<details class="about" id="about-study"><summary>{{ t.s1_about }}</summary>
-<p>{{ t.s1_about_what.format(days=days, animals=animals) }} {{ t.s1_about_why }}</p>
+{% set about_what = t.s1_about_what.format(days=days, animals=animals) %}
+{% call a.disclosure("about", (about_what ~ " " ~ t.s1_about_why ~ " " ~ t.s1_about_link).split()|length, "words") %}
+<p>{{ about_what }} {{ t.s1_about_why }}</p>
 <p><a href="https://github.com/phuse-org/phuse-scripts/tree/master/data/send/PDS" target="_blank" rel="noopener">{{ t.s1_about_link }}</a></p>
-</details>
+{% endcall %}
 <div id="result" class="result" hx-post="/study/run" hx-trigger="load"></div>
 {{ a.screen_nav(1, screens) }}
 {% call a.inside([[t.step_1, t.s1_prod_lead, t.s1_prod]]) %}{{ a.badge_meta("REAL", "") }}<div id="inside-trace"></div>{% endcall %}

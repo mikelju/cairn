@@ -102,7 +102,7 @@ EN: dict[str, str] = {
     "live_budget": "The daily live budget is used up. Try a recorded question.",
     "live_busy": "Another live question is running. Try again in a minute.",
     "live_failed": "The live call failed ({error}).",
-    "s1_lede": "Impossible values, like a negative exposure, are set aside, never fixed.",
+    "s1_lede": "Impossible values are set aside, never fixed.",
     "s1_animals": "rats",
     "s1_doses": "doses: {doses} mg/kg/day",
     "s1_head": "Impossible values set apart: ",
@@ -143,7 +143,7 @@ EN: dict[str, str] = {
     "disc_quarantined": "Show all values",
     "s1_prod": "a queue with workers.",
     "s1_prod_lead": "job runner: in process.",
-    "s1_about": "PDS2014",
+    "disc_about": "Show PDS2014",
     "s1_about_what": (
         "PhUSE PDS2014 is a public, fictional dataset from PhUSE in SEND format, "
         "the FDA standard for nonclinical data. "
@@ -400,7 +400,7 @@ ES: dict[str, str] = {
     "live_budget": "El presupuesto diario en vivo se agotó. Prueba una pregunta grabada.",
     "live_busy": "Hay otra pregunta en vivo en curso. Prueba de nuevo en un minuto.",
     "live_failed": "La llamada en vivo falló ({error}).",
-    "s1_lede": "Lo imposible, como una exposición negativa, se aparta sin corregir.",
+    "s1_lede": "Lo imposible se aparta sin corregir.",
     "s1_animals": "ratas",
     "s1_doses": "dosis: {doses} mg/kg/día",
     "s1_head": "Valores imposibles apartados: ",
@@ -436,7 +436,7 @@ ES: dict[str, str] = {
     "disc_quarantined": "Ver todos los valores",
     "s1_prod": "una cola con trabajadores.",
     "s1_prod_lead": "ejecutor de trabajos: en proceso.",
-    "s1_about": "PDS2014",
+    "disc_about": "Ver PDS2014",
     "s1_about_what": (
         "PhUSE PDS2014 es un conjunto de datos público y ficticio de PhUSE, en formato SEND, "
         "el estándar de la FDA para datos no clínicos. "

@@ -72,10 +72,19 @@ def test_step1_about_the_public_study_is_a_closed_details_with_the_exact_link(la
     with TestClient(create_app()) as client:
         client.cookies.set(COOKIE, lang)
         page = client.get("/study").text
-    found = re.search(r'<details class="about"[^>]*>(.*?)</details>', page, re.S)
+    found = re.search(
+        r'<details class="pill">'
+        r'(<summary class="pill">(?:Show|Ver) PDS2014 [^<]*</summary>)(.*?)</details>',
+        page,
+        re.S,
+    )
     assert found, lang
-    assert '<details class="about" id="about-study">' in page  # closed: no open attribute
-    body = unescape(found.group(1))
+    assert "<details open" not in found.group(0), lang  # closed by default
+    words = re.search(r"· (\d+) ", found.group(1))
+    assert words and int(words.group(1)) == len(
+        re.sub(r"<[^>]+>", " ", unescape(found.group(2))).split()
+    ), lang
+    body = unescape(found.group(2))
     assert "PhUSE PDS2014" in body and "SEND" in body and "FDA" in body
     assert 'href="https://github.com/phuse-org/phuse-scripts/tree/master/data/send/PDS"' in body
     assert 'rel="noopener"' in body
