@@ -163,6 +163,23 @@ def test_screens_are_within_the_cap_in_both_locales(state: str, lang: str) -> No
     assert rendered_problems(html, WORD_CAP) == [], (state, lang)
 
 
+def test_live_states_prove_the_live_box_is_present() -> None:
+    from screens import assert_expected_page
+
+    plain = rendered_state("ask_before", "en")
+    with pytest.raises(AssertionError, match="Your question"):
+        assert_expected_page("ask_live_before", plain)
+    live = rendered_state("ask_live_before", "en")
+    assert 'action="/explore/live"' in live or 'hx-post="/explore/live"' in live
+    assert rendered_words(live) > rendered_words(plain)
+
+
+def test_a_live_state_over_the_cap_fails() -> None:
+    live = rendered_state("ask_live_q2", "en")
+    padded = live.replace("</main>", "<p>" + " ".join(["extra"] * WORD_CAP) + "</p></main>", 1)
+    assert rendered_problems(padded, WORD_CAP) == ["step words"]
+
+
 def test_with_result_fails_when_there_is_no_result_element() -> None:
     with pytest.raises(AssertionError):
         with_result(_page("<p>no result here</p>"), "<p>a b</p>")

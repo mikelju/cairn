@@ -44,6 +44,15 @@ STATE_MARKERS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "ask_q2": (("exp_rules", "ask_col_answer", "ask_col_ai"), ("trick_Q6",)),
     "ask_q6": (("trick_Q6",), ()),
     "ask_g2": (("exp_official",), ("trick_Q6",)),
+    # With an access code configured (as on AWS) the live question box is part of the page.
+    "ask_live_before": (
+        ("s2_lede", "q_Q1", "exp_live_q", "exp_live_code", "exp_live_go", "live_wait"),
+        ("exp_rules",),
+    ),
+    "ask_live_q2": (
+        ("exp_rules", "ask_col_answer", "exp_live_q", "exp_live_code", "exp_live_go", "live_wait"),
+        ("trick_Q6",),
+    ),
     "decide_empty": (("s4_decide", "disc_examples"), ("s4_confirm",)),
     "decide_filled": (("s4_confirm", "disc_examples"), ("s4_decide",)),
     "decide_confirmed": (("disc_examples",), ("s4_decide", "s4_confirm")),
@@ -120,6 +129,9 @@ def _render(client: TestClient, db: Path, name: str) -> str:
             return page
         data = {"switch": SWITCHES[name]} if name in SWITCHES else None
         return with_result(page, client.post("/study/run", data=data).text)
+    if name.startswith("ask_live_"):
+        with mock.patch.dict(os.environ, {"CAIRN_ACCESS_CODE": "test-code-not-real"}):
+            return _ask(client, name.replace("live_", "", 1))
     if name.startswith("ask_"):
         return _ask(client, name)
     if name == "decide_empty":

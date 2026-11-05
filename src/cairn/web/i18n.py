@@ -94,7 +94,7 @@ EN: dict[str, str] = {
     "disc_table": "Show table",
     "exp_prod": "live model calls.",
     "exp_live_label": "Live question",
-    "exp_live_q": "Your own question",
+    "exp_live_q": "Your question",
     "exp_live_code": "Access code",
     "exp_live_go": "Ask live",
     "live_need_code": ("Live questions need the access code. Try a recorded question."),
@@ -392,9 +392,9 @@ ES: dict[str, str] = {
     "disc_table": "Ver tabla",
     "exp_prod": "llamadas en vivo.",
     "exp_live_label": "Pregunta en vivo",
-    "exp_live_q": "Tu propia pregunta",
-    "exp_live_code": "Código de acceso",
-    "exp_live_go": "Preguntar en vivo",
+    "exp_live_q": "Tu pregunta",
+    "exp_live_code": "Código",
+    "exp_live_go": "Preguntar",
     "live_need_code": (
         "Las preguntas en vivo necesitan el código de acceso. Prueba una pregunta grabada."
     ),
