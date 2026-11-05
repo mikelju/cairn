@@ -48,7 +48,7 @@ def _draft(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, lang: str) -> tuple[
 
 def _strip_tags(html: str) -> str:
     """The text of the draft body with every provenance tag removed."""
-    body = html.split('<div class="card answer answer-unit">', 1)[1].split(
+    body = html.split('<div class="card answer"><p class="answer-unit">', 1)[1].split(
         '<p class="prov-legend">'
     )[0]
     while (tag := re.search(r'<details class="prov ', body)) is not None:
@@ -116,13 +116,19 @@ def test_the_counts_line_equals_the_rendered_tags(
     shown = _parse(page).tags
     for kind in counts:
         assert counts[kind] == sum(t["kind"] == kind for t in shown)
+    with_digits = sum(t["kind"] == "data" and bool(re.search(r"\d", t["chip"])) for t in shown)
+    assert 0 < with_digits < counts["data"]  # names and units are data tags without a number
+    outside = _strip_tags(page)
+    for word in FIXED_DIGIT_WORDS:
+        outside = outside.replace(word, "")
+    stray = len(re.findall(r"\d+(?:[.,]\d+)*", outside))
     line = _squash(re.search(r'<p class="meta prov-counts">(.*?)</p>', page, re.S).group(1))  # type: ignore[union-attr]
     numbers = [int(n) for n in re.findall(r"\d+", line)]
     example = sum(
         getattr(p, "who", "") in ("Preloaded example", "Ejemplo precargado") for p in parts
     )
     assert example > 0
-    assert numbers == [counts["data"], 0, counts["decision"] - example, example, counts["quote"]]
+    assert numbers == [with_digits, stray, counts["decision"] - example, example, counts["quote"]]
     assert tail in line
 
 

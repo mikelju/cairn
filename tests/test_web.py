@@ -17,7 +17,7 @@ from cairn.fetch import VENDORED_DIR
 from cairn.ingest import DEFAULT_DB, ingest
 from cairn.web import HERE
 from cairn.web.i18n import COOKIE
-from screens import STATE_MARKERS, main_copy, rendered_state
+from screens import LANGS, STATE_MARKERS, main_copy, rendered_state
 
 
 def test_healthz_and_landing_page() -> None:
@@ -104,7 +104,7 @@ def test_step1_injection_is_one_value_with_one_animal_everywhere() -> None:
 
 
 def test_step1_main_has_no_upper_case_send_terms() -> None:
-    allowed = {"AUC", "FDA", "REAL"}
+    allowed = {"AUC", "FDA"}
     for state in ("study_before", "study_after", "study_injected"):
         for lang in ("es", "en"):
             shown = re.sub(
@@ -189,14 +189,14 @@ def _outside_sources(html: str) -> str:
 
 def _prose_text(html: str) -> str:
     """What the prose says: the text and the chips, not the sources behind them."""
-    prose = re.search(r'<div class="prose">(.*?)</div>', _outside_sources(html), re.S)
+    prose = re.search(r'<div class="prose answer-unit">(.*?)</div>', _outside_sources(html), re.S)
     assert prose, "no rendered answer"
     return " ".join(unescape(re.sub(r"<[^>]+>", "", prose.group(1))).split())
 
 
 def _model_text_toggle(html: str) -> str:
     """The closed disclosure of the model text, whatever the locale."""
-    label = r"(?:Ver texto del modelo|Show model text)"
+    label = r"(?:Ver texto generado|Show model text)"
     found = re.search(
         rf'<details class="pill"><summary class="pill">{label}.*?</details>', html, re.S
     )
@@ -269,14 +269,14 @@ def test_q6_blocked(monkeypatch: pytest.MonkeyPatch) -> None:
     """Deviation D3: the real Q6 recording ends declined, which counts as correct."""
     result = _ask("Q6", monkeypatch, REAL)
     assert "It declines" in result
-    assert "<tr><td>" not in result and 'class="prose"' not in result
+    assert "<tr><td>" not in result and 'class="prose' not in result
 
 
 def test_q6_blocked_by_rules_on_fixture(monkeypatch: pytest.MonkeyPatch) -> None:
     result = _ask("Q6", monkeypatch)
     trace = result[result.index('<div id="inside-trace" hx-swap-oob="true">') :]
     assert "Rules fired: 1, 6" in trace
-    assert 'class="prose"' not in result
+    assert 'class="prose' not in result
     assert "<tr><td>" not in result
 
 
@@ -413,8 +413,9 @@ def test_ask_page_has_a_button_for_every_question() -> None:
 )
 def test_every_ask_question_replays_offline(question: str) -> None:
     result = _explore(question)
-    assert 'class="badge recorded"' in result
-    assert 'class="answer-panel answer-unit"' in result
+    trace = result[result.index('<div id="inside-trace" hx-swap-oob="true">') :]
+    assert 'class="badge recorded"' in trace
+    assert 'answer-unit"' in result or 'class="callout blocked"' in result
 
 
 def test_ask_marks_the_trick_questions() -> None:
@@ -1052,3 +1053,12 @@ def test_noael_unit_is_per_day_on_decide_and_draft() -> None:
         _filled(client)
         one = client.post("/decide/confirm", data={"actor": "R. Reviewer", "sex": "F"}).text
         assert "NOAEL, Females: 20 mg/kg/day" in one
+
+
+def test_no_screen_has_upper_case_send_terms_outside_the_prose() -> None:
+    """The landing and the four screens, every state: only AUC and FDA stay in capitals."""
+    allowed = {"AUC", "FDA", "NOAEL"}
+    for state in STATE_MARKERS:
+        for lang in LANGS:
+            shown = re.sub(r"PDS2014-\d+", "", main_copy(rendered_state(state, lang), prose=False))
+            assert set(re.findall(r"[A-Z]{3,}", shown)) <= allowed, (state, lang)

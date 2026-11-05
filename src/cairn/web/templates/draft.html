@@ -6,7 +6,7 @@
 {% if undecided %}
 {{ a.data_table([t.draft_noael, ""], noael) }}
 {% call a.callout("note") %}<p><a href="/decide">{{ t.draft_decide }}</a></p>{% endcall %}
-{% call a.disclosure("final_text", text.split()|length, "words") %}<div class="card answer"><p>{{ text }}</p></div>{% endcall %}
+{% call a.disclosure("final_text", text.split()|length, "words") %}<div class="card answer"><p class="answer-unit">{{ text }}</p></div>{% endcall %}
 {% else %}
 <div class="detail">
 {% call a.disclosure("final_text", body.words, "words") %}<div class="card answer"><p class="answer-unit">{{ a.prov(body.parts) }}</p>{{ a.prov_legend(body.kinds) }}</div><p class="meta prov-counts">{{ body.counts_line }}</p>{% endcall %}

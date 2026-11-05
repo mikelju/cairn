@@ -115,7 +115,10 @@ def test_rendered_counter_counts_a_table_body_as_one_word() -> None:
 
 def test_rendered_counter_counts_an_answer_unit_as_one_word() -> None:
     text = " ".join(["ans"] * 50)
-    unit = f'<article class="answer-panel"><p class="answer-unit">{text}</p><p>one two three</p></article>'
+    unit = (
+        f'<article class="answer-panel"><p class="answer-unit">{text}</p>'
+        "<p>one two three</p></article>"
+    )
     assert rendered_words(_page(unit, lede="Lede.")) == 1 + 1 + 3  # the sibling is counted
 
 

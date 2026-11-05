@@ -12,6 +12,7 @@ from cairn.app import create_app
 from cairn.questions import QUESTIONS
 from cairn.web import i18n
 from cairn.web.provenance import DataTag, DecisionTag, QuoteTag, TextPart
+from screens import LANGS, STATE_MARKERS, main_copy, rendered_state
 
 QUESTION_IDS = (*QUESTIONS, *web.ASK_QUERIES)
 STATUS_WORDS = ("REAL", "RECORDED", "SIMULATED", "COMPUTED AT BUILD")
@@ -152,3 +153,16 @@ def test_ask_shows_no_status_badge_outside_the_inside_panel(lang: str) -> None:
     assert 'class="badge' not in re.sub(
         r'<details class="inside">.*?</details>', "", main, flags=re.S
     )
+
+
+@pytest.mark.parametrize("lang", LANGS)
+@pytest.mark.parametrize("state", list(STATE_MARKERS))
+def test_no_status_badge_in_any_screen_outside_the_inside_panel(state: str, lang: str) -> None:
+    """C10: the landing and the four screens, in every state, keep status labels in Inside only."""
+    html = rendered_state(state, lang)
+    assert ("<main" in html and "inside" in html) or state == "landing"
+    text = main_copy(html)
+    assert not [w for w in STATUS_WORDS if re.search(rf"\b{w}\b", text)], (state, lang)
+    main = html.split("<main", 1)[1].split("</main>", 1)[0]
+    outside = re.sub(r'<details class="inside">.*?</details>', "", main, flags=re.S)
+    assert 'class="badge' not in outside, (state, lang)
