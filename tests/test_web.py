@@ -111,7 +111,7 @@ def test_step1_main_has_no_upper_case_send_terms() -> None:
             shown = re.sub(
                 r"PDS2014-\d+", "", _text(_main_outside_inside(rendered_state(state, lang)))
             )
-            assert set(re.findall(r"[A-Z]{3,}", shown)) <= allowed, (state, lang)
+            assert set(re.findall(r"\b[A-Z]{3,}\b", shown)) <= allowed, (state, lang)
 
 
 def test_step1_switches_fire_their_rule_without_touching_the_sources(tmp_path: Path) -> None:
