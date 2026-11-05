@@ -132,17 +132,16 @@ def test_the_counts_line_equals_the_rendered_tags(
     assert tail in line
 
 
-@pytest.mark.parametrize(
-    ("lang", "words"), [("en", ("female", "male", "rat")), ("es", ("hembra", "macho", "rata"))]
-)
-def test_ask_shows_sex_and_species_as_words_not_chips(lang: str, words: tuple[str, ...]) -> None:
+@pytest.mark.parametrize("lang", ["en", "es"])
+def test_ask_shows_sex_and_species_as_english_words_not_chips(lang: str) -> None:
     with TestClient(create_app()) as client:
         page = client.post(f"/ask/run?lang={lang}", data={"question": "Q3"}).text
     chips = [t["chip"] for t in _parse(page).tags if t["kind"] == "data"]
     assert chips and all(re.search(r"\d", c) for c in chips), chips
     assert not {"F", "M", "RAT"} & {c.strip() for c in chips}
-    plain = unescape(re.sub(r"<[^>]+>", " ", page))
-    assert words[0] in plain and words[2] in plain
+    plain = " ".join(unescape(re.sub(r"<[^>]+>", " ", page)).split())
+    assert "In female rat from the main study" in plain  # recorded prose is English in both UIs
+    assert not re.search(r"\b(?:hembra|macho|rata)\b", plain)
 
 
 @pytest.mark.parametrize("lang", ["en", "es"])

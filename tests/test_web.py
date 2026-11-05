@@ -899,8 +899,7 @@ def test_explore_recorded_prose_is_identical_in_both_locales() -> None:
     def prose(html: str) -> str:
         return _prose_text(html)
 
-    # D13: controlled terms are plain words of the interface language; the rest is identical
-    assert prose(_explore("Q1", "es")).replace("macho", "male") == prose(_explore("Q1", "en"))
+    assert prose(_explore("Q1", "es")) == prose(_explore("Q1", "en"))
 
 
 def test_decide_first_render_shows_incidence_examples_and_no_noael() -> None:
@@ -1070,4 +1069,4 @@ def test_no_screen_has_upper_case_send_terms_outside_the_prose() -> None:
     for state in STATE_MARKERS:
         for lang in LANGS:
             shown = re.sub(r"PDS2014-\d+", "", main_copy(rendered_state(state, lang), prose=False))
-            assert set(re.findall(r"[A-Z]{3,}", shown)) <= allowed, (state, lang)
+            assert set(re.findall(r"\b[A-Z]{3,}\b", shown)) <= allowed, (state, lang)

@@ -394,11 +394,6 @@ ES: dict[str, str] = {
     ),
     "s1_sex_M": "machos",
     "s1_sex_F": "hembras",
-    "term_sex_F": "hembra",
-    "term_sex_M": "macho",
-    "term_species_RAT": "rata",
-    "term_route_ORAL_GAVAGE": "gavage oral",
-    "term_strain_SPRAGUE_DAWLEY": "Sprague-Dawley",
     "s1_in_total": "Valores apartados: {n}.",
     "s1_in_mean": (
         "Media de AUC, {sex}, {dose} mg/kg, día {day}, en {unit}: {with_bad} con los valores "

@@ -338,7 +338,7 @@ def _step2_context(
         f"{latency:.1f} s | "
         + ((t or i18n.CATALOGUES["en"])["s5_cost_na"] if cost is None else f"{cost:.2f} USD")
     )
-    return result_context(result, "FIXTURE" if fixture else "RECORDED", meta, t)
+    return result_context(result, "FIXTURE" if fixture else "RECORDED", meta)
 
 
 def _answer_kind(result: LoopResult, has_table: bool) -> str:
@@ -350,9 +350,7 @@ def _answer_kind(result: LoopResult, has_table: bool) -> str:
     return "table" if has_table else "text"
 
 
-def result_context(
-    result: LoopResult, badge: str, meta: str, t: dict[str, str] | None = None
-) -> dict[str, Any]:
+def result_context(result: LoopResult, badge: str, meta: str) -> dict[str, Any]:
     """The template data of one answered, declined or rejected question, recorded or live."""
     verdict = result.verdict
     doses, rows = _screen(result)
@@ -378,21 +376,21 @@ def result_context(
             "",
         ),
         "evidence": _evidence(result),
-        "parts": _answer_parts(result, t) if result.rendered else [],
+        "parts": _answer_parts(result) if result.rendered else [],
     }
 
 
-def _answer_parts(result: LoopResult, t: dict[str, str] | None) -> list[Part]:
+def _answer_parts(result: LoopResult) -> list[Part]:
     """The answer sentences as text and provenance tags, one space between sentences.
 
-    Terms such as sex, species or route read as plain words in the interface language.
+    The recorded prose is English, so its terms (sex, species, route) are English words too.
     """
     parts: list[Part] = []
     for sentence in result.sentences:
         if parts:
             parts.append(TextPart(" "))
         parts.extend(provenance_parts(sentence, result.ledger))
-    return plain_terms(parts, t or i18n.CATALOGUES["en"])
+    return plain_terms(parts, i18n.CATALOGUES["en"])
 
 
 def _kinds(parts: list[Part]) -> list[str]:
