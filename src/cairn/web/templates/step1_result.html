@@ -3,11 +3,16 @@
 {% set heads = [t.s1_th_animal, t.s1_th_test, t.s1_th_value] %}
 {% macro lines(items) %}{% set out = namespace(rows=[]) %}{% for q in items %}{% set out.rows = out.rows + [[q.animal, t[q.measure] ~ (t.s1_day.format(day=q.day) if q.day != "-" else ""), q.value]] %}{% endfor %}{{ a.data_table(heads, out.rows, new=true) }}{% endmacro %}
 <h2>{{ t.s1_head }}{{ r.total }}</h2>
-{% if not r.injected and not r.reported %}<p class="figure">{{ t.s1_why }}</p>{% endif %}
-{{ lines(r.short) }}
 <div class="detail">{% call a.disclosure("quarantined", r.total, "rows") %}{{ lines(r.rows) }}{% endcall %}</div>
 {% if r.reported %}<p class="figure">{{ t.s1_reported }} {{ r.reported[0].animal }}, {{ t[r.reported[0].measure] }}</p>{% endif %}
-{% if r.injected %}<p class="figure">{{ t.s1_same.format(sex=t["s1_sex_" ~ g.sex], dose=g.dose|int, day=g.day|int, mean=r.without_bad, unit=r.unit) }}</p>{% endif %}
+{% macro shown(f) %}{{ a.prov([f.tag]) }} (n={{ f.n }}){% endmacro %}
+{% set group = t.s1_group.format(sex=t["s1_sex_" ~ g.sex], dose=g.dose|int, day=g.day|int) %}
+{% if r.injected %}
+{{ a.data_table([group, t.s1_before, t.s1_now], [[t.s1_row_all, shown(r.before.all), shown(r.now.all)], [t.s1_row_ok, shown(r.before.plausible), shown(r.now.plausible)]]) }}
+<p class="figure">{{ t.s1_same }}</p>
+{% elif not r.reported %}
+{{ a.data_table([group, t.s1_th_mean.format(unit=r.unit), t.s1_th_n], [[t.s1_row_all, a.prov([r.now.all.tag]), r.now.all.n], [t.s1_row_ok, a.prov([r.now.plausible.tag]), r.now.plausible.n]]) }}
+{% endif %}
 <form hx-post="/study/run" hx-target="#result">
   <input type="hidden" name="switch" value="{{ 'none' if r.injected else 'negative' }}">
   <button type="submit" class="btn-secondary">{{ t.s1_undo if r.injected else t.s1_break }}</button>

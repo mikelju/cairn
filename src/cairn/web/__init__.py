@@ -19,7 +19,7 @@ from cairn.decisions import finding_key
 from cairn.gateway import DEFAULT_MODEL, LLMGateway, Mode
 from cairn.guidelines import load_manifest
 from cairn.highlight import IMAGES_DIR, cited_page, highlights_by_sentence
-from cairn.ingest import build_report, load_study
+from cairn.ingest import NAIVE_MEAN, build_report, load_study
 from cairn.jobs import JobRunner
 from cairn.loop import PROMPT_VERSION, STUDY_TOOLS, LoopResult, LoopStatus, ask, schema_hash
 from cairn.passages import normalize_whitespace, stored_passages
@@ -33,9 +33,17 @@ from cairn.recording import (
     total_cost,
 )
 from cairn.render import quotations
-from cairn.validate import RULE_AUC, RULE_CONC, validate_study
+from cairn.validate import RULE_AUC, RULE_CONC, auctau_rows, validate_study
 from cairn.web import i18n
-from cairn.web.provenance import Part, QuoteTag, TextPart, plain_terms, provenance_parts
+from cairn.web.provenance import (
+    DataTag,
+    Part,
+    QuoteTag,
+    SourceTable,
+    TextPart,
+    plain_terms,
+    provenance_parts,
+)
 from cairn.web.threads import threads
 
 HERE = Path(__file__).parent
@@ -93,7 +101,8 @@ def _study_facts() -> dict[str, Any]:
 
 
 MEASURES = {
-    RULE_AUC: "s1_m_auc",
+    "AUCTAU": "s1_m_auctau",
+    "AUCIFO": "s1_m_aucifo",
     RULE_CONC: "s1_m_conc",
     "dm_usubjid_unique": "s1_m_dup",
     "dm_setcd_in_tx": "s1_m_set",
@@ -111,7 +120,7 @@ def _row(r: dict[str, Any]) -> dict[str, Any]:
     day = r.get("visit_day")
     return {
         "animal": r["usubjid"],
-        "measure": MEASURES[r["rule"]],
+        "measure": MEASURES[r["test"] if r["rule"] == RULE_AUC else r["rule"]],
         "day": "-" if day is None else int(day),
         "value": _shown(r["value"], r.get("unit")),
         "rule": r["rule"],
@@ -122,32 +131,72 @@ def _result(
     report: dict[str, Any], injected: bool, extra: list[dict[str, Any]] | None = None
 ) -> dict[str, Any]:
     naive = report["naive_mean_auctau"]
-    # one list for every count shown: the injected concentration comes first
-    held = sorted(report["quarantine"]["rows"], key=lambda q: q["rule"] != RULE_CONC)
+    # one list for every count shown: the injected exposure (the newest source row) comes first
+    top = max(
+        (q["source_row"] for q in report["quarantine"]["rows"] if q["domain"] == "PP"), default=-1
+    )
+    held = sorted(
+        report["quarantine"]["rows"],
+        key=lambda q: not (injected and q["domain"] == "PP" and q["source_row"] == top),
+    )
     rows = [_row(q) for q in held]
     return {
         **_study_facts(),
         "injected": injected,
         "total": len(rows),
         "rows": rows,
-        "short": rows[:3],
         "reported": [_row(q) for q in extra or []],
         "group": naive["group"],
         "with_bad": _number(naive["with_quarantined"]["mean"]),
         "n_with": naive["with_quarantined"]["n"],
         "without_bad": _number(naive["without_quarantined"]["mean"]),
         "n_without": naive["without_quarantined"]["n"],
-        "injected_animal": next((q["animal"] for q in rows if q["rule"] == RULE_CONC), ""),
+        "injected_animal": rows[0]["animal"] if injected and rows else "",
     }
 
 
+INJECTED_AUC = -20000.0
+
+
 def _inject(frames: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
-    """Copy the frames and add one negative concentration; the source files stay untouched."""
-    pc = frames["PC"]
-    row = pc[pc["PCSTRESN"] > 0].iloc[[0]].copy()
-    row["PCSTRESN"] = -1.0
-    row.index = pd.Index([int(str(pc.index.max())) + 1])
-    return {**frames, "PC": pd.concat([pc, row])}
+    """Copy the frames and add one negative AUCtau to the mean group; the sources stay untouched."""
+    pp = frames["PP"]
+    chosen = auctau_rows(frames, *NAIVE_MEAN)
+    row = pp.loc[[chosen.index[chosen["PPSTRESN"] > 0][0]]].copy()
+    row["PPSTRESN"] = INJECTED_AUC
+    row.index = pd.Index([int(str(pp.index.max())) + 1])
+    return {**frames, "PP": pd.concat([pp, row])}
+
+
+def _figure(rows: pd.DataFrame, population: str, t: dict[str, str]) -> dict[str, Any]:
+    """One mean with the AUCtau values it comes from, as a provenance tag."""
+    group = t["s1_group"].format(
+        sex=t["s1_sex_" + NAIVE_MEAN[0]], dose=int(NAIVE_MEAN[1]), day=int(NAIVE_MEAN[2])
+    )
+    pairs = zip(rows["USUBJID"], rows["PPSTRESN"], strict=True)
+    values = [[str(a), _number(float(v))] for a, v in pairs]
+    tag = DataTag(
+        text=_number(float(rows["PPSTRESN"].mean())),
+        tool="validate_study",
+        column=t["s1_m_auctau"],
+        population=f"{group}, {population}",
+        table=SourceTable([t["s1_th_animal"], t["s1_m_auctau"]], values, (-1, -1)),
+        source_rows=[],
+        source_row_count=0,
+    )
+    return {"tag": tag, "n": len(rows)}
+
+
+def _means(switch: str, t: dict[str, str]) -> dict[str, Any]:
+    """The mean AUCtau of the group with every value and with the plausible ones only."""
+    frames, zeros, _ = load_study()
+    if switch == "negative":
+        frames = _inject(frames)
+    clean = validate_study(frames, zeros).clean
+    return {
+        "all": _figure(auctau_rows(frames, *NAIVE_MEAN), t["s1_row_all"], t),
+        "plausible": _figure(auctau_rows(clean, *NAIVE_MEAN), t["s1_row_ok"], t),
+    }
 
 
 RULE_UNIQUE = "dm_usubjid_unique"
@@ -224,11 +273,12 @@ async def study_run(request: Request, switch: Annotated[str, Form()] = "none") -
         job = runner.submit("validate_study", {})
         await runner.tasks[job.job_id]
         report = (runner.jobs[job.job_id].outputs or {})["report"]
-    return templates.TemplateResponse(
-        request,
-        "step1_result.html",
-        {**i18n.context(request, 1), "r": _result(report, switch == "negative", extra)},
-    )
+    shell = i18n.context(request, 1)
+    injected = switch == "negative"
+    result = _result(report, injected, extra)
+    result["now"] = _means("negative" if injected else "none", shell["t"])
+    result["before"] = _means("none", shell["t"]) if injected else None
+    return templates.TemplateResponse(request, "step1_result.html", {**shell, "r": result})
 
 
 SCREEN_KIND = "incidence_screen"

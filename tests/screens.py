@@ -30,8 +30,14 @@ def _literal(text: str) -> str:
 STATE_MARKERS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "landing": (("land_cta",), ()),
     "study_before": (("s1_lede",), ("s1_head",)),
-    "study_after": (("s1_head", "s1_break"), ("s1_same", "s1_reported")),
-    "study_injected": (("s1_head", "s1_same", "s1_undo"), ("s1_break",)),
+    "study_after": (
+        ("s1_lede", "s1_head", "s1_break", "s1_row_all", "s1_row_ok"),
+        ("s1_same", "s1_reported", "s1_before"),
+    ),
+    "study_injected": (
+        ("s1_head", "s1_same", "s1_undo", "s1_before", "s1_now", "s1_row_all", "s1_row_ok"),
+        ("s1_break",),
+    ),
     "study_duplicate": (("s1_head", "s1_reported"), ("s1_same",)),
     "study_dose": (("s1_head", "s1_reported"), ("s1_same",)),
     "ask_before": (("s2_lede", "q_Q1"), ("exp_rules",)),

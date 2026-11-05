@@ -69,9 +69,10 @@ def test_step1_run_shows_quarantine_and_computed_means() -> None:
         _english(client)
         result = client.post("/study/run").text
     assert "Impossible values set apart: 12" in result
-    assert result.count('class="new"') == 3 + 12  # the short table and the full list
+    assert result.count('class="new"') == 12  # the full list, folded
     assert "Show all values · 12 rows" in result
-    assert "-23,450 h*ng/mL" in result and "exposure (AUC), day 1" in result
+    assert "-23,450 h*ng/mL" in result and "exposure (AUC, dose interval), day 1" in result
+    assert "exposure (AUC, to infinity), day 1" in result
     assert "Values set apart: 12" in result and "males, 20 mg/kg, day 1" in result
     assert "h*ng/mL: 2,821 with" in result and "(n=3)" in result
     assert "15,956 without" in result and "(n=2)" in result
@@ -95,13 +96,41 @@ def test_step1_injection_is_one_value_with_one_animal_everywhere() -> None:
     animal = re.search(r"Injected value: animal (PDS2014-\d+)", inside)
     assert animal, "the Inside panel does not name the injected animal"
     first_row = re.search(
-        r"<tr class=\"new\"><td>(PDS2014-\d+)</td><td>concentration, day 1</td>", page
+        r"<tr class=\"new\"><td>(PDS2014-\d+)</td>"
+        r"<td>exposure \(AUC, dose interval\), day 1</td><td>-20,000 h\*ng/mL</td>",
+        page,
     )
     assert first_row and first_row.group(1) == animal.group(1)
-    assert "-1 ng/mL" in page
-    # the full list holds 13 rows and the injected animal is the only one with a concentration
-    assert page.count("concentration, day") == 2  # short table and full list
-    assert "New value set apart: mean AUC (males, 20 mg/kg, day 1) stays 15,956 h*ng/mL" in shown
+    # the full list holds 13 rows and the injected exposure is listed first
+    assert page.count("-20,000 h*ng/mL") == 1
+    assert "The mean with all values changes; the plausible-only mean stays." in shown
+
+
+def _means_table(page: str) -> list[list[str]]:
+    """The rows of the means table of /study: label, then the text of each cell."""
+    folded = re.sub(r'<div class="prov-body">.*?</div>', "", page, flags=re.S)  # the source tables
+    labels = "All values|Plausible only|Con todos los valores|Solo verosímiles"
+    rows = re.findall(rf"<tr>(<td>(?:{labels}).*?)</tr>", folded, re.S)
+    assert len(rows) == 2, "no means table"
+
+    def text(cell: str) -> str:
+        return " ".join(unescape(re.sub(r"<[^>]+>", " ", cell)).split())
+
+    return [[text(c) for c in re.findall(r"<td.*?</td>", row, re.S)] for row in rows]
+
+
+def test_step1_means_table_before_and_after_the_injection() -> None:
+    plain = _means_table(rendered_state("study_after", "en"))
+    assert plain == [["All values", "2,821", "3"], ["Plausible only", "15,956", "2"]]
+    page = rendered_state("study_injected", "en")
+    assert _means_table(page) == [
+        ["All values", "2,821 (n=3)", "-2,884 (n=4)"],
+        ["Plausible only", "15,956 (n=2)", "15,956 (n=2)"],
+    ]
+    assert page.count('class="prov prov-data"') == 4  # one source tag per figure
+    spanish = rendered_state("study_injected", "es")
+    assert _means_table(spanish)[0][0] == "Con todos los valores"
+    assert _means_table(spanish)[1][0] == "Solo verosímiles"
 
 
 def test_step1_main_has_no_upper_case_send_terms() -> None:
@@ -121,7 +150,7 @@ def test_step1_switches_fire_their_rule_without_touching_the_sources(tmp_path: P
     watched = [db, *vendored] + ([DEFAULT_DB] if DEFAULT_DB.exists() else [])
     before = [hashlib.sha256(p.read_bytes()).hexdigest() for p in watched]
     expected = {
-        "negative": "concentration",
+        "negative": "-20,000 h*ng/mL",
         "duplicate": "animal ID repeated",
         "dose": "dose group missing",
     }
