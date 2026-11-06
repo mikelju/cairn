@@ -154,10 +154,11 @@ def _result(
         "without_bad": _number(naive["without_quarantined"]["mean"]),
         "n_without": naive["without_quarantined"]["n"],
         "injected_animal": rows[0]["animal"] if injected and rows else "",
+        "injected_value": rows[0]["value"] if injected and rows else "",
     }
 
 
-INJECTED_AUC = -20000.0
+INJECTED_AUC = -50000.0
 
 
 def _inject(frames: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
@@ -258,13 +259,8 @@ async def healthz() -> JSONResponse:
     return JSONResponse({"status": "ok"})
 
 
-@router.get("/study", response_class=HTMLResponse)
-async def study(request: Request) -> HTMLResponse:
-    return _page(request, "study.html", current=1, **_study_facts())
-
-
-@router.post("/study/run", response_class=HTMLResponse)
-async def study_run(request: Request, switch: Annotated[str, Form()] = "none") -> HTMLResponse:
+async def _study_page(request: Request, switch: str) -> HTMLResponse:
+    """The whole study screen, with its result rendered on the server for the chosen switch."""
     extra: list[dict[str, Any]] = []
     if switch not in (*SWITCHES, "none"):
         raise HTTPException(status_code=422, detail="unknown switch")
@@ -275,12 +271,20 @@ async def study_run(request: Request, switch: Annotated[str, Form()] = "none") -
         job = runner.submit("validate_study", {})
         await runner.tasks[job.job_id]
         report = (runner.jobs[job.job_id].outputs or {})["report"]
-    shell = i18n.context(request, 1)
     injected = switch == "negative"
     result = _result(report, injected, extra)
-    result["now"] = _means("negative" if injected else "none", shell["t"])
-    result["before"] = _means("none", shell["t"]) if injected else None
-    return templates.TemplateResponse(request, "step1_result.html", {**shell, "r": result})
+    result["means"] = _means(switch if injected else "none", i18n.context(request, 1)["t"])
+    return _page(request, "study.html", current=1, r=result, **_study_facts())
+
+
+@router.get("/study", response_class=HTMLResponse)
+async def study(request: Request) -> HTMLResponse:
+    return await _study_page(request, "none")
+
+
+@router.post("/study/run", response_class=HTMLResponse)
+async def study_run(request: Request, switch: Annotated[str, Form()] = "none") -> HTMLResponse:
+    return await _study_page(request, switch)
 
 
 SCREEN_KIND = "incidence_screen"

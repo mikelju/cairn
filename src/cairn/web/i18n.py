@@ -105,26 +105,52 @@ EN: dict[str, str] = {
     "live_failed": "The live call failed ({error}).",
     "live_wait": "Waiting for the answer...",
     "live_net": "No answer came back. Try again in a minute.",
-    "s1_lede": "Impossible values are set aside, never fixed.",
+    "s1_lede": (
+        "A public study we can verify, used as a real example with real data, "
+        "to understand better what we are going to do in the demo."
+    ),
+    "s1_card_h": "Which study it is and why we use it",
+    "s1_card_p1": (
+        "It is a drug safety study in rats. The compound is given to several groups of animals "
+        "at ever higher doses, and another group gets nothing (the control group). Then we "
+        "observe what happens to each one."
+    ),
+    "s1_card_p2_a": "The goal is to find the highest dose that is not harmful: the ",
+    "s1_card_term": "NOAEL",
+    "s1_card_p2_b": (
+        ", the no observed adverse effect level. It is public and in the real format of "
+        "nonclinical data, so anyone can check it."
+    ),
     "s1_animals": "rats",
     "s1_doses": "doses: {doses} mg/kg/day",
-    "s1_head": "Impossible values set apart: ",
+    "s1_gone_h": "impossible values set apart",
+    "s1_gone_p": (
+        "The first thing done with the data is to discard impossible values, such as a "
+        "negative exposure. They are set apart without correcting them: nobody fixes them "
+        "behind the scenes."
+    ),
+    "s1_effect": (
+        "Effect on a real mean: AUC (exposure) of {sex}, {dose} mg/kg, day {day}, in {unit}."
+    ),
+    "s1_lbl_all": "with all values (n={n})",
+    "s1_lbl_ok": "plausible only (n={n})",
+    "s1_injected_tag": "impossible, set apart",
+    "s1_note": (
+        "A value of {value} was added to animal {animal}. With all values the mean sinks to "
+        "{mean}; the impossible value is marked and set apart, and the plausible-only mean "
+        "stays at {plausible} (n={n})."
+    ),
     "s1_m_auctau": "exposure (AUC, dose interval)",
     "s1_m_aucifo": "exposure (AUC, to infinity)",
     "s1_group": "{sex}, {dose} mg/kg, day {day}",
     "s1_row_all": "All values",
     "s1_row_ok": "Plausible only",
-    "s1_before": "Before",
-    "s1_now": "Now",
-    "s1_th_mean": "Mean ({unit})",
-    "s1_th_n": "n",
     "s1_m_conc": "concentration",
     "s1_m_dup": "animal ID repeated",
     "s1_m_set": "dose group missing",
     "s1_reported": "Also reported, not set apart:",
     "s1_break": "Try it: inject a negative value",
-    "s1_undo": "Undo",
-    "s1_same": "The mean with all values changes; the plausible-only mean stays.",
+    "s1_undo": "Remove the negative value",
     "s1_sex_M": "males",
     "s1_sex_F": "females",
     "term_sex_F": "female",
@@ -132,20 +158,12 @@ EN: dict[str, str] = {
     "term_species_RAT": "rat",
     "term_route_ORAL_GAVAGE": "oral gavage",
     "term_strain_SPRAGUE_DAWLEY": "Sprague-Dawley",
-    "s1_in_total": "Values set apart: {n}.",
-    "s1_in_mean": (
-        "Mean AUC, {sex}, {dose} mg/kg, day {day}, in {unit}: {with_bad} with the impossible "
-        "values (n={n_with}), {without_bad} without them (n={n_without})."
-    ),
-    "s1_in_injected": "Injected value: animal {animal}.",
     "s1_th_animal": "Animal",
     "s1_th_test": "Measure",
     "s1_th_day": "Day",
     "s1_day": ", day {day}",
     "s1_th_value": "Value",
     "disc_quarantined": "Show all values",
-    "s1_prod": "a queue with workers.",
-    "s1_prod_lead": "job runner: in process.",
     "disc_about": "Show PDS2014",
     "s1_about_what": (
         "PhUSE PDS2014 is a public, fictional dataset from PhUSE in SEND format, "
@@ -412,42 +430,59 @@ ES: dict[str, str] = {
     "live_failed": "La llamada en vivo falló ({error}).",
     "live_wait": "Esperando respuesta...",
     "live_net": "No llegó respuesta. Prueba de nuevo en un minuto.",
-    "s1_lede": "Lo imposible se aparta sin corregir.",
+    "s1_lede": (
+        "Un estudio público que podemos verificar, usado como ejemplo real con datos reales, "
+        "para entender mejor qué vamos a hacer en la demo."
+    ),
+    "s1_card_h": "Qué estudio es y por qué lo usamos",
+    "s1_card_p1": (
+        "Es un estudio de seguridad de un medicamento en ratas. Se da el compuesto a varios "
+        "grupos de animales con dosis cada vez más altas, y a otro grupo no se le da nada "
+        "(el grupo de control). Después se observa qué les pasa a cada uno."
+    ),
+    "s1_card_p2_a": "El objetivo es hallar la dosis máxima que no es perjudicial: el ",
+    "s1_card_term": "NOAEL",
+    "s1_card_p2_b": (
+        ", el nivel sin efecto adverso observado. Es público y está en el formato real de los "
+        "datos no clínicos, así que cualquiera puede comprobarlo."
+    ),
     "s1_animals": "ratas",
     "s1_doses": "dosis: {doses} mg/kg/día",
-    "s1_head": "Valores imposibles apartados: ",
+    "s1_gone_h": "valores imposibles apartados",
+    "s1_gone_p": (
+        "Lo primero que se hace con los datos es descartar los valores imposibles, como una "
+        "exposición negativa. Se apartan sin corregirlos: nadie los arregla a escondidas."
+    ),
+    "s1_effect": (
+        "Efecto en una media real: AUC (exposición) de {sex}, {dose} mg/kg, día {day}, en {unit}."
+    ),
+    "s1_lbl_all": "con todos los valores (n={n})",
+    "s1_lbl_ok": "solo verosímiles (n={n})",
+    "s1_injected_tag": "imposible, se aparta",
+    "s1_note": (
+        "Se ha añadido un valor de {value} al animal {animal}. Con todos los valores la media "
+        "se hunde hasta {mean}; el valor imposible queda marcado y apartado, y la media de los "
+        "verosímiles sigue en {plausible} (n={n})."
+    ),
     "s1_m_auctau": "exposición (AUC, intervalo de dosis)",
     "s1_m_aucifo": "exposición (AUC, hasta infinito)",
     "s1_group": "{sex}, {dose} mg/kg, día {day}",
     "s1_row_all": "Con todos los valores",
     "s1_row_ok": "Solo verosímiles",
-    "s1_before": "Antes",
-    "s1_now": "Ahora",
-    "s1_th_mean": "Media ({unit})",
-    "s1_th_n": "n",
     "s1_m_conc": "concentración",
     "s1_m_dup": "ID de animal repetido",
     "s1_m_set": "grupo de dosis ausente",
     "s1_reported": "Avisado, sin apartar:",
     "s1_break": "Pruébalo: inyecta un valor negativo",
-    "s1_undo": "Deshacer",
-    "s1_same": "La media con todos cambia; la de verosímiles se mantiene.",
+    "s1_undo": "Quitar el valor negativo",
     "s1_sex_M": "machos",
     "s1_sex_F": "hembras",
-    "s1_in_total": "Valores apartados: {n}.",
-    "s1_in_mean": (
-        "Media de AUC, {sex}, {dose} mg/kg, día {day}, en {unit}: {with_bad} con los valores "
-        "imposibles (n={n_with}), {without_bad} sin ellos (n={n_without})."
-    ),
-    "s1_in_injected": "Valor inyectado: animal {animal}.",
     "s1_th_animal": "Animal",
     "s1_th_test": "Medida",
     "s1_th_day": "Día",
     "s1_day": ", día {day}",
     "s1_th_value": "Valor",
     "disc_quarantined": "Ver todos los valores",
-    "s1_prod": "una cola con trabajadores.",
-    "s1_prod_lead": "ejecutor de trabajos: en proceso.",
     "disc_about": "Ver PDS2014",
     "s1_about_what": (
         "PhUSE PDS2014 es un conjunto de datos público y ficticio de PhUSE, en formato SEND, "

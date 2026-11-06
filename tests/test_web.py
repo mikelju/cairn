@@ -61,7 +61,8 @@ def test_step1_summary_comes_from_the_data() -> None:
         page = client.get("/study").text
     assert 'class="num">124<' in page and 'class="num">4<' in page
     assert "doses: 0, 20, 200, 400 mg/kg/day" in page
-    assert "job runner: in process." in _inside(page)
+    # E58 (D24): the study screen has no Inside panel, only the study and its numbers
+    assert '<details class="inside"' not in page
 
 
 @pytest.mark.parametrize("lang", LANGS)
@@ -74,16 +75,13 @@ def test_step1_about_the_public_study_is_a_closed_details_with_the_exact_link(la
         page = client.get("/study").text
     found = re.search(
         r'<details class="pill">'
-        r'(<summary class="pill">(?:Show|Ver) PDS2014 [^<]*</summary>)(.*?)</details>',
+        r'(<summary class="pill">(?:Show|Ver) PDS2014</summary>)(.*?)</details>',
         page,
         re.S,
     )
     assert found, lang
     assert "<details open" not in found.group(0), lang  # closed by default
-    words = re.search(r"· (\d+) ", found.group(1))
-    assert words and int(words.group(1)) == len(
-        re.sub(r"<[^>]+>", " ", unescape(found.group(2))).split()
-    ), lang
+    assert "·" not in found.group(1), lang  # E58: the note is a label-only pill, no size count
     body = unescape(found.group(2))
     assert "PhUSE PDS2014" in body and "SEND" in body and "FDA" in body
     assert 'href="https://github.com/phuse-org/phuse-scripts/tree/master/data/send/PDS"' in body
@@ -97,73 +95,93 @@ def test_step1_run_shows_quarantine_and_computed_means() -> None:
     with TestClient(create_app()) as client:
         _english(client)
         result = client.post("/study/run").text
-    assert "Impossible values set apart: 12" in result
     assert result.count('class="new"') == 12  # the full list, folded
     assert "Show all values · 12 rows" in result
     assert "-23,450 h*ng/mL" in result and "exposure (AUC, dose interval), day 1" in result
     assert "exposure (AUC, to infinity), day 1" in result
-    assert "Values set apart: 12" in result and "males, 20 mg/kg, day 1" in result
-    assert "h*ng/mL: 2,821 with" in result and "(n=3)" in result
-    assert "15,956 without" in result and "(n=2)" in result
+    assert "males, 20 mg/kg, day 1" in result
+    assert "with all values (n=3)" in _text(result) and "plausible only (n=2)" in _text(result)
+    assert 'class="prov-chip">2,821<' in result and 'class="prov-chip">15,956<' in result
+
+
+def _study_numbers(page: str) -> dict[str, str]:
+    """What the study screen shows: the count set apart, the two means with their n, the rows."""
+    shown = _text(re.sub(r'<div class="prov-body">.*?</div>', "", page, flags=re.S))
+    count = re.search(r'class="num">(\d+)</span><span><span class="big-h">', page)
+    chips = re.findall(r'class="prov-chip">(-?[\d,]+)</summary>', page)
+    ns = re.findall(
+        r"(?:with all values|plausible only|con todos los valores|solo verosímiles)"
+        r" \(n=(\d+)\)",
+        shown,
+    )
+    assert count and len(chips) == 2 and len(ns) == 2, "the study numbers are not on the page"
+    return {
+        "set_apart": count.group(1),
+        "all": chips[0],
+        "plausible": chips[1],
+        "n_all": ns[0],
+        "n_plausible": ns[1],
+        "rows": str(page.count('<tr class="new">')),
+    }
 
 
 def test_step1_without_injection_every_count_is_twelve() -> None:
     page = rendered_state("study_after", "en")
-    shown = _text(_main_outside_inside(page))
-    assert "Impossible values set apart: 12" in shown and "· 12 rows" in shown
-    assert _text(_inside(page)).count("Values set apart: 12") == 1
+    assert _study_numbers(page) == {
+        "set_apart": "12",
+        "all": "2,821",
+        "plausible": "15,956",
+        "n_all": "3",
+        "n_plausible": "2",
+        "rows": "12",
+    }
+    shown = _text(page)
+    assert "· 12 rows" in shown
     assert "13" not in re.sub(r"PDS2014-\d+", "", shown)
-    assert "New value set apart" not in shown and "injected" not in _text(page).lower()
+    assert "injected" not in shown.lower() and "-50,000" not in page
 
 
 def test_step1_injection_is_one_value_with_one_animal_everywhere() -> None:
     page = rendered_state("study_injected", "en")
-    shown = _text(_main_outside_inside(page))
-    inside = _text(_inside(page))
-    assert "Impossible values set apart: 13" in shown and "· 13 rows" in shown
-    assert "Values set apart: 13." in inside and "Values set apart: 12" not in inside
-    animal = re.search(r"Injected value: animal (PDS2014-\d+)", inside)
-    assert animal, "the Inside panel does not name the injected animal"
+    assert _study_numbers(page) == {
+        "set_apart": "13",
+        "all": "-10,384",
+        "plausible": "15,956",
+        "n_all": "4",
+        "n_plausible": "2",
+        "rows": "13",
+    }
+    shown = _text(page)
+    assert "· 13 rows" in shown
+    # the full list holds 13 rows and the injected exposure is listed first
     first_row = re.search(
         r"<tr class=\"new\"><td>(PDS2014-\d+)</td>"
-        r"<td>exposure \(AUC, dose interval\), day 1</td><td>-20,000 h\*ng/mL</td>",
+        r"<td>exposure \(AUC, dose interval\), day 1</td>"
+        r"<td>-50,000 h\*ng/mL · impossible, set apart</td>",
         page,
     )
-    assert first_row and first_row.group(1) == animal.group(1)
-    # the full list holds 13 rows and the injected exposure is listed first
-    assert page.count("-20,000 h*ng/mL") == 1
-    assert "The mean with all values changes; the plausible-only mean stays." in shown
+    assert first_row, "the injected exposure is not the first row"
+    note = re.search(r"A value of (-50,000 h\*ng/mL) was added to animal (PDS2014-\d+)\.", shown)
+    assert note and note.group(2) == first_row.group(1)
+    # the row and the note; the figure's own source table is folded in its tag
+    assert (
+        re.sub(r'<div class="prov-body">.*?</div>', "", page, flags=re.S).count("-50,000 h*ng/mL")
+        == 2
+    )
+    assert "mean sinks to -10,384" in shown and "stays at 15,956 (n=2)" in shown
+    assert "negative exposure" in shown and "negative dose" not in shown
 
 
-def _means_table(page: str) -> list[list[str]]:
-    """The rows of the means table of /study: label, then the text of each cell."""
-    folded = re.sub(r'<div class="prov-body">.*?</div>', "", page, flags=re.S)  # the source tables
-    labels = "All values|Plausible only|Con todos los valores|Solo verosímiles"
-    rows = re.findall(rf"<tr>(<td>(?:{labels}).*?)</tr>", folded, re.S)
-    assert len(rows) == 2, "no means table"
-
-    def text(cell: str) -> str:
-        return " ".join(unescape(re.sub(r"<[^>]+>", " ", cell)).split())
-
-    return [[text(c) for c in re.findall(r"<td.*?</td>", row, re.S)] for row in rows]
-
-
-def test_step1_means_table_before_and_after_the_injection() -> None:
-    plain = _means_table(rendered_state("study_after", "en"))
-    assert plain == [["All values", "2,821", "3"], ["Plausible only", "15,956", "2"]]
-    page = rendered_state("study_injected", "en")
-    assert _means_table(page) == [
-        ["All values", "2,821 (n=3)", "-2,884 (n=4)"],
-        ["Plausible only", "15,956 (n=2)", "15,956 (n=2)"],
-    ]
-    assert page.count('class="prov prov-data"') == 4  # one source tag per figure
-    spanish = rendered_state("study_injected", "es")
-    assert _means_table(spanish)[0][0] == "Con todos los valores"
-    assert _means_table(spanish)[1][0] == "Solo verosímiles"
+def test_step1_spanish_says_exposicion_negativa() -> None:
+    shown = _text(rendered_state("study_injected", "es"))
+    assert "con todos los valores (n=4)" in shown and "solo verosímiles (n=2)" in shown
+    assert "exposición negativa" in shown and "dosis negativa" not in shown
+    assert "-50,000 h*ng/mL · imposible, se aparta" in shown
 
 
 def test_step1_main_has_no_upper_case_send_terms() -> None:
-    allowed = {"AUC", "FDA", "SEND"}  # SEND: the format named in the PDS2014 note (E48)
+    # SEND: the format named in the PDS2014 note (E48); NOAEL: the term the study card defines
+    allowed = {"AUC", "FDA", "SEND", "NOAEL"}
     for state in ("study_before", "study_after", "study_injected"):
         for lang in ("es", "en"):
             shown = re.sub(
@@ -179,7 +197,7 @@ def test_step1_switches_fire_their_rule_without_touching_the_sources(tmp_path: P
     watched = [db, *vendored] + ([DEFAULT_DB] if DEFAULT_DB.exists() else [])
     before = [hashlib.sha256(p.read_bytes()).hexdigest() for p in watched]
     expected = {
-        "negative": "-20,000 h*ng/mL",
+        "negative": "-50,000 h*ng/mL",
         "duplicate": "animal ID repeated",
         "dose": "dose group missing",
     }
@@ -188,17 +206,18 @@ def test_step1_switches_fire_their_rule_without_touching_the_sources(tmp_path: P
         plain = client.post("/study/run", data={"switch": "none"}).text
         for switch, shown in expected.items():
             result = client.post("/study/run", data={"switch": switch}).text
+            numbers = _study_numbers(result)
             if switch == "negative":
-                assert "Impossible values set apart: 13" in result and "Undo" in result
+                assert numbers["set_apart"] == "13" and "Remove the negative value" in result
             else:  # the validator reports these rules and does not quarantine them
-                assert "Impossible values set apart: 12" in result
+                assert numbers["set_apart"] == "12"
                 assert "Also reported, not set apart:" in result
-                assert "Undo" not in result
+                assert "Remove the negative value" not in result
             assert shown in result
             assert all(other not in result for o, other in expected.items() if o != switch)
             assert shown not in plain
         assert client.post("/study/run", data={"switch": "bogus"}).status_code == 422
-    assert "Impossible values set apart: 12" in plain
+    assert _study_numbers(plain)["set_apart"] == "12"
     assert [hashlib.sha256(p.read_bytes()).hexdigest() for p in watched] == before
 
 
@@ -219,7 +238,7 @@ def test_footer_uses_baked_commit(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("CAIRN_COMMIT", "abc1234")
     with TestClient(create_app()) as client:
         landing = client.get("/").text
-        screen = client.get("/study").text
+        screen = client.get("/decide").text  # the study screen has no Inside panel (E58, D24)
     assert "commit abc1234" in landing
     assert "commit abc1234" in _inside(screen) and "commit abc1234" not in screen.replace(
         _inside(screen), ""

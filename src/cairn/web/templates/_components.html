@@ -90,6 +90,9 @@
 {# A disclosure pill: key names the catalogue label, n and unit give the size ("Show passage ranking · 3 rows"), tag tells repeats apart. #}
 {% macro disclosure(key, n, unit, tag=none) %}{% set forms = t["unit_" ~ unit].split("|") %}<details class="pill"><summary class="pill">{{ t["disc_" ~ key] }}{% if tag %} ({{ tag }}){% endif %} · {{ n }} {{ forms[0] if n == 1 else forms[1] }}</summary>{{ caller() }}</details>{% endmacro %}
 
+{# A disclosure pill without a size: the label alone, for a note whose length is not the point. #}
+{% macro pill(key) %}<details class="pill"><summary class="pill">{{ t["disc_" ~ key] }}</summary>{{ caller() }}</details>{% endmacro %}
+
 {# Reading cues: a numbered path for the page header and matching number badges on the parts it names. #}
 {% macro reading_path(labels, label) %}<ol class="path" aria-label="{{ label }}">{% for text in labels %}<li><span class="cue solid" aria-hidden="true">{{ loop.index }}</span>{{ text }}</li>{% endfor %}</ol>{% endmacro %}
 

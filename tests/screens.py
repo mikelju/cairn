@@ -29,17 +29,21 @@ def _literal(text: str) -> str:
 # Per state: catalogue entries the page must show, and entries it must not (a fall-through fails).
 STATE_MARKERS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "landing": (("land_cta",), ()),
-    "study_before": (("s1_lede",), ("s1_head",)),
+    # The study screen renders its result on the server: the GET page already holds the means.
+    "study_before": (
+        ("s1_lede", "s1_card_h", "s1_gone_h", "s1_effect", "s1_break", "s1_lbl_all", "s1_lbl_ok"),
+        ("s1_note", "s1_undo", "s1_reported", "s1_injected_tag"),
+    ),
     "study_after": (
-        ("s1_lede", "s1_head", "s1_break", "s1_row_all", "s1_row_ok"),
-        ("s1_same", "s1_reported", "s1_before"),
+        ("s1_lede", "s1_card_h", "s1_gone_h", "s1_break", "s1_lbl_all", "s1_lbl_ok"),
+        ("s1_note", "s1_undo", "s1_reported", "s1_injected_tag"),
     ),
     "study_injected": (
-        ("s1_head", "s1_same", "s1_undo", "s1_before", "s1_now", "s1_row_all", "s1_row_ok"),
-        ("s1_break",),
+        ("s1_gone_h", "s1_note", "s1_undo", "s1_injected_tag", "s1_lbl_all", "s1_lbl_ok"),
+        ("s1_break", "s1_reported"),
     ),
-    "study_duplicate": (("s1_head", "s1_reported"), ("s1_same",)),
-    "study_dose": (("s1_head", "s1_reported"), ("s1_same",)),
+    "study_duplicate": (("s1_gone_h", "s1_reported", "s1_break"), ("s1_note", "s1_undo")),
+    "study_dose": (("s1_gone_h", "s1_reported", "s1_break"), ("s1_note", "s1_undo")),
     "ask_before": (("s2_lede", "q_Q1"), ("exp_rules",)),
     "ask_q2": (("exp_rules", "ask_col_answer", "ask_col_ai"), ("trick_Q6",)),
     "ask_q6": (("trick_Q6",), ()),
@@ -124,11 +128,9 @@ def _render(client: TestClient, db: Path, name: str) -> str:
     if name == "landing":
         return client.get("/").text
     if name.startswith("study_"):
-        page = client.get("/study").text
-        if name == "study_before":
-            return page
-        data = {"switch": SWITCHES[name]} if name in SWITCHES else None
-        return with_result(page, client.post("/study/run", data=data).text)
+        if name in SWITCHES:  # the POST answers with the whole screen, result included
+            return client.post("/study/run", data={"switch": SWITCHES[name]}).text
+        return client.get("/study").text
     if name.startswith("ask_live_"):
         with mock.patch.dict(os.environ, {"CAIRN_ACCESS_CODE": "test-code-not-real"}):
             return _ask(client, name.replace("live_", "", 1))

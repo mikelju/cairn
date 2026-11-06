@@ -175,14 +175,13 @@ def test_c6_one_current_page_per_screen(client: TestClient, lang: str) -> None:
 
 # C13: technical detail is folded into one closed Inside panel per screen.
 INSIDE_STATES = {
-    "/study": "study_after",
+    # E58 (D24): the study screen carries no Inside panel; it is checked in its own test below
     "/ask": "ask_q2",
     "/decide": "decide_filled",
     "/draft": "draft_approved",
 }
 # Catalogue keys of the detail that lives only inside the panel, per state.
 INSIDE_ONLY = {
-    "study_after": ("inside_prod_h", "s1_prod_lead", "s1_prod"),
     "ask_q2": ("inside_prod_h", "exp_prod", "exp_trace", "exp_en_live"),
     "decide_filled": ("inside_prod_h", "s4_prod"),
     "draft_approved": (
@@ -218,7 +217,17 @@ INSIDE = re.compile(r'<details class="inside">.*?</details>', re.S)
 
 
 @pytest.mark.parametrize("lang", ["es", "en"])
-@pytest.mark.parametrize("screen", SCREENS)
+@pytest.mark.parametrize("state", ["study_after", "study_injected"])
+def test_the_study_screen_has_no_inside_panel(state: str, lang: str) -> None:
+    from cairn.web.i18n import CATALOGUES
+
+    html = rendered_state(state, lang)
+    assert '<details class="inside"' not in html
+    assert CATALOGUES[lang]["inside"] not in html
+
+
+@pytest.mark.parametrize("lang", ["es", "en"])
+@pytest.mark.parametrize("screen", list(INSIDE_STATES))
 def test_c13_one_closed_inside_panel_holds_the_technical_detail(screen: str, lang: str) -> None:
     from cairn.web.i18n import CATALOGUES
 

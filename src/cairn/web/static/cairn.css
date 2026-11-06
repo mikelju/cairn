@@ -54,6 +54,7 @@
   --text-lg: 18px;
   --text-xl: 30px;
   --text-2xl: 52px;
+  --text-3xl: 72px;
   --text-sheet: 14.5px;
   --leading-sheet: 1.6;
   --leading-body: 1.5;
@@ -351,6 +352,21 @@ h2 { font-size: var(--text-md); line-height: 1.2; margin: 0 0 var(--space-2); }
 .tile.ok .num { color: var(--color-real); }
 .tile.warn .num { color: var(--color-simulated); }
 .result .tiles { margin-top: var(--space-2); }
+.tiles.one { grid-template-columns: minmax(0, 1fr); }
+.tile.big { padding: var(--space-4) var(--space-6); gap: var(--space-5); }
+.tile.big .num { font-size: var(--text-3xl); }
+.big-h { display: block; font-size: var(--text-lg); font-weight: var(--weight-semibold); }
+.tile.big .lbl { display: block; max-width: 640px; font-size: var(--text-md); margin-top: var(--space-1); }
+.about { margin-bottom: var(--space-2); }
+.about h2 { font-size: var(--text-lg); }
+.about p { margin: var(--space-1) 0; max-width: 760px; }
+.gone { margin: var(--space-6) 0 var(--space-4); }
+.effect { font-size: var(--text-md); margin: var(--space-4) 0 var(--space-1); }
+.note { font-size: var(--text-md); max-width: 760px; }
+button.sm { padding: var(--space-1) var(--space-4); }
+button.sec { background: var(--color-surface-2); color: var(--color-ink); border-color: var(--color-control-border); }
+.tile .num .prov-chip { font-size: var(--text-2xl); line-height: 1; }
+.tile .prov-body { font-size: var(--text-sm); line-height: var(--leading-body); letter-spacing: normal; }
 .controls .cue, .qhead .cue { margin-right: var(--space-1); }
 .verb { float: right; margin-left: var(--space-3); font-family: var(--font-mono); font-size: var(--text-2xs); padding: 1px var(--space-2); border: var(--border-1) solid var(--color-real); border-radius: var(--radius-pill); color: var(--color-real); }
 .btn-row { display: flex; gap: var(--space-3); margin: var(--space-4) 0 0; }
