@@ -71,9 +71,11 @@ def test_every_rendered_summary_is_a_pill_that_names_content_and_size(
 def test_the_disclosure_labels_come_from_the_active_catalogue(
     lang: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    html = _pages(lang, monkeypatch)["/ask"]
-    assert CATALOGUES[lang]["inside"] in html
-    assert CATALOGUES[lang]["disc_explore"] in html
+    pages = _pages(lang, monkeypatch)
+    # E59: /ask has no Inside panel; its disclosures are the question list and the evidence
+    assert CATALOGUES[lang]["inside"] not in pages["/ask"]
+    assert CATALOGUES[lang]["disc_explore"] in pages["/ask"]
+    assert CATALOGUES[lang]["disc_evidence"] in pages["ask_q2"]
 
 
 def test_the_catalogue_has_a_label_and_a_unit_for_every_disclosure() -> None:

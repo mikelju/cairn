@@ -175,7 +175,7 @@ def test_c6_one_current_page_per_screen(client: TestClient, lang: str) -> None:
 
 # C13: technical detail is folded into one closed Inside panel per screen.
 INSIDE_STATES = {
-    # E58/E59 (D24): the study and ask screens carry no Inside panel; checked in their own test below
+    # E58/E59 (D24): the study and ask screens carry no Inside panel (own test below)
     "/decide": "decide_filled",
     "/draft": "draft_approved",
 }

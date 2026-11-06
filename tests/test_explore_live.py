@@ -126,7 +126,8 @@ def test_explore_live_answers_with_real_badge_and_never_shows_the_code(live_box:
     }
     live_box.replies = [LIVE_RUN, incidence, cited]
     page = ask_box("s3cret")
-    assert 'class="badge real"' in page and "opus-4-6" in page and "USD" in page
+    # the Step2 design has no badge or model line on the answer: only the sentence the code filled
+    assert 'class="badge' not in page and "USD" not in page
     assert "Examined:" in page and "s3cret" not in page
     assert live_box.calls == 3
 
@@ -157,12 +158,14 @@ def test_live_cap_blocks_at_the_cap_and_reopens_next_utc_day(
     live_box: LiveFake, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("CAIRN_LIVE_CAP_USD", "0.01")
-    assert 'class="badge real"' in ask_box("s3cret")  # two calls, about 0.0165 USD
+    first = ask_box("s3cret")  # two calls, about 0.0165 USD; the Step2 answer has no badge
+    assert "daily live budget" not in first and "prov-legend" in first
     calls = live_box.calls
     assert "daily live budget" in ask_box("s3cret")
     assert live_box.calls == calls
     monkeypatch.setattr(explore_live, "utc_today", lambda: date(2099, 1, 2))
-    assert 'class="badge real"' in ask_box("s3cret")
+    reopened = ask_box("s3cret")
+    assert "daily live budget" not in reopened and "prov-legend" in reopened
 
 
 def test_live_cap_counts_a_failed_call_and_refuses_a_second_question_while_one_runs(
@@ -317,7 +320,7 @@ def test_live_failure_after_the_model_returns_is_a_200_message_and_frees_the_loc
         monkeypatch.setattr(live, "make_client", lambda mode: live_box)
         again = client.post("/explore/live?lang=en", data={"question": "q", "code": "s3cret"})
     assert "Another live question is running" not in again.text
-    assert 'class="badge real"' in again.text
+    assert "The live call failed" not in again.text and "prov-legend" in again.text
 
 
 def test_live_lock_is_free_after_a_cancellation(

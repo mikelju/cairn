@@ -310,16 +310,12 @@ def test_badge_recorded_keeps_its_metadata_and_simulated_its_production_line(
         data["source"] = "bedrock"
         (served / source.name).write_text(json.dumps(data), encoding="utf-8")
     monkeypatch.setenv("CAIRN_RECORDINGS", str(served))
-    recorded = json.loads((served / "q2.json").read_text(encoding="utf-8"))
     with TestClient(create_app()) as client:
         client.cookies.set("cairn_lang", "en")
         result = client.post("/ask/run", data={"question": "Q2"}).text
         study = client.get("/decide").text  # /study has no Inside panel since E58 (D24)
-    meta = re.search(r'<p class="meta">(.*?)</p>', result, flags=re.S)
-    assert meta is not None and 'class="badge recorded"' in meta.group(1)
-    assert str(recorded["date"]) in meta.group(1) and str(recorded["region"]) in meta.group(1)
-    assert "opus-4-6" in meta.group(1)
-    assert re.search(r"\| \d+\.\d s \|", meta.group(1)) and "USD" in meta.group(1)
+    # E59: the Step2 answer carries no badge or metadata line, its Inside panel is gone
+    assert 'class="badge' not in result and 'class="meta"' not in result and "USD" not in result
     panel = re.search(r'<details class="inside">.*?</details>', study, flags=re.S)
     assert panel is not None and "In production" in panel.group(0)
 

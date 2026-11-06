@@ -265,6 +265,12 @@ def _outside_sources(html: str) -> str:
     return PROV_BODY.sub("</details>", html)
 
 
+def _screen_rows(html: str) -> int:
+    """Rows of the screen table (Sex, Finding, doses); the Element/Value table is another."""
+    tables = [t.split("</table>")[0] for t in html.split("<table>")[1:]]
+    return sum(t.count("<tr><td>") for t in tables if "<th>Sex</th>" in t)
+
+
 def _prose_text(html: str) -> str:
     """What the prose says: the text and the chips, not the sources behind them."""
     prose = re.search(r'<div class="prose answer-unit">(.*?)</div>', _outside_sources(html), re.S)
@@ -314,8 +320,9 @@ def _as_bedrock(folder: Path, target: Path) -> Path:
 def test_q2_replay(monkeypatch: pytest.MonkeyPatch) -> None:
     """Offline replay of the real-shape Opus 4.6 fixture: 9-row screen, honest denominators."""
     result = _ask("Q2", monkeypatch, REAL)
-    assert 'class="badge' not in result and "Rules fired" not in result  # no trace on the Ask screen
-    assert _outside_sources(result).count("<tr><td>") == 9
+    # no trace on the Ask screen
+    assert 'class="badge' not in result and "Rules fired" not in result
+    assert _screen_rows(result) == 9  # the Element/Value evidence table is counted apart
     assert "not examined" in result and "0/1" in result
     assert (
         "9 screened findings; the clearest is adrenal gland, vacuolization in female and male"
@@ -327,10 +334,10 @@ def test_q2_replay_fixture(monkeypatch: pytest.MonkeyPatch) -> None:
     result = _ask("Q2", monkeypatch)
     for trace_only in ("run_job -&gt; study_design", "cost n/a", "Screen: a finding enters"):
         assert trace_only not in result  # the trace left the Ask screen with the Inside panel
-    assert _outside_sources(result).count("<tr><td>") == 9
+    assert _screen_rows(result) == 9
     assert "not examined" in result
     assert "The screen examined 80 animals" in _prose_text(result)
-    assert "Rules fired: none" in result
+    assert "Rules fired" not in result
     assert "incidence, main study" in result and "n=80" in result
 
 
@@ -458,7 +465,7 @@ def test_q2_prose_counts_the_screened_findings_by_reference(
 
     result = _ask("Q2", monkeypatch, REAL)
     text = _prose_text(result)
-    rows = _outside_sources(result).count("<tr><td>")
+    rows = _screen_rows(result)
     assert re.match(rf"{rows} screened findings", text), text
     assert rows == incidence().values["n_findings"]
     column = _ai_column(result)
@@ -1146,5 +1153,8 @@ def test_no_screen_has_upper_case_send_terms_outside_the_prose() -> None:
     allowed = {"AUC", "FDA", "NOAEL", "SEND"}  # SEND: the format named in the PDS2014 note (E48)
     for state in STATE_MARKERS:
         for lang in LANGS:
-            shown = re.sub(r"PDS2014-\d+", "", main_copy(rendered_state(state, lang), prose=False))
+            # names of a source stay as printed: the study id and the unnumbered FDA sections
+            # the evidence table of a guideline answer gives (E59)
+            copy = main_copy(rendered_state(state, lang), prose=False)
+            shown = re.sub(r"PDS2014-\d+|\b(GLOSSARY|REFERENCES)\b", "", copy)
             assert set(re.findall(r"\b[A-Z]{3,}\b", shown)) <= allowed, (state, lang)

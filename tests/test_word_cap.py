@@ -63,7 +63,8 @@ def test_ask_states_replay_the_real_recordings_whatever_the_environment_says(
     html = rendered_state(state, "en")
     assert STALE_NOTICE not in html
     assert os.environ["CAIRN_RECORDINGS"] == str(tmp_path)  # restored afterwards
-    assert "Rules fired:" in html
+    # E59: no trace on the Ask screen; a recorded answer shows its legend with the AI key
+    assert CATALOGUES["en"]["prov_legend_ai"] in html and "Rules fired" not in html
 
 
 @pytest.mark.parametrize("lang", ["es", "en"])

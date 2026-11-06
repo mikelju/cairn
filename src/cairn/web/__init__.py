@@ -598,7 +598,7 @@ def _answer_context(question: str, t: dict[str, str]) -> dict[str, Any]:
             context = _query_context(question)
         else:
             context = _step2_context(question, _recordings_dir(), t)
-    except StaleRecording as error:
+    except (StaleRecording, ValueError) as error:  # an unreadable recording is stale too
         return {"stale": str(error)}
     return {
         "r": {

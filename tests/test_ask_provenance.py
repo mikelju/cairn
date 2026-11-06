@@ -136,8 +136,9 @@ def test_the_legend_has_the_ai_key_and_the_quote_key_only_with_a_citation(lang: 
     cat = i18n.CATALOGUES[lang]
     cited, plain = _answer("NS1", lang), _answer("Q2", lang)
     assert cat["prov_legend_quote"] in cited and cat["prov_legend_quote"] not in plain
-    for html in (cited, plain):
-        assert cat["prov_legend_ai"] in html and cat["prov_legend_data"] in html
+    # the keys follow the kinds used: the guideline answer has no study data, so no data key
+    assert cat["prov_legend_ai"] in cited and cat["prov_legend_data"] not in cited
+    assert cat["prov_legend_ai"] in plain and cat["prov_legend_data"] in plain
 
 
 def test_every_kind_is_shown_with_a_label_in_both_locales() -> None:
