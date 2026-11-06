@@ -25,9 +25,12 @@ from test_ask_provenance import _parse, _squash
 def _decided(client: TestClient, lang: str) -> None:
     client.cookies.set("cairn_lang", lang)
     client.get("/decide")
-    client.post("/decide/choose", data={"sex": "F", "related": "20", "adverse": "200"})
-    client.post("/decide/choose", data={"sex": "M", "related": "400", "adverse": "400"})
-    client.post("/decide/confirm", data={"actor": "R. Reviewer"})
+    # The reviewer's Decide button records and confirms each sex in one step.
+    for sex, related, adverse in (("F", "20", "200"), ("M", "400", "400")):
+        client.post(
+            "/decide/choose",
+            data={"actor": "reviewer", "sex": sex, "related": related, "adverse": adverse},
+        )
 
 
 def _draft(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, lang: str) -> tuple[str, list[Part]]:
@@ -163,7 +166,9 @@ def test_a_refused_choice_is_an_html_page_with_a_plain_message(
     with TestClient(create_app()) as client:
         for lang, message in (("en", "choose both"), ("es", "elige la dosis")):
             client.cookies.set("cairn_lang", lang)
-            reply = client.post("/decide/choose", data={"sex": "F", "adverse": "200"})
+            reply = client.post(
+                "/decide/choose", data={"actor": "reviewer", "sex": "F", "adverse": "200"}
+            )
             assert reply.status_code == 422
             assert reply.headers["content-type"].startswith("text/html")
             assert message in reply.text and '{"detail"' not in reply.text

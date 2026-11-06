@@ -4,6 +4,7 @@ import os
 import re
 import tempfile
 from collections.abc import Iterator
+from html import unescape
 from pathlib import Path
 
 import pytest
@@ -113,8 +114,9 @@ def test_c3_crawler_finds_no_dead_or_old_links(client: TestClient) -> None:
         assert reply.status_code < 400, (path, reply.status_code)
         if "text/html" not in reply.headers.get("content-type", ""):
             continue
-        refs = re.findall(r'(?:href|action)="([^"]*)"', reply.text)
-        actions = re.findall(r'action="([^"]*)"', reply.text)
+        # a browser reads the attribute unescaped: `&amp;` in the role links is a plain `&`
+        refs = [unescape(r) for r in re.findall(r'(?:href|action)="([^"]*)"', reply.text)]
+        actions = [unescape(r) for r in re.findall(r'action="([^"]*)"', reply.text)]
         for ref in refs:
             if ref.startswith(("http", "#", "mailto:")) or not ref:
                 continue

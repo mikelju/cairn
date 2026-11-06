@@ -73,15 +73,15 @@ def _judged(page: str) -> bool:
 
 
 def people_decide() -> bool:
-    """Decide and draft end to end: example, confirm, author refused, reviewer approves."""
+    """Decide and draft end to end: example, reviewer decides, author refused, reviewer approves."""
     page = get("/decide")[1].decode()
     if THREAD_COOKIE not in JAR or CATALOGUES["en"]["s4_decide"] not in page:
         print("decide screen has no thread cookie or no decide button")
         return False
     calibration = _calibration()
-    post("/decide/choose", {"sex": "F", "related": "20", "adverse": "200"})
-    post("/decide/choose", {"sex": "M", "related": "400", "adverse": "400"})
-    final = post("/decide/confirm", {"actor": "R. Reviewer"})
+    post("/decide/choose", {"actor": "reviewer", "sex": "F", "related": "20", "adverse": "200"})
+    post("/decide/choose", {"actor": "reviewer", "sex": "M", "related": "400", "adverse": "400"})
+    final = get("/draft")[1].decode()  # the reviewer's Decide stays on /decide (E60)
     refused = post("/draft/approve", {"actor": "A. Author"}, refused=True)
     approved = post("/draft/approve", {"actor": "R. Reviewer"})
     draft = get("/draft")[1].decode()
@@ -141,8 +141,12 @@ def main() -> int:
         request = http.Request(BASE + "/ask/run", data=b"question=Q2")
         with http.urlopen(request) as response:
             body = response.read()
-            ok = response.status == 200 and b"RECORDED" in body
-            print("POST /ask/run", response.status, "RECORDED" if ok else "missing RECORDED")
+            # the Ask screen (E59) shows the status badges only inside its Inside panel: the
+            # replayed answer is the column of the answer
+            ok = response.status == 200 and any(
+                c["ask_col_answer"].encode() in body for c in CATALOGUES.values()
+            )
+            print("POST /ask/run", response.status, "answered" if ok else "missing the answer")
         return 0 if ok and people_decide() else 1
     finally:
         server.terminate()

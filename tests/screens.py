@@ -57,9 +57,10 @@ STATE_MARKERS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
         ("ask_col_answer", "exp_live_q", "exp_live_code", "exp_live_go", "live_wait"),
         ("trick_Q6",),
     ),
-    "decide_empty": (("s4_decide", "disc_examples"), ("s4_confirm",)),
-    "decide_filled": (("s4_confirm", "disc_examples"), ("s4_decide",)),
-    "decide_confirmed": (("disc_examples",), ("s4_decide", "s4_confirm")),
+    # E60: one Decide button per sex, no Confirm button; the reviewer's Decide also confirms.
+    "decide_empty": (("s4_decide", "disc_examples", "s4_role_label"), ("s4_confirm",)),
+    "decide_filled": (("s4_decide", "disc_examples"), ("s4_confirm",)),
+    "decide_confirmed": (("s4_decide", "disc_examples"), ("s4_confirm",)),
     "draft_empty": (("undecided",), ("s5_approved",)),
     "draft_confirmed": (("s5_lede", "s6_chain_ok"), ("s5_refused", "s5_approved")),
     "draft_rejected": (("s5_refused",), ("s5_approved",)),
@@ -112,9 +113,18 @@ def _ask(client: TestClient, name: str) -> str:
 
 
 def decide_both(client: TestClient) -> None:
-    """The visitor decides both sexes on the key finding (not yet confirmed)."""
-    client.post("/decide/choose", data={"sex": "F", "related": "20", "adverse": "200"})
-    client.post("/decide/choose", data={"sex": "M", "related": "400", "adverse": "400"})
+    """The reviewer decides both sexes on the key finding.
+
+    The Decide button records and confirms in one step for the reviewer; the author is refused.
+    """
+    client.post(
+        "/decide/choose",
+        data={"actor": "reviewer", "sex": "F", "related": "20", "adverse": "200"},
+    )
+    client.post(
+        "/decide/choose",
+        data={"actor": "reviewer", "sex": "M", "related": "400", "adverse": "400"},
+    )
 
 
 def _render(client: TestClient, db: Path, name: str) -> str:
@@ -138,8 +148,7 @@ def _render(client: TestClient, db: Path, name: str) -> str:
     assert thread, "the decide screen starts no thread"
     decide_both(client)
     if name == "decide_filled":
-        return client.get("/decide").text
-    client.post("/decide/confirm", data={"actor": "R. Reviewer"})
+        return client.get("/decide?actor=reviewer").text  # the Reviewer role of the selector
     if name in ("decide_confirmed", "draft_confirmed"):
         return client.get("/decide" if name == "decide_confirmed" else "/draft").text
     if name == "draft_rejected":

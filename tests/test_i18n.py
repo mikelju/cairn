@@ -76,9 +76,11 @@ def test_toggle_on_a_post_page_keeps_the_thread() -> None:
         client.get("/decide")
         thread = client.cookies.get("cairn_thread")
         assert thread
-        client.post("/decide/choose", data={"sex": "F", "adverse": "200"})
-        client.post("/decide/choose", data={"sex": "M", "adverse": "400"})
-        client.post("/decide/confirm", data={"actor": "R. Reviewer"})
+        for sex, related, adverse in (("F", "20", "200"), ("M", "400", "400")):
+            client.post(
+                "/decide/choose",
+                data={"actor": "reviewer", "sex": sex, "related": related, "adverse": adverse},
+            )
         refused = client.post("/draft/approve", data={"actor": "A. Author"}).text
         links = re.findall(r'href="(/draft\?[^"]*lang=[^"]*)"', refused)
         assert links

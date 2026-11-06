@@ -678,19 +678,24 @@ def test_web_parses_passages_and_highlights_once_per_process(
 
 
 def _filled(client: TestClient) -> str:
-    """Start the thread on /decide, fill the example and return its id (the cookie)."""
+    """Start the thread on /decide, have the reviewer decide both sexes and return its id.
+
+    The Decide button of the reviewer records and confirms in one step (change 004 E60).
+    """
     client.get("/decide")
     id_ = client.cookies.get("cairn_thread")
     assert id_
-    client.post("/decide/choose", data={"sex": "F", "related": "20", "adverse": "200"})
-    client.post("/decide/choose", data={"sex": "M", "related": "400", "adverse": "400"})
+    for sex, related, adverse in (("F", "20", "200"), ("M", "400", "400")):
+        reply = client.post(
+            "/decide/choose",
+            data={"actor": "reviewer", "sex": sex, "related": related, "adverse": adverse},
+        )
+        assert reply.status_code == 200
     return id_
 
 
 def _decided(client: TestClient) -> str:
-    id_ = _filled(client)
-    client.post("/decide/confirm", data={"actor": "R. Reviewer"})
-    return id_
+    return _filled(client)
 
 
 def test_decide_and_draft_people_decide_and_the_author_cannot_approve() -> None:
@@ -702,12 +707,19 @@ def test_decide_and_draft_people_decide_and_the_author_cannot_approve() -> None:
         assert "checked" not in step4 and "selected" not in step4  # nothing preselected
         assert step4.count("not decided yet") == 2 and "NOAEL, Females: 400" not in step4
         assert "no decision yet" not in step4 and "Decide" in step4
-        client.post("/decide/choose", data={"sex": "F", "related": "20", "adverse": "200"})
-        client.post("/decide/choose", data={"sex": "M", "related": "400", "adverse": "400"})
-        one = client.post("/decide/confirm", data={"actor": "R. Reviewer", "sex": "F"})
-        assert "NOAEL, Females: 20 mg/kg" in one.text and "Confirm Males" in one.text
-        confirmed = client.post("/decide/confirm", data={"actor": "R. Reviewer", "sex": "M"})
-        assert "Acting as" not in confirmed.text and "Show draft in English" in confirmed.text
+        # E60: one Decide button; the reviewer's choice is recorded and confirmed together
+        one = client.post(
+            "/decide/choose",
+            data={"actor": "reviewer", "sex": "F", "related": "20", "adverse": "200"},
+        )
+        assert "NOAEL, Females: 20 mg/kg" in one.text and "Confirm Males" not in one.text
+        confirmed = client.post(
+            "/decide/choose",
+            data={"actor": "reviewer", "sex": "M", "related": "400", "adverse": "400"},
+        )
+        assert "Acting as" not in confirmed.text and "NOAEL, Males: 200 mg/kg" in confirmed.text
+        confirmed = client.get("/draft")
+        assert "Show draft in English" in confirmed.text
         refused = client.post("/draft/approve", data={"actor": "A. Author"})
         assert (
             refused.status_code == 403
@@ -728,9 +740,9 @@ def test_draft_with_nothing_decided_is_200_and_says_so(lang: str, text: str) -> 
 def test_decide_pages_redirect_on_409_and_reject_bad_input() -> None:
     with TestClient(create_app(), follow_redirects=False) as client:
         id_ = _filled(client)
-        client.post("/decide/confirm", data={"actor": "R. Reviewer"})
         again = client.post(
-            "/decide/choose", data={"sex": "F", "related": "20", "adverse": "200"}
+            "/decide/choose",
+            data={"actor": "reviewer", "sex": "F", "related": "20", "adverse": "200"},
         )  # back button
         assert again.status_code == 303 and again.headers["location"].startswith("/draft?actor=")
         twice = client.post("/draft/approve", data={"actor": "R. Reviewer"})
@@ -747,7 +759,7 @@ def test_decide_pages_redirect_on_409_and_reject_bad_input() -> None:
         fresh = _filled(client)
         assert fresh != id_
         slot = client.get(f"/api/threads/{fresh}").json()["slots"][0]["slot"]
-        bad = client.post("/decide/choose", data={"sex": "F", "adverse": "x"})
+        bad = client.post("/decide/choose", data={"actor": "reviewer", "sex": "F", "adverse": "x"})
         assert bad.status_code == 422
         assert slot
 
@@ -1025,18 +1037,21 @@ def _stored(client: TestClient, sex: str) -> tuple[float | None, float | None]:
 def test_decide_stores_what_the_person_chose_and_never_infers_relatedness() -> None:
     with TestClient(create_app(), follow_redirects=False) as client:
         client.get("/decide")
-        only_adverse = client.post("/decide/choose", data={"sex": "F", "adverse": "200"})
+        who = {"actor": "reviewer"}  # the author cannot decide (E60)
+        only_adverse = client.post("/decide/choose", data={**who, "sex": "F", "adverse": "200"})
         assert only_adverse.status_code == 422
-        below = client.post("/decide/choose", data={"sex": "F", "related": "400", "adverse": "200"})
+        below = client.post(
+            "/decide/choose", data={**who, "sex": "F", "related": "400", "adverse": "200"}
+        )
         assert below.status_code == 422
         id_ = client.cookies.get("cairn_thread")
         assert client.get(f"/api/threads/{id_}").json()["decisions"] == []  # still undecided
         # Incidence would suggest 20 for females; the person says 200 and code keeps it.
-        client.post("/decide/choose", data={"sex": "F", "related": "200", "adverse": "200"})
+        client.post("/decide/choose", data={**who, "sex": "F", "related": "200", "adverse": "200"})
         assert _stored(client, "F") == (200, 200)
         client.cookies.clear()
         client.get("/decide")
-        client.post("/decide/choose", data={"sex": "M", "related": "20", "adverse": "none"})
+        client.post("/decide/choose", data={**who, "sex": "M", "related": "20", "adverse": "none"})
         assert _stored(client, "M") == (20, None)
 
 
@@ -1054,12 +1069,14 @@ def test_stored_related_and_adverse_equal_the_posted_values_for_every_dose(sex: 
                     related != "none" and (adverse == "none" or float(related) <= float(adverse))
                 )
                 reply = client.post(
-                    "/decide/choose", data={"sex": sex, "related": related, "adverse": adverse}
+                    "/decide/choose",
+                    data={"actor": "reviewer", "sex": sex, "related": related, "adverse": adverse},
                 )
                 if not valid:
                     assert reply.status_code == 422
                     continue
-                assert reply.status_code == 303
+                # E60: the reviewer's Decide answers with /decide itself, no redirect
+                assert reply.status_code == 200
                 want = (
                     None if related == "none" else float(related),
                     None if adverse == "none" else float(adverse),
@@ -1089,7 +1106,9 @@ def test_example_decisions_are_labelled_as_examples_end_to_end() -> None:
         client.cookies.set(COOKIE, "en")
         _decided(client)
         by_actor = [d["actor"] for d in _decisions(client)]
-        assert by_actor.count("Example") == 9 and by_actor.count("A. Author") == 2
+        assert (
+            by_actor.count("Example") == 9 and by_actor.count("R. Reviewer") == 2
+        )  # E60: the reviewer decides
         draft = client.get("/draft").text
         decide = client.get("/decide").text
     chips = CHIP.findall(draft)
@@ -1115,14 +1134,16 @@ def test_every_decision_chip_shows_who_and_a_nonempty_role() -> None:
 
 def test_change_before_confirming_and_start_over() -> None:
     with TestClient(create_app(), follow_redirects=False) as client:
+        client.cookies.set(COOKIE, "en")
         client.get("/decide")
-        client.post("/decide/choose", data={"sex": "F", "related": "20", "adverse": "200"})
+        who = {"actor": "reviewer"}
+        client.post("/decide/choose", data={**who, "sex": "F", "related": "20", "adverse": "200"})
         plain = client.get("/decide").text
-        assert "/decide?change=F" in plain
-        assert plain.count('action="/decide/choose"') == 1  # only males, still undecided
-        changing = client.get("/decide?change=F").text
-        assert changing.count('action="/decide/choose"') == 2
-        client.post("/decide/choose", data={"sex": "F", "related": "400", "adverse": "400"})
+        assert "/decide?change=F" not in plain  # E60: no "Change" link, Decide is the only action
+        assert plain.count('action="/decide/choose"') == 2  # both cards keep their Decide button
+        assert "NOAEL, Females: 20 mg/kg/day" in plain and "NOAEL, Males: not decided" in plain
+        # until both are confirmed the reviewer can decide a sex again
+        client.post("/decide/choose", data={**who, "sex": "F", "related": "400", "adverse": "400"})
         assert _stored(client, "F") == (400, 400)
         old = client.cookies.get("cairn_thread")
         reply = client.post("/restart")
@@ -1144,8 +1165,83 @@ def test_noael_unit_is_per_day_on_decide_and_draft() -> None:
     with TestClient(create_app()) as client:
         client.cookies.set(COOKIE, "en")
         _filled(client)
-        one = client.post("/decide/confirm", data={"actor": "R. Reviewer", "sex": "F"}).text
-        assert "NOAEL, Females: 20 mg/kg/day" in one
+        assert "NOAEL, Females: 20 mg/kg/day" in client.get("/decide").text
+
+
+def _audit(db: Path, thread: str) -> list[tuple[str, str]]:
+    """The (actor, action) pairs of the thread's audit chain, in order."""
+    with sqlite3.connect(db) as conn:
+        rows = conn.execute(
+            "SELECT actor, action FROM audit WHERE thread_id = ? ORDER BY seq", (thread,)
+        ).fetchall()
+    return [(actor, action) for actor, action in rows]
+
+
+@pytest.mark.parametrize(
+    ("lang", "message"),
+    [
+        ("en", "The author cannot decide; a reviewer does."),
+        ("es", "El autor no puede decidir; lo hace un revisor."),
+    ],
+)
+def test_decide_author_gets_403_with_the_message_and_an_audit_entry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, lang: str, message: str
+) -> None:
+    db = tmp_path / "threads.db"
+    monkeypatch.setenv("CAIRN_THREADS_DB", str(db))
+    with TestClient(create_app()) as client:
+        client.cookies.set(COOKIE, lang)
+        client.get("/decide")
+        thread = client.cookies.get("cairn_thread")
+        assert thread
+        reply = client.post(
+            "/decide/choose",
+            data={"actor": "author", "sex": "F", "related": "20", "adverse": "200"},
+        )
+        assert reply.status_code == 403
+        assert message in reply.text and '{"detail"' not in reply.text
+        assert client.get(f"/api/threads/{thread}").json()["decisions"] == []  # nothing recorded
+    # the thread start, then the refusal of the author's Decide
+    assert _audit(db, thread) == [("A. Author", "thread_started"), ("A. Author", "refused")]
+
+
+def test_decide_reviewer_decides_both_sexes_and_stays_on_decide(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db = tmp_path / "threads.db"
+    monkeypatch.setenv("CAIRN_THREADS_DB", str(db))
+    with TestClient(create_app(), follow_redirects=False) as client:
+        client.cookies.set(COOKIE, "en")
+        client.get("/decide")
+        thread = client.cookies.get("cairn_thread")
+        assert thread
+        female = client.post(
+            "/decide/choose",
+            data={"actor": "reviewer", "sex": "F", "related": "20", "adverse": "200"},
+        )
+        assert female.status_code == 200  # no redirect to /draft
+        assert "NOAEL, Females: 20 mg/kg/day" in female.text
+        male = client.post(
+            "/decide/choose",
+            data={"actor": "reviewer", "sex": "M", "related": "400", "adverse": "400"},
+        )
+        assert male.status_code == 200
+        assert "NOAEL, Females: 20 mg/kg/day" in male.text
+        assert "NOAEL, Males: 200 mg/kg/day" in male.text
+    chain = _audit(db, thread)
+    assert chain[0] == ("A. Author", "thread_started")
+    assert chain[1:3] == [("R. Reviewer", "decisions_recorded"), ("R. Reviewer", "noael_confirmed")]
+    reviewer = [action for actor, action in chain if actor == "R. Reviewer"]
+    assert reviewer.count("decisions_recorded") == 2 and reviewer.count("noael_confirmed") == 2
+
+
+@pytest.mark.parametrize("lang", ["en", "es"])
+def test_decide_with_actor_reviewer_is_200(lang: str) -> None:
+    with TestClient(create_app()) as client:
+        client.cookies.set(COOKIE, lang)
+        reply = client.get("/decide?actor=reviewer")
+        assert reply.status_code == 200
+        assert 'class="seg' in reply.text
 
 
 def test_no_screen_has_upper_case_send_terms_outside_the_prose() -> None:

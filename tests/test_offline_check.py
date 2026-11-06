@@ -119,7 +119,7 @@ def test_offline_check_passes_against_the_app(
     out = capsys.readouterr().out
     assert "/ask 200" in out
     assert "PNG" in out
-    assert "POST /ask/run 200 RECORDED" in out
+    assert "POST /ask/run 200 answered" in out
     assert "decide-draft: reviewer approves ok" in out
 
 
