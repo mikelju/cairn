@@ -56,7 +56,7 @@ def test_unknown_locale_falls_back_to_the_default() -> None:
 def test_the_redirect_from_a_retired_step_keeps_the_chosen_locale() -> None:
     with TestClient(create_app()) as client:
         page = client.get("/step/4?lang=en").text
-    assert '<html lang="en">' in page and "Acting as:" in page
+    assert '<html lang="en">' in page and "Acting as" not in page
 
 
 FIXTURES = Path(__file__).parent / "fixtures" / "recordings"

@@ -685,7 +685,7 @@ def test_decide_and_draft_people_decide_and_the_author_cannot_approve() -> None:
         client.cookies.set(COOKIE, "en")
         step4 = client.get("/decide").text  # starts a thread and sets the cookie
         assert client.cookies.get("cairn_thread")
-        assert "Acting as: A. Author" in step4
+        assert "Acting as" not in step4  # the header keeps the fixed role (change 004 D29)
         assert "checked" not in step4 and "selected" not in step4  # nothing preselected
         assert step4.count("not decided yet") == 2 and "NOAEL, Females: 400" not in step4
         assert "no decision yet" not in step4 and "Decide" in step4
@@ -694,9 +694,7 @@ def test_decide_and_draft_people_decide_and_the_author_cannot_approve() -> None:
         one = client.post("/decide/confirm", data={"actor": "R. Reviewer", "sex": "F"})
         assert "NOAEL, Females: 20 mg/kg" in one.text and "Confirm Males" in one.text
         confirmed = client.post("/decide/confirm", data={"actor": "R. Reviewer", "sex": "M"})
-        assert (
-            "Acting as: R. Reviewer" in confirmed.text and "Show draft in English" in confirmed.text
-        )
+        assert "Acting as" not in confirmed.text and "Show draft in English" in confirmed.text
         refused = client.post("/draft/approve", data={"actor": "A. Author"})
         assert (
             refused.status_code == 403
@@ -946,7 +944,9 @@ def test_landing_sentence_is_the_recorded_body_weight_answer_of_ask(lang: str) -
 def test_landing_quote_is_english_and_labelled_en_in_both_locales(lang: str) -> None:
     with TestClient(create_app()) as client:
         landing = client.get(f"/?lang={lang}").text
-    assert '<span class="lang-tag">EN</span>' in landing
+    from cairn.web.i18n import CATALOGUES
+
+    assert f'<span class="lang-tag">{CATALOGUES[lang]["land_example"]}</span>' in landing
     assert '<div class="lede answer" lang="en">' in landing
 
 

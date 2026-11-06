@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 
 from cairn.app import create_app
 from cairn.web import HERE, templates
-from test_word_cap import rendered_lede, rendered_problems, rendered_words
+from main_counter import rendered_lede, rendered_problems, rendered_words
 
 MOCKUP_WORD_CAP = 93  # the static mockups keep the cap they were drawn under
 
@@ -363,6 +363,13 @@ CONTRAST_PAIRS: list[tuple[str, str, float, str]] = [
     ("accent", "paper", LARGE, "focus outline on paper"),
     ("accent", "surface", LARGE, "focus outline on surface"),
     ("accent", "accent-tint", LARGE, "focus outline on tinted callouts"),
+    ("sheet-ink", "sheet-paper", BODY, "draft sheet text"),
+    ("sheet-label", "sheet-paper", BODY, "draft sheet labels"),
+    ("sheet-faint", "sheet-paper", BODY, "draft sheet header and footer"),
+    ("sheet-chip-data", "sheet-paper", BODY, "data chip on the sheet"),
+    ("sheet-chip-quote", "sheet-paper", BODY, "quote chip on the sheet"),
+    ("sheet-chip-decision", "sheet-paper", BODY, "decision chip on the sheet"),
+    ("on-highlight", "highlight", BODY, "highlighted gap"),
 ]
 
 

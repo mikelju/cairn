@@ -3,7 +3,7 @@
 
 {% macro badge_meta(kind, meta) %}<p class="meta">{{ badge(kind) }} {{ meta }}</p>{% endmacro %}
 
-{% macro shell_header(steps, current, t, locale, lang_links, actor=none) %}
+{% macro shell_header(steps, current, t, locale, lang_links) %}
 <header>
   <div class="bar">
     <a class="brand" href="/">{{ t.brand }}</a>
@@ -12,7 +12,7 @@
         <a href="{{ path }}"{% if current == n %} aria-current="page"{% endif %}><span class="n">{{ n }}</span>{{ t["step_" ~ n] }}</a>
       {% endfor %}
     </nav>
-    <span class="role">{% if actor %}{{ t.acting_as }} {{ actor }} {{ badge("SIMULATED") }}{% else %}{{ t.role }}{% endif %}</span>
+    <span class="role">{{ t.role }}</span>
     <div class="lang" role="group" aria-label="{{ t.lang_label }}">
       {% for code in ("es", "en") %}
       <a href="{{ lang_links[code] }}" hreflang="{{ code }}" lang="{{ code }}"{% if locale == code %} aria-current="true"{% endif %}>{{ code|upper }}</a>

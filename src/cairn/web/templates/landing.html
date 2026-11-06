@@ -6,12 +6,10 @@
   <p class="lede">{{ t.land_goal }}</p>
   <p class="meta">{{ t.land_steps }}</p>
   <div class="answer-unit">
-    <span class="lang-tag">EN</span>
+    <span class="lang-tag">{{ t.land_example }}</span> <span class="meta">{{ t.land_example_note }}</span>
     <div class="lede answer" lang="en">{{ a.prov(parts) }}</div>
   </div>
   <p class="meta">{{ counts_line }}</p>
-  <p class="actions">
-    <a class="btn-primary" href="/study">{{ t.land_cta }} &rarr;</a>
-  </p>
+  <p class="btn-row"><a class="btn-primary" href="/study">{{ t.land_cta }} &rarr;</a></p>
 </section>
 {% endblock %}
