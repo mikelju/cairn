@@ -127,7 +127,17 @@ def test_the_legend_names_exactly_the_kinds_the_answer_uses(question: str, lang:
     parsed = _parse(_answer(question, lang))
     used = {t["kind"] for t in parsed.tags}
     assert used <= KINDS
-    assert set(parsed.legend) == used and len(parsed.legend) == len(used)
+    # E59: the AI key is always there; the quote key only when the answer cites a guideline
+    assert set(parsed.legend) == used | {"ai"} and len(parsed.legend) == len(used | {"ai"})
+
+
+@pytest.mark.parametrize("lang", ["en", "es"])
+def test_the_legend_has_the_ai_key_and_the_quote_key_only_with_a_citation(lang: str) -> None:
+    cat = i18n.CATALOGUES[lang]
+    cited, plain = _answer("NS1", lang), _answer("Q2", lang)
+    assert cat["prov_legend_quote"] in cited and cat["prov_legend_quote"] not in plain
+    for html in (cited, plain):
+        assert cat["prov_legend_ai"] in html and cat["prov_legend_data"] in html
 
 
 def test_every_kind_is_shown_with_a_label_in_both_locales() -> None:
@@ -137,7 +147,6 @@ def test_every_kind_is_shown_with_a_label_in_both_locales() -> None:
 
 def _outside_panel(html: str) -> str:
     html = re.sub(r'<details class="inside">.*?</details>', "", html, flags=re.S)
-    html = html.split('<div id="inside-trace" hx-swap-oob="true">')[0]
     return " ".join(unescape(re.sub(r"<[^>]+>", " ", html)).split())
 
 
@@ -160,8 +169,8 @@ def test_ask_shows_no_status_badge_outside_the_inside_panel(lang: str) -> None:
 def test_no_status_badge_in_any_screen_outside_the_inside_panel(state: str, lang: str) -> None:
     """C10: the landing and the four screens, in every state, keep status labels in Inside only."""
     html = rendered_state(state, lang)
-    # no Inside on /study (E58, D24)
-    no_panel = state == "landing" or state.startswith("study_")
+    # no Inside on /study and /ask (E58, E59, D24)
+    no_panel = state == "landing" or state.startswith(("study_", "ask_"))
     assert ("<main" in html and "inside" in html) or no_panel
     text = main_copy(html)
     assert not [w for w in STATUS_WORDS if re.search(rf"\b{w}\b", text)], (state, lang)

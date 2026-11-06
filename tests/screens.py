@@ -44,17 +44,17 @@ STATE_MARKERS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     ),
     "study_duplicate": (("s1_gone_h", "s1_reported", "s1_break"), ("s1_note", "s1_undo")),
     "study_dose": (("s1_gone_h", "s1_reported", "s1_break"), ("s1_note", "s1_undo")),
-    "ask_before": (("s2_lede", "q_Q1"), ("exp_rules",)),
-    "ask_q2": (("exp_rules", "ask_col_answer", "ask_col_ai"), ("trick_Q6",)),
+    "ask_before": (("s2_lede", "q_Q1", "ask_col_answer"), ("trick_Q6",)),
+    "ask_q2": (("ask_col_answer", "ask_col_ai"), ("trick_Q6",)),
     "ask_q6": (("trick_Q6",), ()),
     "ask_g2": (("exp_official",), ("trick_Q6",)),
     # With an access code configured (as on AWS) the live question box is part of the page.
     "ask_live_before": (
         ("s2_lede", "q_Q1", "exp_live_q", "exp_live_code", "exp_live_go", "live_wait"),
-        ("exp_rules",),
+        ("trick_Q6",),
     ),
     "ask_live_q2": (
-        ("exp_rules", "ask_col_answer", "exp_live_q", "exp_live_code", "exp_live_go", "live_wait"),
+        ("ask_col_answer", "exp_live_q", "exp_live_code", "exp_live_go", "live_wait"),
         ("trick_Q6",),
     ),
     "decide_empty": (("s4_decide", "disc_examples"), ("s4_confirm",)),
@@ -83,24 +83,17 @@ def assert_expected_page(name: str, html: str) -> None:
         assert marker and marker not in text, f"{name} renders {marker!r}"
 
 
-OOB_TRACE = '<div id="inside-trace" hx-swap-oob="true">'
-
-
 def with_result(page: str, fragment: str, target: str = "result") -> str:
-    """The GET page with the POST fragment inside its target element, as HTMX places it.
-
-    An out-of-band trace block goes where HTMX puts it: into the Inside panel's empty slot.
-    """
-    if OOB_TRACE in fragment:
-        fragment, rest = fragment.split(OOB_TRACE)
-        trace = rest[: rest.rindex("</div>")]
-        slot = '<div id="inside-trace"></div>'
-        assert page.count(slot) == 1, "no empty #inside-trace slot in the page"
-        page = page.replace(slot, f'<div id="inside-trace">{trace}</div>')
-    empty = re.compile(rf'(<div [^>]*id="{target}"[^>]*>)</div>')
-    placed, count = empty.subn(lambda m: f"{m.group(1)}{fragment}</div>", page)
-    assert count == 1, f"no empty #{target} element to place the fragment in"
-    return placed
+    """The GET page with the POST fragment replacing the content of its target, as HTMX swaps it."""
+    opener = re.search(rf'<div [^>]*id="{target}"[^>]*>', page)
+    assert opener is not None, f"no #{target} element to place the fragment in"
+    depth = 1
+    for found in re.finditer(r"<div\b|</div>", page[opener.end() :]):
+        depth += 1 if found.group() == "<div" else -1
+        if depth == 0:
+            end = opener.end() + found.start()
+            return page[: opener.end()] + fragment + page[end:]
+    raise AssertionError(f"#{target} is never closed")
 
 
 def _break_chain(db: Path, thread: str) -> None:
@@ -110,7 +103,7 @@ def _break_chain(db: Path, thread: str) -> None:
 
 def _ask(client: TestClient, name: str) -> str:
     page = client.get("/ask").text
-    if name == "ask_before":
+    if name == "ask_before":  # the GET page already holds the recorded answer to Q2
         return page
     question = {"ask_q6": "Q6", "ask_g2": "G2"}.get(name, "Q2")
     result = client.post("/ask/run", data={"question": question}).text

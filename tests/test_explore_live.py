@@ -73,6 +73,22 @@ def test_explore_live_refuses_without_code_wrong_code_or_long_question(live_box:
     assert live_box.calls == 0
 
 
+def test_explore_live_empty_question_says_live_empty_but_the_code_is_checked_first(
+    live_box: LiveFake,
+) -> None:
+    from cairn.web.i18n import CATALOGUES
+
+    cat = CATALOGUES["en"]
+    for question in ("", "   "):
+        assert cat["live_empty"] in ask_box("s3cret", question)
+        wrong = ask_box("wrong", question)
+        assert cat["live_need_code"] in wrong and cat["live_empty"] not in wrong
+    with TestClient(create_app()) as client:  # no question field at all
+        bare = client.post("/explore/live?lang=en", data={"code": "s3cret"}).text
+    assert cat["live_empty"] in bare
+    assert live_box.calls == 0
+
+
 def test_explore_live_is_off_without_a_configured_code(
     live_box: LiveFake, monkeypatch: pytest.MonkeyPatch
 ) -> None:

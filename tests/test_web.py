@@ -282,12 +282,21 @@ def _ai_column(html: str) -> str:
     return found.group(1)
 
 
-def test_step2_page_lists_the_questions_with_the_recorded_badge() -> None:
+def test_step2_page_lists_the_questions_and_has_no_badge_or_inside_panel() -> None:
     with TestClient(create_app()) as client:
         page = _english(client).get("/ask").text
-    assert 'class="badge recorded"' in page
-    assert "In production" in _inside(page)
+    assert 'class="badge' not in page and '<details class="inside"' not in page
     assert '"question": "Q2"' in page and '"question": "Q6"' in page
+
+
+def test_ask_page_opens_with_the_recorded_answer_to_q2_pressed() -> None:
+    """E59: the GET page already holds the answer to Q2 and marks its button as pressed."""
+    with TestClient(create_app()) as client:
+        page = _english(client).get("/ask").text
+    pressed = re.findall(r'<button[^>]*aria-pressed="true"[^>]*>', page)
+    assert len(pressed) == 1 and '"question": "Q2"' in pressed[0]
+    result = page.split('id="result"', 1)[1]
+    assert 'class="answer-panel"' in result and "answer-unit" in result
 
 
 REAL = Path(__file__).parent / "fixtures" / "recordings_real_shape"
@@ -305,28 +314,19 @@ def _as_bedrock(folder: Path, target: Path) -> Path:
 def test_q2_replay(monkeypatch: pytest.MonkeyPatch) -> None:
     """Offline replay of the real-shape Opus 4.6 fixture: 9-row screen, honest denominators."""
     result = _ask("Q2", monkeypatch, REAL)
-    assert 'class="badge fixture"' in result
-    assert "Rules fired: none" in result
+    assert 'class="badge' not in result and "Rules fired" not in result  # no trace on the Ask screen
     assert _outside_sources(result).count("<tr><td>") == 9
     assert "not examined" in result and "0/1" in result
     assert (
         "9 screened findings; the clearest is adrenal gland, vacuolization in female and male"
         in (_prose_text(result))
     )
-    recorded = json.loads((REAL / "q2.json").read_text(encoding="utf-8"))
-    cost = sum(call["cost_usd"] for call in recorded["calls"])
-    assert f"{recorded['date']} | {recorded['region']} | opus-4-6 |" in result
-    assert re.search(r"\| [1-9]\d*\.\d s \|", result)
-    assert f"| {cost:.2f} USD" in result
-    assert "Screen: a finding enters" in result
 
 
 def test_q2_replay_fixture(monkeypatch: pytest.MonkeyPatch) -> None:
     result = _ask("Q2", monkeypatch)
-    assert "run_job -&gt; study_design -&gt; incidence" in result
-    assert 'class="badge fixture"' in result
-    assert "cost n/a" in result
-    assert "Screen: a finding enters" in result
+    for trace_only in ("run_job -&gt; study_design", "cost n/a", "Screen: a finding enters"):
+        assert trace_only not in result  # the trace left the Ask screen with the Inside panel
     assert _outside_sources(result).count("<tr><td>") == 9
     assert "not examined" in result
     assert "The screen examined 80 animals" in _prose_text(result)
@@ -353,8 +353,8 @@ def test_q6_blocked(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_q6_blocked_by_rules_on_fixture(monkeypatch: pytest.MonkeyPatch) -> None:
     result = _ask("Q6", monkeypatch)
-    trace = result[result.index('<div id="inside-trace" hx-swap-oob="true">') :]
-    assert "Rules fired: 1, 6" in trace
+    assert "inside-trace" not in result and "Rules fired" not in result
+    assert "blocked" in _callout_classes(result)
     assert 'class="prose' not in result
     assert "<tr><td>" not in result
 
@@ -408,30 +408,19 @@ def test_q2_sentence_and_evidence_state_the_same_examined_count(
     assert evidence.group(3) == "affected"
 
 
-def test_step2_header_badge_follows_the_recordings_served(
+def test_ask_page_shows_no_badge_whatever_the_recordings_are(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    recorded = _as_bedrock(REAL, tmp_path)
-    cases = ((FIXTURES, "fixture", "recorded"), (recorded, "recorded", "fixture"))
-    for folder, shown, hidden in cases:
-        monkeypatch.setenv("CAIRN_RECORDINGS", str(folder))
-        with TestClient(create_app()) as client:
-            page = client.get("/ask").text
-        assert f'class="badge {shown}"' in page and f'class="badge {hidden}"' not in page
-
-
-def test_step2_badge_ignores_unreadable_files_and_empty_folders(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    (tmp_path / "list.json").write_text("[]", encoding="utf-8")
+    """E59 removed the page badge (and `_step2_badge` with it, so its unreadable-file test too)."""
     (tmp_path / "bad.json").write_text("{not json", encoding="utf-8")
-    for folder in (tmp_path, tmp_path / "missing"):
+    (tmp_path / "real").mkdir()
+    recorded = _as_bedrock(REAL, tmp_path / "real")
+    for folder in (FIXTURES, recorded, tmp_path, tmp_path / "missing"):
         monkeypatch.setenv("CAIRN_RECORDINGS", str(folder))
         with TestClient(create_app()) as client:
             response = client.get("/ask")
         assert response.status_code == 200
-        page = response.text
-        assert 'class="badge none"' in page and 'class="badge recorded"' not in page
+        assert 'class="badge' not in response.text
 
 
 def test_q2_prose_names_the_screened_findings_by_sex_and_places_no_table_position(
@@ -499,7 +488,7 @@ def test_ask_page_has_a_button_for_every_question() -> None:
     for question_id in (*QUESTIONS, "NS1", "NS2"):
         assert f'"question": "{question_id}"' in page
     assert len(QUESTIONS) == 11
-    assert "live model calls." in _inside(page) and 'class="badge recorded"' in page
+    assert 'class="badge' not in page and "live model calls." not in page
 
 
 @pytest.mark.parametrize(
@@ -507,8 +496,7 @@ def test_ask_page_has_a_button_for_every_question() -> None:
 )
 def test_every_ask_question_replays_offline(question: str) -> None:
     result = _explore(question)
-    trace = result[result.index('<div id="inside-trace" hx-swap-oob="true">') :]
-    assert 'class="badge recorded"' in trace
+    assert "stale recording" not in result and "inside-trace" not in result
     assert 'answer-unit"' in result or 'class="callout blocked"' in result
 
 
@@ -533,11 +521,10 @@ def test_old_explore_routes_are_gone() -> None:
 @pytest.mark.parametrize("question", ["G1", "G2", "G3"])
 def test_ask_guideline_questions_render_quotes_from_quoteref(question: str) -> None:
     result = _explore(question)
-    assert 'class="badge recorded"' in result
+    assert 'class="badge' not in result and "Rules fired" not in result
     assert "<blockquote" not in result
     assert 'class="prov prov-quote"' in result
     assert "official page" in result and "#page=" in result
-    assert "Rules fired: none" in result
 
 
 def test_ask_rejects_an_unknown_question() -> None:
@@ -981,7 +968,7 @@ def test_explore_strings_come_from_the_active_catalogue(lang: str) -> None:
     for key in ("step_2", "s2_lede"):
         assert own[key] in page
         assert other[key] not in page
-    for key in ("exp_rules",):
+    for key in ("ev_th_item", "ev_th_value", "prov_legend_ai"):
         assert own[key] in answer and other[key] not in answer
     assert f"<th>{own['exp_th_sex']}</th>" in answer
 
