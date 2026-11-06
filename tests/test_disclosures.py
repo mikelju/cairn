@@ -52,6 +52,8 @@ def test_every_rendered_summary_is_a_pill_that_names_content_and_size(
                 continue  # a provenance chip is the figure itself, not a disclosure pill
             seen += 1
             assert 'class="pill"' in attrs, (lang, name, label)
+            if label == CATALOGUES[lang]["disc_about"]:
+                continue  # the study "about" pill carries no counter (E58)
             match = re.fullmatch(r"(\S+) (.+?) · (\d+) (\S+)", label)
             assert match, (lang, name, label)
             assert match.group(1).lower() in {"ver", "show", "mostrar"}, (lang, name, label)

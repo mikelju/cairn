@@ -314,7 +314,7 @@ def test_badge_recorded_keeps_its_metadata_and_simulated_its_production_line(
     with TestClient(create_app()) as client:
         client.cookies.set("cairn_lang", "en")
         result = client.post("/ask/run", data={"question": "Q2"}).text
-        study = client.get("/study").text
+        study = client.get("/decide").text  # /study has no Inside panel since E58 (D24)
     meta = re.search(r'<p class="meta">(.*?)</p>', result, flags=re.S)
     assert meta is not None and 'class="badge recorded"' in meta.group(1)
     assert str(recorded["date"]) in meta.group(1) and str(recorded["region"]) in meta.group(1)
