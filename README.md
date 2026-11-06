@@ -20,3 +20,4 @@ Video walkthrough: VIDEO_URL (pending, recorded after the merge).
 - [docs/production.md](docs/production.md): what production would need.
 - [docs/adr/](docs/adr/): decisions (Bedrock profiles, workflows).
 - [docs/como-trabajar.md](docs/como-trabajar.md): how the project is developed with SDD Lite (in Spanish).
+- [docs/estilo.md](docs/estilo.md): the visual style tokens of the demo canvas.
