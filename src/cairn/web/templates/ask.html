@@ -1,17 +1,18 @@
 {% extends "base.html" %}
 {% import "_components.html" as a with context %}
-{% macro button(id) %}<button type="button" class="qbtn" aria-controls="result" hx-post="/ask/run" hx-vals='{"question": "{{ id }}"}' hx-target="#result"><span class="q">{{ t["q_" ~ id] }}</span>{% if id in tricks %} <span class="trick-tag">{{ t.q_trick }}</span>{% endif %}</button>{% endmacro %}
+{% macro button(id) %}<button type="button" class="qbtn" aria-controls="result"{% if id == selected %} aria-pressed="true"{% endif %} hx-post="/ask/run" hx-vals='{"question": "{{ id }}"}' hx-target="#result"><span class="q">{{ t["q_" ~ id] }}</span>{% if id in tricks %} <span class="trick-tag">{{ t.q_trick }}</span>{% endif %}</button>{% endmacro %}
 {% block main %}
 <section class="step">
 {{ a.screen_head(2, t.step_2, t.s2_lede) }}
+<p class="meta">{{ t.s2_how }}</p>
 <div role="group" aria-label="{{ t.step_2 }}">
   <div class="qlist">{% for id in first %}{{ button(id) }}{% endfor %}</div>
   {% call a.disclosure("explore", more|length, "questions") %}<div class="qlist">{% for id in more %}{{ button(id) }}{% endfor %}</div>{% endcall %}
 </div>
-<div class="slot" id="result" aria-live="polite"></div>
+<div class="slot" id="result" aria-live="polite">{% include "ask_answer.html" %}</div>
 {% if live %}
 <form class="live card" hx-post="/explore/live" hx-target="#answer-live" hx-indicator="#live-wait" hx-disabled-elt="find button" hx-sync="this:drop" data-error="{{ t.live_net }}" autocomplete="off" aria-label="{{ t.exp_live_label }}">
-  <label>{{ t.exp_live_q }} <input type="text" name="question" maxlength="500" required></label>
+  <label>{{ t.exp_live_q }} <input type="text" name="question" maxlength="500"></label>
   <label>{{ t.exp_live_code }} <input type="password" name="code" autocomplete="off"></label>
   <button type="submit">{{ t.exp_live_go }}</button>
 </form>
@@ -19,7 +20,6 @@
 <div class="slot" id="answer-live" aria-live="polite"></div>
 {% endif %}
 {{ a.screen_nav(2, screens) }}
-{% call a.inside([[t.step_2, "-", t.exp_prod]]) %}{{ a.badge_meta(page_badge, t.s2_recorded) }}<div id="inside-trace"></div>{% endcall %}
 </section>
 {% endblock %}
-{% block scripts %}{% if live %}<script src="/static/live.js"></script>{% endif %}{% endblock %}
+{% block scripts %}<script src="/static/ask.js"></script>{% if live %}<script src="/static/live.js"></script>{% endif %}{% endblock %}

@@ -2,7 +2,7 @@
 {% if stale %}
 {% call a.callout("stale") %}<p>{{ stale }}</p>{% endcall %}
 {% else %}
-{{ a.prov_legend(r.kinds) }}
+<p class="prov-legend">{% for k in r.kinds %}<span class="prov-key prov-{{ k }}">{{ t["prov_legend_" ~ k] }}</span>{% endfor %}<span class="prov-key prov-ai">{{ t.prov_legend_ai }}</span></p>
 <article class="answer-panel">
 {% if r.trick %}{% call a.callout("blocked") %}<p>{{ t["trick_" ~ r.id] }}</p>{% endcall %}{% endif %}
 {% if r.parts %}
@@ -20,7 +20,19 @@
 {% if r.failures %}<ul>{% for f in r.failures %}<li>{{ f }}</li>{% endfor %}</ul>{% endif %}
 {% endcall %}
 {% endif %}
-{% if r.rows or r.evidence %}{% call a.disclosure("evidence", r.evidence|length + (1 if r.rows else 0), "items") %}
+{% set ev = namespace(rows=[], pops=[]) %}
+{% for p in r.parts if p.kind is defined %}
+{% if p.kind == "data" %}
+{% set ev.rows = ev.rows + [[p.column, p.text]] %}
+{% if p.population not in ev.pops %}{% set ev.pops = ev.pops + [p.population] %}{% set ev.rows = ev.rows + [[t.prov_population, p.population]] %}{% endif %}
+{% elif p.kind == "quote" %}
+{% set ev.rows = ev.rows + [[p.guideline ~ ", " ~ p.section, p.citation]] %}
+{% else %}
+{% set ev.rows = ev.rows + [[p.who, p.value]] %}
+{% endif %}
+{% endfor %}
+{% if ev.rows or r.rows or r.evidence %}{% call a.disclosure("evidence", ev.rows|length, "items") %}
+{% if ev.rows %}{{ a.data_table([t.ev_th_item, t.ev_th_value], ev.rows) }}{% endif %}
 {% if r.rows %}
 {% set screen = namespace(rows=[]) %}
 {% for row in r.rows %}{% set screen.rows = screen.rows + [[t["s1_sex_" ~ row.sex] if ("s1_sex_" ~ row.sex) in t else row.sex, t[row.fkey] if row.fkey in t else ((row.tissue ~ " " ~ row.finding)|lower)] + row.cells] %}{% endfor %}
@@ -29,5 +41,4 @@
 {{ a.evidence_list(r.evidence) }}
 {% endcall %}{% endif %}
 </article>
-{{ a.inside_trace(r) }}
 {% endif %}

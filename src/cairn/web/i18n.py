@@ -83,23 +83,23 @@ EN: dict[str, str] = {
     "exp_s2_intro": "Requests at the edge: see how the model holds its limits.",
     "exp_next": "Next:",
     "exp_next_step": "Next step:",
-    "exp_en_rec": "EN · recorded",
-    "exp_en_live": "EN · live",
     "exp_th_sex": "Sex",
     "exp_th_tissue": "Tissue",
     "exp_th_finding": "Finding",
     "exp_hl": "highlighted page",
     "exp_official": "official page",
     "exp_rules": "Rules fired:",
-    "exp_trace": "Trace",
     "disc_table": "Show table",
-    "exp_prod": "live model calls.",
     "exp_live_label": "Live question",
     "exp_live_q": "Your question",
     "exp_live_code": "Access code",
-    "exp_live_go": "Ask live",
+    "exp_live_go": "Ask",
     "live_need_code": ("Live questions need the access code. Try a recorded question."),
-    "live_length": "A question has 1 to {n} characters.",
+    "live_empty": "Write a question first (or pick one above).",
+    "live_length": "A question has at most {n} characters.",
+    "ev_th_item": "Item",
+    "ev_th_value": "Value",
+    "prov_legend_ai": "text the AI writes",
     "live_budget": "The daily live budget is used up. Try a recorded question.",
     "live_busy": "Another live question is running. Try again in a minute.",
     "live_failed": "The live call failed ({error}).",
@@ -176,8 +176,15 @@ EN: dict[str, str] = {
         "so anyone can check them, and nobody's data is used."
     ),
     "s1_about_link": "See the public data (PhUSE, GitHub)",
-    "s2_lede": "Before the draft, test it: real data, no shortcuts.",
-    "s2_recorded": "Answers replay recorded runs.",
+    "s2_lede": (
+        "Here you ask the study data questions. This is how you check that the AI does not "
+        "invent its answers: every figure it gives really exists in the study."
+    ),
+    "s2_how": (
+        "Pick a question or write your own. On the left you see the answer; on the right, what "
+        "the AI wrote with blanks, which the code fills with the real figure. Study data is "
+        "green and underlined; the text the AI writes is in the normal color."
+    ),
     "prov_legend_data": "study data",
     "prov_legend_decision": "a person's decision",
     "prov_legend_quote": "guideline quote",
@@ -406,17 +413,13 @@ ES: dict[str, str] = {
     "exp_s2_intro": "Peticiones al límite: mira cómo mantiene el modelo sus límites.",
     "exp_next": "Sigue:",
     "exp_next_step": "Siguiente paso:",
-    "exp_en_rec": "EN · grabado",
-    "exp_en_live": "EN · en vivo",
     "exp_th_sex": "Sexo",
     "exp_th_tissue": "Tejido",
     "exp_th_finding": "Hallazgo",
     "exp_hl": "página resaltada",
     "exp_official": "página oficial",
     "exp_rules": "Reglas aplicadas:",
-    "exp_trace": "Traza",
     "disc_table": "Ver tabla",
-    "exp_prod": "llamadas en vivo.",
     "exp_live_label": "Pregunta en vivo",
     "exp_live_q": "Tu pregunta",
     "exp_live_code": "Código",
@@ -424,7 +427,11 @@ ES: dict[str, str] = {
     "live_need_code": (
         "Las preguntas en vivo necesitan el código de acceso. Prueba una pregunta grabada."
     ),
-    "live_length": "Una pregunta tiene de 1 a {n} caracteres.",
+    "live_empty": "Escribe una pregunta primero (o elige una de arriba).",
+    "live_length": "Una pregunta tiene como máximo {n} caracteres.",
+    "ev_th_item": "Elemento",
+    "ev_th_value": "Valor",
+    "prov_legend_ai": "texto que pone la IA",
     "live_budget": "El presupuesto diario en vivo se agotó. Prueba una pregunta grabada.",
     "live_busy": "Hay otra pregunta en vivo en curso. Prueba de nuevo en un minuto.",
     "live_failed": "La llamada en vivo falló ({error}).",
@@ -495,8 +502,15 @@ ES: dict[str, str] = {
         "así que cualquiera puede comprobarlos, y no se usan datos de nadie."
     ),
     "s1_about_link": "Ver los datos públicos (PhUSE, GitHub)",
-    "s2_lede": "Antes del borrador, ponla a prueba: datos reales, sin atajos.",
-    "s2_recorded": "Las respuestas repiten ejecuciones grabadas.",
+    "s2_lede": (
+        "Aquí le haces preguntas a los datos del estudio. Así compruebas que la IA no se "
+        "inventa las respuestas: cada dato que da existe de verdad en el estudio."
+    ),
+    "s2_how": (
+        "Elige una pregunta o escribe la tuya. A la izquierda ves la respuesta; a la derecha, "
+        "lo que escribió la IA con huecos, que el código rellena con el dato real. Los datos "
+        "del estudio van en verde y subrayados; el texto que escribe la IA va en el color normal."
+    ),
     "prov_legend_data": "dato del estudio",
     "prov_legend_decision": "decisión de una persona",
     "prov_legend_quote": "cita de guía",

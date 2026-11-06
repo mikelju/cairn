@@ -72,13 +72,15 @@ def _refused(request: Request, key: str, **values: object) -> HTMLResponse:
 @explore_live.post("/explore/live", response_class=HTMLResponse)
 def explore_ask_live(
     request: Request,
-    question: Annotated[str, Form()],
+    question: Annotated[str, Form()] = "",
     code: Annotated[str, Form()] = "",
 ) -> HTMLResponse:
     question = question.strip()
     if not code_ok(code):
         return _refused(request, "live_need_code")
-    if not question or len(question) > MAX_QUESTION_CHARS:
+    if not question:
+        return _refused(request, "live_empty")
+    if len(question) > MAX_QUESTION_CHARS:
         return _refused(request, "live_length", n=MAX_QUESTION_CHARS)
     if spent_today() >= daily_cap():
         return _refused(request, "live_budget")

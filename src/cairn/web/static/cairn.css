@@ -313,19 +313,7 @@ h2 { font-size: var(--text-md); line-height: 1.2; margin: 0 0 var(--space-2); }
 .page-images figure { margin: 0; }
 .page-image { display: block; max-height: 60vh; width: auto; max-width: 100%; border: var(--border-1) solid var(--color-line); }
 
-/* Explore: three ordered stages, cards, answers under their card */
-.explore { max-width: none; }
-.explore .path { margin-bottom: var(--space-3); }
-.eyebrow { margin: 0; font-family: var(--font-mono); font-size: var(--text-2xs); letter-spacing: var(--tracking-eyebrow); text-transform: uppercase; color: var(--color-accent); }
-.stagebar { position: sticky; top: 0; z-index: 2; padding: var(--space-3) 0; background: var(--color-paper); border-bottom: var(--border-1) solid var(--color-line); }
-.stagebar ol { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
-.stagebar a { display: inline-flex; align-items: center; gap: var(--space-2); padding: var(--space-1) var(--space-3) var(--space-1) var(--space-2); border: var(--border-1) solid var(--color-line); border-radius: var(--radius-pill); color: var(--color-muted); font-size: var(--text-sm); text-decoration: none; }
-.stagebar a[aria-current] { background: var(--color-accent-tint); border-color: var(--color-accent); color: var(--color-ink); }
-.explore section.stage { display: grid; grid-template-columns: 96px minmax(0, 1fr); column-gap: var(--space-4); padding: var(--space-7) 0 var(--space-6); border-bottom: var(--border-1) dashed var(--color-line); }
-.stage-num { margin: 0; font-family: var(--font-mono); font-size: var(--text-2xl); line-height: 1; color: var(--color-accent); }
-#stage-2 .stage-num, #stage-2 .eyebrow { color: var(--color-block); }
-#stage-3 .stage-num, #stage-3 .eyebrow { color: var(--color-real); }
-.stage-body h2 { font-size: var(--text-xl); letter-spacing: var(--tracking-display); margin: var(--space-1) 0; }
+/* Ask screen: questions, answer under them */
 .intro { display: flex; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-4); color: var(--color-muted); }
 .qlist { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); margin: var(--space-4) 0; }
 .trick-tag { font-family: var(--font-mono); font-size: var(--text-2xs); padding: 1px var(--space-2); border: var(--border-1) dashed var(--color-block); border-radius: var(--radius-pill); color: var(--color-block); white-space: nowrap; }
@@ -338,11 +326,7 @@ h2 { font-size: var(--text-md); line-height: 1.2; margin: 0 0 var(--space-2); }
 .detail details { margin: var(--space-2) 0 0; }
 .next { margin: var(--space-4) 0 0; font-size: var(--text-sm); color: var(--color-muted); }
 .live { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); margin-top: var(--space-5); }
-.stage.reveal { transition: opacity 0.5s, transform 0.5s; }
-.stage.reveal:not(.in) { opacity: 0; transform: translateY(var(--space-5)); }
-@media (prefers-reduced-motion: reduce) { .stage.reveal, .stage.reveal:not(.in) { opacity: 1; transform: none; transition: none; } }
-@media (max-width: 900px) { .explore section.stage { grid-template-columns: minmax(0, 1fr); } .qlist { grid-template-columns: minmax(0, 1fr); } }
-.explore a:not(.stagebar a) { color: var(--color-accent); }
+@media (max-width: 900px) { .qlist { grid-template-columns: minmax(0, 1fr); } }
 .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); margin: var(--space-4) 0; }
 .tiles.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .tile { position: relative; display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-5); background: var(--color-surface); border: var(--border-1) solid var(--color-line); border-radius: var(--radius-md); }
@@ -411,6 +395,7 @@ details.prov[open] > summary.prov-chip { outline: var(--border-focus) solid curr
 .prov-legend { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); margin: var(--space-3) 0; padding: 0; list-style: none; font-size: var(--text-sm); }
 .prov-key { display: inline-block; padding: 0 var(--space-2); border-radius: var(--radius-sm); border-bottom: var(--border-badge) solid; font-weight: var(--weight-semibold); }
 .prov-key::before { margin-right: var(--space-1); font-size: var(--text-xs); }
+.prov-key.prov-ai { color: var(--color-ink); border-bottom-color: transparent; }
 
 /* Screen 3: the key finding, one block per sex */
 .decide-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-5); align-items: start; margin: var(--space-4) 0; }

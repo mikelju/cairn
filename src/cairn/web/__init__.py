@@ -1,6 +1,5 @@
 """Web pages: landing page, steps 1 and 2 and /healthz, rendered with Jinja2 and local HTMX."""
 
-import json
 import os
 import subprocess
 from functools import lru_cache
@@ -292,21 +291,6 @@ SCREEN_KIND = "incidence_screen"
 
 def _recordings_dir() -> Path:
     return Path(os.environ.get("CAIRN_RECORDINGS", str(RECORDINGS_DIR)))
-
-
-def _step2_badge(directory: Path) -> str:
-    """FIXTURE if any readable recording is hand-written, RECORDED if there are any, else NONE."""
-    sources = []
-    for path in directory.glob("*.json"):
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            continue
-        if isinstance(data, dict):
-            sources.append(data.get("source"))
-    if not sources:
-        return "NONE"
-    return "FIXTURE" if "fixture" in sources else "RECORDED"
 
 
 def _marker(field: str) -> str:
@@ -604,8 +588,31 @@ def _query_context(question_id: str) -> dict[str, Any]:
     }
 
 
+ASK_ENTRY = "Q2"  # the answer shown on entering the screen
+
+
+def _answer_context(question: str, t: dict[str, str]) -> dict[str, Any]:
+    """The recorded answer of a question as context: `r`, or `stale` when it is out of date."""
+    try:
+        if question in ASK_QUERIES:
+            context = _query_context(question)
+        else:
+            context = _step2_context(question, _recordings_dir(), t)
+    except StaleRecording as error:
+        return {"stale": str(error)}
+    return {
+        "r": {
+            **context,
+            "id": question,
+            "trick": question in ASK_TRICKS,
+            "kinds": _kinds(context["parts"]),
+        }
+    }
+
+
 @router.get("/ask", response_class=HTMLResponse)
 async def ask_page(request: Request) -> HTMLResponse:
+    shell = i18n.context(request)
     return _page(
         request,
         "ask.html",
@@ -613,8 +620,9 @@ async def ask_page(request: Request) -> HTMLResponse:
         first=ASK_FIRST,
         more=ASK_MORE,
         tricks=ASK_TRICKS,
+        selected=ASK_ENTRY,
         live=bool(os.environ.get("CAIRN_ACCESS_CODE")),
-        page_badge=_step2_badge(_recordings_dir()),
+        **_answer_context(ASK_ENTRY, shell["t"]),
     )
 
 
@@ -624,22 +632,9 @@ def ask_run(request: Request, question: Annotated[str, Form()]) -> HTMLResponse:
     if question not in QUESTIONS and question not in ASK_QUERIES:
         raise HTTPException(status_code=422, detail="unknown question")
     shell = i18n.context(request)
-    try:
-        if question in ASK_QUERIES:
-            context = _query_context(question)
-        else:
-            context = _step2_context(question, _recordings_dir(), shell["t"])
-    except StaleRecording as error:
-        return templates.TemplateResponse(
-            request, "ask_answer.html", {**shell, "stale": str(error)}
-        )
-    context = {
-        **context,
-        "id": question,
-        "trick": question in ASK_TRICKS,
-        "kinds": _kinds(context["parts"]),
-    }
-    return templates.TemplateResponse(request, "ask_answer.html", {**shell, "r": context})
+    return templates.TemplateResponse(
+        request, "ask_answer.html", {**shell, **_answer_context(question, shell["t"])}
+    )
 
 
 REDIRECTS = {1: "/study", 2: "/ask", 3: "/ask", 4: "/decide", 5: "/draft", 6: "/draft", 7: "/draft"}

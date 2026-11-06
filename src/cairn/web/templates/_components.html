@@ -112,15 +112,6 @@
 </div></details>
 {% endmacro %}
 
-{# The trace of the last answer, swapped out of band into the Inside panel of the Ask screen. #}
-{% macro inside_trace(r) %}<div id="inside-trace" hx-swap-oob="true">
-{{ badge_meta(r.badge, r.meta) }}
-<p class="lang-tag">{{ t.exp_en_rec if r.badge == "RECORDED" else t.exp_en_live }}</p>
-{{ trace(r.trace, t.exp_trace) }}
-{% if r.rows %}<p>{{ r.rule }}</p>{% endif %}
-{% call callout("rules") %}<p>{{ t.exp_rules }} {{ r.rules or t.exp_none }}</p>{% endcall %}
-</div>{% endmacro %}
-
 {# Provenance: the sentence as text and tags; each tag opens the source of the piece it shows. #}
 {% macro prov_facts(rows) %}<dl class="prov-facts">{% for label, value in rows %}<dt>{{ t[label] }}</dt><dd>{{ value }}</dd>{% endfor %}</dl>{% endmacro %}
 
