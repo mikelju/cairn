@@ -48,7 +48,7 @@ Current authorization and limits: on 2026-11-03 the user approved the change and
 - [ ] I9 Verification (C17 and all): full walk at 1440x900 in both locales with screenshots in `docs/changes/004-evidence/`, `npm run check`, `make demo-offline-check`, push and CI green on PR 15
 - [x] I10 Design: shell, tokens, landing, word-cap test (C1, C6, C10, C14, D23)
 - [x] I11 Design: step 1 (C12, C13, C15)
-- [ ] I12 Design: step 2 screen, evidence, live box, first answer loaded (C7, C10, C13, D28)
+- [x] I12 Design: step 2 screen, evidence, live box, first answer loaded (C7, C10, C13, D28)
 - [ ] I13 Design: step 3 role and one-click decide (C4, C11, C16, D25, D27)
 - [ ] I14 Design: step 4 sheet with tags, yellow gaps, sign, Inside (C8, C9, C10, C12, C13, C16)
 - [ ] I15 Design: real-path test, canvas comparison, screenshots, image on `prueba-aws`, dry run
@@ -125,7 +125,7 @@ Supervisor, 2026-11-03, on the Jefe's question about the answer unit: C14 as fro
 | E55 | supervisor | Test redeploy after the memory fix | ready locally | `prueba-aws` fast-forwarded to 1cf5260; image run 42184575953 green, so `cairn guidance check` passed on amd64 with batch 32; image loaded locally, amd64, `CAIRN_COMMIT=1cf5260`; `make deploy-dry-run` kept the four environment variables and created no deployment; the user deploys with `make deploy SKIP_BUILD=1` |
 | E56 | explorador (opus) | Plan applying the approved design (D22): compare the five canvases with the demo, check the step 1 figures against the data, list clashes with C1-C19, propose increments | done | Step 1 figures match the data except the injected mean (-10,384, computed, not the canvas -10,385) and the set-aside count (13 after injecting); the canvas NOAEL ignores the example decisions, so the real rule stays; clashes with C10, C11, C13, C14 sent to the Jefe; nine sequential increments |
 | E58 | ejecutor (sonnet) | I11 design step 1 (study screen, injection -50000, 13 set-aside rows, server render, no Inside) | done | 396caf3 and test follow-up c6edcf8 (E58b); 336 tests passed, ruff and mypy clean; browser check ES/EN: 12 to 13 rows, -10,384 and 15,956 |
-| E59 | ejecutor (sonnet) | I12 design step 2 (lede, evidence table, selector, Ask button, first recorded answer loaded, no Inside, drop dead explore.js) | in progress | |
+| E59 | ejecutor (sonnet) | I12 design step 2 (lede, evidence table, selector, Ask button, first recorded answer loaded, no Inside, drop dead explore.js) | done | 8b5928a, tests d4f9915 and aa8cf68 (E59b, E59c); 345 passed, ruff and mypy clean; browser check ES/EN; one real defect fixed: unreadable Q2 recording on /ask was a 500, now shown as stale |
 | E57 | ejecutor (sonnet) | I10 design shell, tokens, landing, word-cap test | done | Commit dcee068: tokens only in `:root`, header without "Acting as", landing with "Ejemplo" label and one CTA, word cap test replaced by key-copy checks; ruff, mypy and the affected suites green except `test_i18n` key parity, a prior defect fixed (five `term_*` keys added to ES with the English values, the draft is English) |
 | E29 | ejecutor (sonnet) | I8 correction 2: landing uses the recorded Q2 answer sentence | done | Commit 89db67a: landing shows the first clause of the recorded body-weight answer (Q3 in `questions.py`), same chips as `/ask` (8.9 %); code-composed sentence removed; language hint dropped for the cap; landing 57 ES / 58 EN; 189 passed, ruff and mypy green |
 
