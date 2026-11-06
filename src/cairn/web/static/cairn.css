@@ -408,6 +408,12 @@ details.prov[open] > summary.prov-chip { outline: var(--border-focus) solid curr
 .choice-grid legend { padding: 0; margin-bottom: var(--space-2); font-weight: 600; }
 .choice-grid .dose-head { text-align: center; }
 .choice-grid input { justify-self: center; }
+.role-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-5); margin-bottom: var(--space-4); }
+.role-bar .label { font-weight: var(--weight-semibold); }
+.role-bar .meta { margin: 0; }
+.role-toggle { display: inline-flex; gap: var(--space-1); padding: 2px; border: var(--border-1) solid var(--color-control-border); border-radius: var(--radius-pill); background: var(--color-paper); }
+.role-toggle a.seg { text-decoration: none; }
+.decide-sex .warn { margin: 0 0 var(--space-2); }
 .choice label { display: inline-flex; align-items: center; gap: var(--space-2); }
 @media (max-width: 900px) { .decide-grid { grid-template-columns: minmax(0, 1fr); } }
 .lang-tag { display: inline-block; font-size: var(--text-sm, 0.75rem); font-weight: 600; letter-spacing: 0.05em; padding: 0 var(--space-1); border: var(--border-1) solid currentColor; border-radius: var(--radius-sm, 4px); color: var(--color-muted, inherit); }

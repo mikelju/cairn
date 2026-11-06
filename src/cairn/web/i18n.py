@@ -249,6 +249,15 @@ EN: dict[str, str] = {
     "s4_chosen": "{sex}: related from {related}, adverse from {adverse}",
     "s4_confirm": "Confirm {sex} as R. Reviewer",
     "s4_noael": "NOAEL, {sex}: {value}",
+    "s4_role_label": "Role:",
+    "s4_role_note": "Peer review: whoever drafts cannot decide.",
+    "s4_role_warn": "The author cannot decide; a reviewer does. Switch the role to Reviewer.",
+    "decide_err_author": "The author cannot decide; a reviewer does.",
+    "s4_inc_note": (
+        "These are the data for this finding (affected animals out of 10). "
+        "With them you decide the NOAEL of females and males in the cards on the right. "
+        "Below you see how other decisions turned out."
+    ),
     "disc_examples": "Show example decisions",
     "s4_ex_tag": "example",
     "s4_ex_note": (
@@ -575,6 +584,15 @@ ES: dict[str, str] = {
     "s4_chosen": "{sex}: relacionado desde {related}, adverso desde {adverse}",
     "s4_confirm": "Confirmar {sex} como R. Reviewer",
     "s4_noael": "NOAEL, {sex}: {value}",
+    "s4_role_label": "Rol:",
+    "s4_role_note": "Revisión por pares: quien redacta no puede decidir.",
+    "s4_role_warn": "El autor no puede decidir; lo hace un revisor. Cambia el rol a Revisor.",
+    "decide_err_author": "El autor no puede decidir; lo hace un revisor.",
+    "s4_inc_note": (
+        "Estos son los datos de este hallazgo (animales afectados de cada 10). "
+        "Con ellos decides el NOAEL de hembras y machos en las tarjetas de la derecha. "
+        "Más abajo ves ejemplos de cómo quedaron otras decisiones."
+    ),
     "disc_examples": "Ver decisiones de ejemplo",
     "s4_ex_tag": "ejemplo",
     "s4_ex_note": (

@@ -181,6 +181,8 @@ def _decide_context(
                 "doses": [f"{d:g}" for d in slot["doses"] if d > 0],
                 "decided": decision is not None and sex != change,
                 "adverse": "" if decision is None else _decision_line(decision, sex, t),
+                "related_pick": _pick(decision, "treatment_related_from"),
+                "adverse_pick": _pick(decision, "adverse_from"),
                 "confirmed": confirmed,
                 "noael": (
                     t["undecided"]
@@ -227,21 +229,42 @@ def _decision_line(decision: dict[str, Any], sex: str, t: dict[str, str]) -> str
     )
 
 
+def _pick(decision: dict[str, Any] | None, field: str) -> str:
+    """The radio value that a recorded decision selects; empty when nothing is recorded."""
+    if decision is None:
+        return ""
+    return "none" if decision[field] is None else f"{decision[field]:g}"
+
+
+def _role(actor: str) -> Actor:
+    """The role of the screen: the reviewer by name or short key, otherwise the author."""
+    return REVIEWER if actor in ("reviewer", REVIEWER) else AUTHOR
+
+
 def _label(dose: float | None, t: dict[str, str]) -> str:
     return t["s4_none"] if dose is None else f"{dose:g}"
 
 
 @people.get("/decide", response_class=HTMLResponse)
-async def decide(request: Request, thread: str | None = None, change: str = "") -> Response:
-    return await _decide_page(request, await _session_thread(request, thread), change=change)
+async def decide(
+    request: Request, thread: str | None = None, change: str = "", actor: str = AUTHOR
+) -> Response:
+    return await _decide_page(
+        request, await _session_thread(request, thread), change=change, actor=_role(actor)
+    )
 
 
 async def _decide_page(
-    request: Request, thread: str, error: str = "", status: int = 200, change: str = ""
+    request: Request,
+    thread: str,
+    error: str = "",
+    status: int = 200,
+    change: str = "",
+    actor: str = AUTHOR,
 ) -> Response:
     state, _, view = await load_view(request, thread)
     context = _decide_context(state, view, i18n.context(request)["t"], change)
-    response = page(request, "decide.html", current=3, actor=AUTHOR, error=error, **context)
+    response = page(request, "decide.html", current=3, actor=actor, error=error, **context)
     response.status_code = status
     return _remember(response, thread)
 
@@ -262,24 +285,51 @@ async def decide_choose(
     adverse: Annotated[str, Form()] = "",
     related: Annotated[str, Form()] = "",
     thread: Annotated[str | None, Form()] = None,
+    actor: Annotated[str, Form()] = AUTHOR,
 ) -> Response:
-    """Record the visitor's two choices for one sex; a refusal is a one-line message, not JSON."""
+    """The Decide button: the reviewer records one sex and confirms it; the author is refused."""
+    who = _role(actor)
     thread = await _session_thread(request, thread)
+    t = i18n.context(request)["t"]
     try:
-        return await _choose(request, thread, sex, adverse, related)
+        if who == AUTHOR:
+            if sex not in ("F", "M"):
+                raise HTTPException(status_code=422, detail="unknown sex")
+            try:  # the refusal and its audit entry belong to confirm
+                await confirm(request, thread, Confirm(actor=AUTHOR, confirmed=[sex]))  # type: ignore[list-item]
+            except HTTPException as refusal:
+                if refusal.status_code == 409:
+                    return _remember(_current(AUTHOR), thread)
+                if refusal.status_code != 403:
+                    raise
+                return await _decide_page(request, thread, t["decide_err_author"], 403, actor=who)
+            return await _decide_page(request, thread, actor=who)
+        if stale := await _choose(request, thread, sex, adverse, related):
+            return stale
+        try:
+            await confirm(request, thread, Confirm(actor=REVIEWER, confirmed=[sex]))  # type: ignore[list-item]
+        except HTTPException as refusal:
+            if refusal.status_code != 409:
+                raise
+            if refusal.detail != "verify_final is not green":
+                return _remember(_current(REVIEWER), thread)
+            reason = t["confirm_err_verify"]
+            error = t["confirm_error"].format(detail=reason)
+            return await _decide_page(request, thread, error, 409, actor=who)
+        return await _decide_page(request, thread, actor=who)
     except HTTPException as refusal:
         if refusal.status_code != 422:
             raise
-        t = i18n.context(request)["t"]
         raw = str(refusal.detail)
         key = "decide_err_dose" if raw.startswith("bad dose") else REFUSALS.get(raw, "")
         detail = t.get(key, raw)
-        return await _decide_page(request, thread, t["decide_error"].format(detail=detail), 422)
+        error = t["decide_error"].format(detail=detail)
+        return await _decide_page(request, thread, error, 422, actor=who)
 
 
 async def _choose(
     request: Request, thread: str, sex: str, adverse: str, related: str
-) -> RedirectResponse:
+) -> Response | None:
     _, _, view = await load_view(request, thread)
     if sex not in ("F", "M"):
         raise HTTPException(status_code=422, detail="unknown sex")
@@ -317,13 +367,13 @@ async def _choose(
     )
     try:
         await record_decisions(
-            request, thread, Record(actor=AUTHOR, decisions=list(items.values()))
+            request, thread, Record(actor=REVIEWER, decisions=list(items.values()))
         )
     except HTTPException as refusal:
         if refusal.status_code != 409:
             raise
-        return _remember(_current(AUTHOR), thread)  # type: ignore[return-value]
-    return _remember(RedirectResponse("/decide", status_code=303), thread)  # type: ignore[return-value]
+        return _remember(_current(REVIEWER), thread)
+    return None
 
 
 @people.post("/decide/confirm", response_model=None)
