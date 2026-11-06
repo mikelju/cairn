@@ -1,25 +1,82 @@
 {% extends "base.html" %}
 {% import "_components.html" as a with context %}
 {% block main %}
-<section class="step">
+{% set is_author = actor == "A. Author" %}
+<section class="step draft">
 {{ a.screen_head(4, t.step_4, t.s5_lede) }}
-{% if undecided %}
 {{ a.data_table([t.draft_noael, ""], noael) }}
-{% call a.callout("note") %}<p><a href="/decide">{{ t.draft_decide }}</a></p>{% endcall %}
-{% call a.disclosure("final_text", text.split()|length, "words") %}<div class="card answer"><p class="answer-unit">{{ text }}</p></div>{% endcall %}
-{% else %}
-<div class="detail">
-{% call a.disclosure("final_text", body.words, "words") %}<div class="card answer"><div class="answer-unit">{{ a.prov(body.parts) }}</div>{{ a.prov_legend(body.kinds) }}</div><p class="meta prov-counts">{{ body.counts_line }}</p>{% endcall %}
-</div>
-<p>{{ t.draft_rules_line.format(passed=passed, total=rule_total) }}<br>{{ t.draft_judge_flags.format(n=flagged, judged=judged) if flagged else t.draft_judge_clean }}</p>
-<p class="meta">{{ t.draft_differ }}</p>
+{% if undecided %}{% call a.callout("note") %}<p><a href="/decide">{{ t.draft_decide }}</a></p>{% endcall %}{% endif %}
 {% if error %}{% call a.callout("blocked") %}<p>{{ error }}</p>{% endcall %}{% endif %}
+<p class="meta sheet-note">{{ t.draft_label }}{% if sheet.holes %} <span class="hl">{{ t.draft_hl }}</span> {{ t.draft_hl_note }}{% endif %}</p>
+<div class="sheetwrap">
+<article class="sheet" lang="en">
+<div class="sh-head"><span>Nonclinical Summary</span><span>DRAFT</span></div>
+<h1 class="sh-title">Nonclinical Summary</h1>
+<table class="sh-meta">
+{% for l1, c1, l2, c2 in sheet.meta %}<tr><th>{{ l1 }}</th><td>{{ a.sheet_parts(c1) }}</td><th>{{ l2 }}</th><td>{{ a.sheet_parts(c2) }}</td></tr>
+{% endfor %}</table>
+
+<h2>1. Study design</h2>
+<p>{{ a.sheet_parts(sheet.intro) }}</p>
+<table class="sh-tab">
+<thead><tr><th>Parameter</th><th>Value</th></tr></thead>
+<tbody>
+{% for label, cell in sheet.parameters %}<tr><td>{{ label }}</td><td>{{ a.sheet_parts(cell) }}</td></tr>
+{% endfor %}</tbody>
+</table>
+
+<h2>2. Recorded decisions</h2>
+<p>The following decisions on adversity of the findings were recorded.</p>
+<table class="sh-tab">
+<thead><tr><th class="sh-ref">Ref.</th><th>Recorded decision</th></tr></thead>
+<tbody>
+{% for slot, cell in sheet.decisions %}<tr><td>{{ slot }}</td><td>{{ a.sheet_parts(cell) }}</td></tr>
+{% endfor %}</tbody>
+</table>
+
+<h2>3. Toxicokinetics</h2>
+<p>{{ a.sheet_parts(sheet.tk_intro) }}</p>
+{% if sheet.tk_means %}<table class="sh-tab">
+<thead><tr><th>Quarantined value</th><th>Mean {{ sheet.tk_head }}</th></tr></thead>
+<tbody>
+{% for label, cell in sheet.tk_means %}<tr><td>{{ label }}</td><td>{{ a.sheet_parts(cell) }}</td></tr>
+{% endfor %}</tbody>
+</table>{% endif %}
+{% if sheet.tk_notes %}<ul>
+{% for note in sheet.tk_notes %}<li>{{ a.sheet_parts(note) }}</li>
+{% endfor %}</ul>{% endif %}
+
+<h2>4. No-observed-adverse-effect level (NOAEL)</h2>
+{% for n in sheet.noael %}<h3>{{ n.heading }}</h3>
+<p>{{ a.sheet_parts(n.text) }}</p>
+{% if n.quote %}<blockquote>{{ a.sheet_parts(n.quote) }}</blockquote>{% endif %}
+{% endfor %}
+<h2>References</h2>
+<ol>
+{% for g in sheet.guidelines %}<li>{{ g }}</li>
+{% endfor %}</ol>
+<div class="sh-foot"><span>{{ sheet.footer }}</span></div>
+</article>
+</div>
+{% if not undecided %}
+<p class="meta prov-counts">{{ sheet.counts_line }}</p>
+<p>{{ t.draft_rules_line.format(passed=passed, total=rule_total) }}<br>{{ t.draft_judge_flags.format(n=flagged, judged=judged) if flagged else t.draft_judge_clean }}</p>
+{% for reason in flags %}<p class="meta">{{ reason }}</p>{% endfor %}
+<p class="meta">{{ t.draft_differ }}</p>
 {% if approved_by %}{% call a.callout("rules") %}<p>{{ t.s5_approved }} {{ approved_by }}.</p>{% endcall %}
 <form method="post" action="/restart"><button type="submit">{{ t.s4_restart }}</button></form>
 {% else %}
-<form method="post" action="/draft/approve" class="controls"><input type="hidden" name="thread" value="{{ thread }}">
-<button type="submit" name="actor" value="A. Author">{{ t.s5_approve_as }} A. Author</button>
-<button type="submit" name="actor" value="R. Reviewer">{{ t.s5_approve_as }} R. Reviewer</button></form>
+<div class="card role-bar">
+<span class="label">{{ t.s4_role_label }}</span>
+<span class="role-toggle">
+<a class="seg{% if is_author %} on{% endif %}" href="/draft?actor=author&amp;thread={{ thread }}">{{ t.role_author }}</a>
+<a class="seg{% if not is_author %} on{% endif %}" href="/draft?actor=reviewer&amp;thread={{ thread }}">{{ t.role_reviewer }}</a>
+</span>
+<span class="meta">{{ t.s5_role_note }}</span>
+{% if is_author %}<span class="warn" role="alert">{{ t.s5_role_warn }}</span>{% endif %}
+<form method="post" action="/draft/approve" hx-post="/draft/approve" hx-target="main" hx-select="main" hx-swap="outerHTML"><input type="hidden" name="thread" value="{{ thread }}"><input type="hidden" name="actor" value="{{ actor }}">
+<button type="submit" class="sm{% if is_author %} locked{% endif %}">{{ t.s5_approve_as }} {{ t.role_author if is_author else t.role_reviewer }}</button></form>
+</div>
 {% endif %}
 {% endif %}
 {{ a.screen_nav(4, screens) }}

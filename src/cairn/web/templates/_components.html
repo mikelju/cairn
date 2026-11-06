@@ -131,4 +131,7 @@
 
 {% macro prov(parts) %}{% for p in parts %}{% if p.kind is defined %}{{ prov_tag(p) }}{% else %}{{ p.text }}{% endif %}{% endfor %}{% endmacro %}
 
+{# The same parts on the white sheet; a decision nobody has taken is a yellow gap. #}
+{% macro sheet_parts(parts) %}{% for p in parts %}{% if p.kind is defined %}{% if p.kind == "hole" %}<span class="hl">{{ p.text }}</span>{% else %}{{ prov_tag(p) }}{% endif %}{% else %}{{ p.text }}{% endif %}{% endfor %}{% endmacro %}
+
 {% macro prov_legend(kinds) %}{% if kinds %}<p class="prov-legend">{% for k in kinds %}<span class="prov-key prov-{{ k }}">{{ t["prov_legend_" ~ k] }}</span>{% endfor %}</p>{% endif %}{% endmacro %}

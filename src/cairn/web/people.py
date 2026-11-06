@@ -2,21 +2,21 @@
 
 import json
 import re
+from dataclasses import dataclass
 from typing import Annotated, Any, Literal
 
 import httpx
 from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastmcp import Client
-from markupsafe import Markup, escape
+from markupsafe import Markup
+from pydantic import TypeAdapter
 
-from cairn.content import QuoteRef, Text, ValueRef
+from cairn.content import DecisionRef, QuoteRef, Sentence, Text, ValueRef
 from cairn.decisions import (
     EXAMPLE,
     EXAMPLE_ACTOR,
     KEY_FINDING,
-    Decision,
-    apply_decisions,
     finding_key,
 )
 from cairn.gateway import DEFAULT_MODEL
@@ -29,11 +29,21 @@ from cairn.judge import (
     replay_judge,
 )
 from cairn.recording import RECORDINGS_DIR, ReplayClient, recorded_model, total_cost
-from cairn.render import render
 from cairn.verify import RULE_REASONS
 from cairn.web import _page as page
 from cairn.web import _recordings_dir, _step2_context, i18n, provenance
-from cairn.web.provenance import DecisionInfo, TextPart, number_tags, stray_numbers, tag_counts
+from cairn.web.i18n import CATALOGUES
+from cairn.web.provenance import (
+    DataTag,
+    DecisionInfo,
+    DecisionTag,
+    Part,
+    QuoteTag,
+    TextPart,
+    number_tags,
+    stray_numbers,
+    tag_counts,
+)
 from cairn.web.threads import (
     AUTHOR,
     REVIEWER,
@@ -51,6 +61,7 @@ from cairn.web.threads import (
     verify_audit,
 )
 from cairn.workflow import (
+    NONCLINICAL_SUMMARY,
     build_ledger,
     draft_key,
     final_ledger,
@@ -60,7 +71,7 @@ from cairn.workflow import (
 )
 
 people = APIRouter()
-EMPTY_SLOT = re.compile(r"\[((?:D\d+|NOAEL-[FM]): no decision yet)\]")
+HOLE = re.compile(r"\[?((?:D\d+|NOAEL-[FM]): no decision yet)\]?")
 
 
 def _dose(value: str) -> float | None:
@@ -107,17 +118,8 @@ async def _session_thread(request: Request, explicit: str | None = None) -> str:
     return str((await start(request))["thread_id"])
 
 
-async def _draft(request: Request, thread: str) -> Markup:
-    """The draft with the decisions placed so far; an empty slot is a dashed box."""
-    state = (await load_view(request, thread))[0]
-    ledger = build_ledger(state)
-    decisions = [Decision.model_validate(d) for d in state.get("decisions", [])]
-    apply_decisions(ledger, decisions, frozenset(state.get("confirmed", [])))
-    text = str(escape(render(sections_of(state), ledger)))
-    return Markup(EMPTY_SLOT.sub(r'<span class="slot">\1</span>', text))
-
-
 ROLE_KEYS: dict[str, str] = {AUTHOR: "role_author", REVIEWER: "role_reviewer"}
+SHORT_ROLES: dict[str, str] = {"author": AUTHOR, "reviewer": REVIEWER}
 
 
 def _decision_info(state: Any, t: dict[str, str]) -> dict[str, DecisionInfo]:
@@ -132,23 +134,150 @@ def _decision_info(state: Any, t: dict[str, str]) -> dict[str, DecisionInfo]:
     return {**found, "NOAEL-F": info(REVIEWER), "NOAEL-M": info(REVIEWER)}
 
 
-def _body(state: Any, t: dict[str, str]) -> dict[str, Any]:
-    """The final draft as tagged parts, the legend kinds used and the counts line."""
-    parts = provenance.draft_parts(
-        sections_of(state), final_ledger(state), _decision_info(state, t)
-    )
-    counts = tag_counts(parts)
-    kinds = [k for k in ("data", "quote", "decision") if counts[k]]
-    example = sum(getattr(p, "who", "") == t["prov_example"] for p in parts)
+@dataclass(frozen=True)
+class Hole:
+    """A decision nobody has taken yet: shown yellow on the sheet, never filled in."""
+
+    text: str
+    kind: str = "hole"
+
+
+def _marked(part: Part) -> Part | Hole:
+    found = HOLE.fullmatch(part.text) if isinstance(part, DecisionTag) else None
+    return Hole(found.group(1)) if found else part
+
+
+def _tags(parts: list[Part], column: str) -> list[DataTag]:
+    return [p for p in parts if isinstance(p, DataTag) and p.column == column]
+
+
+def _first(parts: list[Part], column: str) -> DataTag | None:
+    return next(iter(_tags(parts, column)), None)
+
+
+def _word(tag: DataTag | None, capital: bool = False) -> str:
+    """A controlled term as the plain English word, as the sentence shows it."""
+    if tag is None:
+        return ""
+    word = provenance.plain_terms([tag], CATALOGUES["en"])[0].text
+    return word[:1].upper() + word[1:] if capital else word
+
+
+def _listed(tags: list[DataTag], unit: str = "") -> list[Part]:
+    """The tags as 'a, b and c', then the unit."""
+    out: list[Part] = []
+    for i, tag in enumerate(tags):
+        if i:
+            out.append(TextPart(" and " if i == len(tags) - 1 else ", "))
+        out.append(tag)
+    return [*out, TextPart(f" {unit}")] if unit and out else out
+
+
+def _mean_rows(parts: list[Part]) -> list[tuple[str, DataTag]]:
+    """Each mean with the label the sentence gives it (including or excluding the quarantine)."""
+    rows: list[tuple[str, DataTag]] = []
+    for i, part in enumerate(parts[:-1]):
+        after = parts[i + 1].text.lower() if isinstance(parts[i + 1], TextPart) else ""
+        found = sorted((after.find(w), w) for w in ("including", "excluding") if w in after)
+        if isinstance(part, DataTag) and part.column == "mean" and found:
+            rows.append((f"{found[0][1].capitalize()} the quarantined value", part))
+    return rows
+
+
+def _by_section(state: Any) -> dict[str, list[Sentence]]:
+    adapter = TypeAdapter(list[Sentence])
+    saved = state.get("sections", {})
+    return {n: adapter.validate_python(saved.get(n, [])) for n in NONCLINICAL_SUMMARY.sections}
+
+
+NOAEL_HEADINGS = {"NOAEL-F": "Females", "NOAEL-M": "Males"}
+
+
+def _sheet(state: Any, t: dict[str, str]) -> dict[str, Any]:
+    """The draft as a document: sections from the recorded draft, tables from the same tags.
+
+    Every figure on the sheet is a tag (study value, quotation or decision); the headings and
+    references are fixed text. Counts come from the tags shown, so they match the page.
+    """
+    ledger, info, sections = final_ledger(state), _decision_info(state, t), _by_section(state)
+    shown: list[Part | Hole] = []
+
+    def show(parts: list[Part]) -> list[Part | Hole]:
+        marked = [_marked(p) for p in parts]
+        shown.extend(marked)
+        return marked
+
+    def prose(sentences: list[Sentence]) -> list[Part | Hole]:
+        return show(provenance.draft_parts(sentences, ledger, info))
+
+    def raw(name: str) -> list[Part]:
+        return [p for s in sections[name] for p in provenance.provenance_parts(s, ledger, info)]
+
+    design = raw("design")
+    study, animals = _tags(design, "study_id")[:1], _tags(design, "n_examined")[:1]
+    unit = next((x.text for x in _tags(design, "dose_unit")), "")
+    doses = _listed(_tags(design, "dose"), unit)
+    strain, kind = _word(_first(design, "strain")), _word(_first(design, "species"))
+    species = f"{strain} {kind}".strip()
+    route = _word(_first(design, "route"), capital=True)
+    meta = [
+        ("Study", show(list(study)), "Species", [TextPart(species)]),
+        ("Route", [TextPart(route)], "Animals", show(list(animals))),
+        ("Dose levels", show(doses), "Status", [TextPart("Draft for review")]),
+    ]
+    parameters = [
+        ("Animals", show([*animals, TextPart(f" {kind}")] if animals else [])),
+        ("Route of administration", [TextPart(route)]),
+        ("Dose levels", show(doses)),
+    ]
+    decisions = []
+    for sentence in sections["findings"]:
+        for tag in provenance.provenance_parts(sentence, ledger, info):
+            if isinstance(tag, DecisionTag):
+                decisions.append((tag.slot, show([tag])))
+    tk = raw("tk")
+    heads = _tags(tk, "test")[:1]
+    means = [(label, show([tag])) for label, tag in _mean_rows(tk)]
+    notes = sections["tk"][1:]
+    noael = []
+    guidelines: list[str] = []
+    for number, sentence in enumerate(sections["noael"], 1):
+        parts = provenance.draft_parts([sentence], ledger, info)
+        cut = next((i for i, p in enumerate(parts) if isinstance(p, QuoteTag)), len(parts))
+        guidelines += [p.guideline for p in parts[cut:] if isinstance(p, QuoteTag)]
+        slot = next((p.slot for p in sentence.parts if isinstance(p, DecisionRef)), "")
+        noael.append(
+            {
+                "heading": f"4.{number} {NOAEL_HEADINGS.get(slot, slot)}",
+                "text": show(parts[:cut]),
+                "quote": show(parts[cut:]),
+            }
+        )
+    tags = [p for p in shown if not isinstance(p, Hole)]
+    counts = tag_counts(tags)
+    example = sum(getattr(p, "who", "") == t["prov_example"] for p in tags)
     line = t["draft_counts"].format(
-        numbers=number_tags(parts),
-        ai=stray_numbers(parts),
+        numbers=number_tags(tags),
+        ai=stray_numbers(tags),
         decisions=counts["decision"] - example,
         example=example,
         quotes=counts["quote"],
     )
-    words = len("".join(p.text for p in parts).split())
-    return {"parts": parts, "kinds": kinds, "counts_line": line, "words": words}
+    return {
+        "meta": meta,
+        "parameters": parameters,
+        "decisions": decisions,
+        "intro": prose(sections["design"]),
+        "tk_intro": prose(sections["tk"][:1]),
+        "tk_head": _word(heads[0]) if heads else "",
+        "tk_means": means,
+        "tk_notes": [prose([s]) for s in notes],
+        "noael": noael,
+        "guidelines": list(dict.fromkeys(guidelines)),
+        "footer": CATALOGUES["en"]["footer_note"],
+        "holes": any(isinstance(p, Hole) for p in shown),
+        "counts_line": line,
+    }
 
 
 def _incidence(state: Any, sex: str) -> list[tuple[float, int, int]]:
@@ -422,10 +551,9 @@ async def restart(request: Request) -> Response:
     return _remember(RedirectResponse("/decide", status_code=303), thread)
 
 
-async def _undecided(request: Request, thread: str, view: dict[str, Any], actor: str) -> Response:
-    """The draft page while the decisions are still open: gaps stay visible, nothing is invented."""
-    t = i18n.context(request)["t"]
-    noael = [
+def _noael_rows(view: dict[str, Any], t: dict[str, str]) -> list[list[str]]:
+    """The NOAEL of each sex as the rule gives it once confirmed, else 'not decided yet'."""
+    return [
         [
             f"{t['draft_noael']} {sex}",
             f"{n['dose']:g} mg/kg/day"
@@ -434,6 +562,12 @@ async def _undecided(request: Request, thread: str, view: dict[str, Any], actor:
         ]
         for sex, n in view["noael"].items()
     ]
+
+
+async def _undecided(request: Request, thread: str, view: dict[str, Any], actor: str) -> Response:
+    """The draft page while the decisions are still open: gaps stay visible, nothing is invented."""
+    t = i18n.context(request)["t"]
+    state = (await load_view(request, thread))[0]
     response = page(
         request,
         "draft.html",
@@ -441,8 +575,8 @@ async def _undecided(request: Request, thread: str, view: dict[str, Any], actor:
         actor=actor,
         thread=thread,
         undecided=True,
-        noael=noael,
-        text=await _draft(request, thread),
+        noael=_noael_rows(view, t),
+        sheet=_sheet(state, t),
     )
     return _remember(response, thread)
 
@@ -537,7 +671,9 @@ async def _draft_page(request: Request, thread: str, actor: str, error: str = ""
         thread=thread,
         undecided=False,
         error=error,
-        body=_body(state, t),
+        sheet=_sheet(state, t),
+        noael=_noael_rows(view, t),
+        flags=[r["reason"] for r in view["judge"] if r["verdict"] == "overstated"],
         approved_by=view["approved_by"],
         meta=(
             f"{recording['date']} | {recording['region']} | {recording['model']} | "
@@ -604,7 +740,7 @@ async def landing(request: Request) -> Response:
 @people.get("/draft", response_class=HTMLResponse)
 async def draft(request: Request, thread: str | None = None, actor: str = REVIEWER) -> Response:
     thread = await _session_thread(request, thread)
-    return await _draft_page(request, thread, _actor(actor))
+    return await _draft_page(request, thread, _actor(SHORT_ROLES.get(actor, actor)))
 
 
 @people.post("/draft/approve", response_class=HTMLResponse)
