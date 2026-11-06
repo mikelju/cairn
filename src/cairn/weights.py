@@ -107,4 +107,10 @@ def load_embedder(models: Path | None = None) -> Any:
     from fastembed import TextEmbedding
 
     folder = verify_model(EMBEDDER, models or models_dir())
-    return TextEmbedding(EMBEDDER, specific_model_path=str(folder), local_files_only=True)
+    # The ONNX CPU arena would keep the peak of the largest batch; the host has 2 GB.
+    return TextEmbedding(
+        EMBEDDER,
+        specific_model_path=str(folder),
+        local_files_only=True,
+        enable_cpu_mem_arena=False,
+    )

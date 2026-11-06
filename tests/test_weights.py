@@ -94,6 +94,22 @@ def test_weights_embedder_loads_offline() -> None:
     assert vector.shape == (384,)
 
 
+def test_weights_embedder_disables_the_cpu_memory_arena(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import fastembed
+
+    seen: dict[str, Any] = {}
+
+    class Spy:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            seen.update(kwargs)
+
+    monkeypatch.setattr(fastembed, "TextEmbedding", Spy)
+    weights.load_embedder()
+    assert seen["enable_cpu_mem_arena"] is False
+
+
 def test_weights_reranker_loads_offline_with_the_retrieval_threads(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

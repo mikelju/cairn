@@ -36,9 +36,13 @@ TOP = 5
 # int8 dynamic quantisation makes a pair's score depend on its batch (measured up to 0.59 between
 # batch compositions, E138), so each pair is scored alone: the score no longer depends on the
 # order of the candidates, which can shift when near-tied RRF scores resolve differently.
-# Four threads were measured faster than the 12 of this laptop (oversubscription); scores agree.
+# One thread: the host has one vCPU, where a warm search takes 17-18 s with 1 thread against
+# 41-53 s with 4 (the live page times out at 55 s); scores agree across thread counts.
 RERANK_BATCH = 1
-RERANK_THREADS = 4
+RERANK_THREADS = 1
+# One batch of all passages padded to 512 tokens needs about 3 GiB and the host has 2 GB; 16 changes
+# vectors beyond the cache tolerance, so do not go lower.
+EMBED_BATCH = 32
 # Reranker logits span about -10..10; the same query agrees to this absolute tolerance across runs
 # on the same platform (across platforms see PLATFORM_RERANK_TOLERANCE). The abstention margin
 # (half the gap between the calibration ranges) is far larger.
@@ -211,7 +215,7 @@ def build_index(path: Path = PASSAGES_PATH, models: Path | None = None) -> Index
     retriever = bm25s.BM25()
     retriever.index(corpus, show_progress=False)
     embedder = weights.load_embedder(models)
-    vectors = np.asarray(list(embedder.embed(texts)), dtype=np.float64)
+    vectors = np.asarray(list(embedder.embed(texts, batch_size=EMBED_BATCH)), dtype=np.float64)
     return Index(
         ids=ids,
         retriever=retriever,

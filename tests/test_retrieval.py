@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from cairn import retrieval
+from cairn import retrieval, weights
 
 pytestmark = pytest.mark.usefixtures("block_sockets")
 
@@ -15,6 +15,21 @@ pytestmark = pytest.mark.usefixtures("block_sockets")
 @pytest.fixture(scope="module")
 def index() -> retrieval.Index:
     return retrieval.build_index()
+
+
+def test_retrieval_build_index_embeds_in_bounded_batches(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: dict[str, Any] = {}
+
+    class Spy:
+        def embed(self, texts: list[str], **kwargs: Any) -> Any:
+            seen.update(kwargs)
+            return iter([[0.0] * 384 for _ in texts])
+
+    monkeypatch.setattr(weights, "load_embedder", lambda models=None: Spy())
+    retrieval.build_index()
+    assert seen["batch_size"] == retrieval.EMBED_BATCH == 32
 
 
 def test_retrieval_sockets_blocked() -> None:
