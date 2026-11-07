@@ -22,4 +22,4 @@
 {{ a.screen_nav(2, screens) }}
 </section>
 {% endblock %}
-{% block scripts %}<script src="/static/ask.js"></script>{% if live %}<script src="/static/live.js"></script>{% endif %}{% endblock %}
+{% block scripts %}<script src="{{ static_url('ask.js') }}"></script>{% if live %}<script src="{{ static_url('live.js') }}"></script>{% endif %}{% endblock %}

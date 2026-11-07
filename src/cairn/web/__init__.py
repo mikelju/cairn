@@ -1,8 +1,10 @@
 """Web pages: landing page, steps 1 and 2 and /healthz, rendered with Jinja2 and local HTMX."""
 
+import hashlib
+import mimetypes
 import os
 import subprocess
-from functools import lru_cache
+from functools import cache, lru_cache
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -48,6 +50,21 @@ from cairn.web.threads import threads
 HERE = Path(__file__).parent
 templates = Jinja2Templates(directory=HERE / "templates")
 router = APIRouter()
+mimetypes.add_type("font/woff2", ".woff2")  # slim Linux images may not know it
+
+
+def file_digest(path: Path) -> str:
+    """Short content hash: it changes only when the file changes."""
+    return hashlib.sha256(path.read_bytes()).hexdigest()[:10]
+
+
+@cache
+def static_url(name: str) -> str:
+    """Own static file URL carrying its content hash, so a changed file is never served stale."""
+    return f"/static/{name}?v={file_digest(HERE / 'static' / name)}"
+
+
+templates.env.globals["static_url"] = static_url
 SCREENS = ((1, "/study"), (2, "/ask"), (3, "/decide"), (4, "/draft"))
 
 

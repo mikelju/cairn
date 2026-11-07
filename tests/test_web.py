@@ -1462,3 +1462,33 @@ def test_language_links_on_the_author_refusal_page_keep_the_actor_and_the_thread
     assert href is not None
     link = unescape(href.group(1))
     assert "actor=A.+Author" in link and f"thread={thread}" in link
+
+
+def test_stylesheet_url_carries_the_content_hash_of_the_file() -> None:
+    from cairn.web import file_digest
+
+    css = HERE / "static" / "cairn.css"
+    with TestClient(create_app()) as client:
+        page = client.get("/study").text
+        link = f"/static/cairn.css?v={file_digest(css)}"
+        assert f'href="{link}"' in page
+        assert client.get(link).status_code == 200
+
+
+def test_file_digest_changes_only_when_the_content_changes(tmp_path: Path) -> None:
+    from cairn.web import file_digest
+
+    sheet = tmp_path / "a.css"
+    sheet.write_text("body{}", encoding="utf-8")
+    first = file_digest(sheet)
+    assert file_digest(sheet) == first
+    sheet.write_text("body{color:red}", encoding="utf-8")
+    assert file_digest(sheet) != first
+
+
+def test_woff2_fonts_are_served_as_font_woff2() -> None:
+    font = next((HERE / "static" / "fonts").glob("*.woff2"))
+    with TestClient(create_app()) as client:
+        reply = client.get(f"/static/fonts/{font.name}")
+    assert reply.status_code == 200
+    assert reply.headers["content-type"] == "font/woff2"

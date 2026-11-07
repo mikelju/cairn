@@ -350,7 +350,7 @@ def test_live_form_waits_visibly_and_cannot_be_sent_twice(live_box: LiveFake) ->
     ):
         assert attribute in form
     assert 'id="live-wait"' in page and "Waiting for the answer..." in page
-    assert '<script src="/static/live.js">' in page
+    assert '<script src="/static/live.js?v=' in page
     with TestClient(create_app()) as client:
         assert "Esperando respuesta..." in client.get("/ask?lang=es").text
 
