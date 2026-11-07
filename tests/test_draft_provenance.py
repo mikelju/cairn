@@ -156,24 +156,28 @@ def test_without_tags_the_draft_has_no_digit_but_the_fixed_words(
 def test_the_counts_line_equals_the_rendered_tags(
     lang: str, tail: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    page, _parts = _draft(monkeypatch, tmp_path, lang)
+    page, _parts, every = _draft_all(monkeypatch, tmp_path, lang)
     shown = _parse(page).tags
-    # The sheet repeats tags in its tables; the line counts the tags as they are shown.
-    with_digits = sum(t["kind"] == "data" and bool(re.search(r"\d", t["chip"])) for t in shown)
-    assert with_digits > 0 and with_digits == sum(t["kind"] == "data" for t in shown)
+    # The sheet repeats tags in its tables; the line counts each figure, quotation and decision
+    # once, ids such as PDS2014 are not numbers and the preloaded examples are not people.
+    figures = {
+        (_squash(t["chip"]), _squash(t["body"]))
+        for t in shown
+        if t["kind"] == "data" and re.fullmatch(r"-?\d[\d,]*(?:\.\d+)?", t["chip"].strip())
+    }
+    assert len(figures) > 0 and len(figures) < sum(t["kind"] == "data" for t in shown)
     outside = _strip_tags(page)
     for word in FIXED_DIGIT_WORDS:
         outside = outside.replace(word, "")
     stray = len(re.findall(r"\d+(?:[.,]\d+)*", outside))
     line = _squash(re.search(r'<p class="meta prov-counts">(.*?)</p>', page, re.S).group(1))  # type: ignore[union-attr]
     numbers = [int(n) for n in re.findall(r"\d+", line)]
-    decisions = [t for t in shown if t["kind"] == "decision"]
-    example = sum(
-        "Preloaded example" in t["body"] or "Ejemplo precargado" in t["body"] for t in decisions
-    )
-    assert example > 0
-    quotes = sum(t["kind"] == "quote" for t in shown)
-    assert numbers == [with_digits, stray, len(decisions) - example, example, quotes]
+    slots = [p for p in every if isinstance(p, DecisionTag)]
+    example = {p.slot for p in slots if p.who in ("Preloaded example", "Ejemplo precargado")}
+    people = {p.slot for p in slots if p.who and p.slot not in example}
+    assert example and people
+    quotes = {_squash(t["body"]) for t in shown if t["kind"] == "quote"}
+    assert numbers == [len(figures), stray, len(people), len(example), len(quotes)]
     assert tail in line
 
 
@@ -197,7 +201,7 @@ def test_draft_shows_sex_and_species_as_english_words_not_chips(
     chips = [t["chip"] for t in _parse(page).tags if t["kind"] == "data"]
     assert not {"F", "M", "RAT"} & {c.strip() for c in chips}
     text = "".join(p.text for p in parts if isinstance(p, TextPart))
-    assert re.search(r"\brat\b", text) and "oral gavage" in text and "Sprague-Dawley" in text
+    assert "Sprague-Dawley rats were" in text and "oral gavage" in text
     assert not re.search(r"\b(?:F|M|RAT)\b", text)
 
 

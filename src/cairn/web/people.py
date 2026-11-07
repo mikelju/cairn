@@ -3,7 +3,7 @@
 import json
 import re
 from dataclasses import dataclass
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any
 
 import httpx
 from fastapi import APIRouter, Form, HTTPException, Request
@@ -12,7 +12,7 @@ from fastmcp import Client
 from markupsafe import Markup
 from pydantic import TypeAdapter
 
-from cairn.content import DecisionRef, QuoteRef, Sentence, Text, ValueRef
+from cairn.content import DecisionRef, Sentence, Text
 from cairn.decisions import (
     EXAMPLE,
     EXAMPLE_ACTOR,
@@ -257,15 +257,17 @@ def _sheet(state: Any, t: dict[str, str]) -> dict[str, Any]:
     intro, tk_intro = prose(sections["design"]), prose(sections["tk"][:1])
     tk_notes = [prose([s]) for s in notes]
     tags = [p for p in shown if not isinstance(p, Hole)]
-    counts = tag_counts(tags)
-    example = sum(getattr(p, "who", "") == t["prov_example"] for p in tags)
-    line = t["draft_counts"].format(
-        numbers=number_tags(tags),
-        ai=stray_numbers(tags),
-        decisions=counts["decision"] - example,
-        example=example,
-        quotes=counts["quote"],
-    )
+    decided = [p for p in tags if isinstance(p, DecisionTag)]
+    # A preloaded example is never a person's decision, whatever the actor field says.
+    counts = {
+        "numbers": number_tags(tags),
+        "quotes": tag_counts(tags)["quote"],
+        "decisions": tag_counts([p for p in decided if p.who and p.who != t["prov_example"]])[
+            "decision"
+        ],
+        "example": tag_counts([p for p in decided if p.who == t["prov_example"]])["decision"],
+    }
+    line = t["draft_counts"].format(ai=stray_numbers(tags), **counts)
     return {
         "meta": meta,
         "parameters": parameters,
@@ -280,6 +282,7 @@ def _sheet(state: Any, t: dict[str, str]) -> dict[str, Any]:
         "footer": CATALOGUES["en"]["footer_note"],
         "holes": any(isinstance(p, Hole) for p in shown),
         "counts_line": line,
+        "counts": counts,
     }
 
 
@@ -508,45 +511,6 @@ async def _choose(
     return None
 
 
-@people.post("/decide/confirm", response_model=None)
-async def decide_confirm(
-    request: Request,
-    actor: Annotated[str, Form()],
-    thread: Annotated[str | None, Form()] = None,
-    sex: Annotated[str, Form()] = "",
-) -> Response:
-    who = _actor(actor)
-    thread = await _session_thread(request, thread)
-    if sex not in ("", "F", "M"):
-        raise HTTPException(status_code=422, detail="unknown sex")
-    sexes: list[Literal["F", "M"]] = [sex] if sex else ["F", "M"]  # type: ignore[list-item]
-    t = i18n.context(request)["t"]
-    _, waiting, view = await load_view(request, thread)
-    if waiting == "await_decisions":
-        keyed = {s["slot"]: s["sex"] for s in view["slots"] if s["finding"] == KEY_FINDING}
-        decided = {keyed[d["dec_id"]] for d in view["decisions"] if d["dec_id"] in keyed}
-        if missing := [x for x in sexes if x not in decided]:
-            names = " / ".join(t["s1_sex_" + x] for x in missing)
-            reason = t["confirm_err_undecided"].format(sex=names)
-            return await _decide_page(
-                request, thread, t["confirm_error"].format(detail=reason), 409
-            )
-    try:
-        await confirm(request, thread, Confirm(actor=who, confirmed=sexes))
-    except HTTPException as refusal:
-        if refusal.status_code != 409:
-            raise
-        if refusal.detail == "verify_final is not green":
-            reason = t["confirm_err_verify"]
-            return await _decide_page(
-                request, thread, t["confirm_error"].format(detail=reason), 409
-            )
-        return _remember(_current(who), thread)
-    if (await get_thread(request, thread))["waiting"] == "await_decisions":
-        return _remember(RedirectResponse("/decide", status_code=303), thread)
-    return _remember(_current(who), thread)
-
-
 @people.post("/restart")
 async def restart(request: Request) -> Response:
     """Start over: a new thread replaces the one in the cookie."""
@@ -649,6 +613,7 @@ async def _draft_page(request: Request, thread: str, actor: str, error: str = ""
     parts = [p for s in sections_of(state) for p in s.parts]
     by_model = sum(c.isdigit() for p in parts if isinstance(p, Text) for c in p.text)
     over_mcp, over_rest = await _two_doors(request)
+    sheet = _sheet(state, t)  # the Inside counts come from the same tags as the sheet's line
     session = [
         [
             t["s7_draft"],
@@ -674,7 +639,7 @@ async def _draft_page(request: Request, thread: str, actor: str, error: str = ""
         thread=thread,
         undecided=False,
         error=error,
-        sheet=_sheet(state, t),
+        sheet=sheet,
         noael=_noael_rows(view, t),
         flags=[r["reason"] for r in view["judge"] if r["verdict"] == "overstated"],
         approved_by=view["approved_by"],
@@ -702,10 +667,10 @@ async def _draft_page(request: Request, thread: str, actor: str, error: str = ""
         ),
         chain_ok=chain["ok"],
         session=session,
-        numbers=sum(isinstance(p, ValueRef) for p in parts),
+        numbers=sheet["counts"]["numbers"],
         by_model=by_model,
-        quotes=sum(isinstance(p, QuoteRef) for p in parts),
-        decisions=len(view["decisions"]),
+        quotes=sheet["counts"]["quotes"],
+        decisions=sheet["counts"]["decisions"],
         doors=[["MCP", over_mcp[:16]], ["REST", over_rest[:16]]],
         same=over_mcp == over_rest,
         links=[(t[key], href) for key, href in STEP7_LINKS],

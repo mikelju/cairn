@@ -288,7 +288,16 @@ def plain_terms(parts: list[Part], t: Mapping[str, str]) -> list[Part]:
             add(gap.text[1:])
             i += 3
             continue
-        add(_word(part, t))
+        word = _word(part, t)
+        counted = out[-2] if len(out) >= 2 else None
+        if (  # after a count of animals the species is plural: "124 Sprague-Dawley rats"
+            part.column == "species"
+            and isinstance(counted, DataTag)
+            and counted.column == "n_examined"
+            and counted.text.strip() != "1"
+        ):
+            word += "s"
+        add(word)
         i += 1
     return out
 
@@ -338,13 +347,29 @@ def stray_numbers(parts: list[Part]) -> int:
     return len(NUMBER.findall(text))
 
 
+FIGURE = re.compile(r"-?\d[\d,]*(?:\.\d+)?")
+
+
+def _origin(tag: DataTag | QuoteTag | DecisionTag) -> tuple[Any, ...]:
+    """What a tag points at: the same origin shown twice is one figure, quotation or decision."""
+    if isinstance(tag, DataTag):
+        return (tag.text, tag.tool, tag.column, tag.population)
+    if isinstance(tag, QuoteTag):
+        return (tag.guideline, tag.section, tag.page, tuple(tag.sentence_ids))
+    return (tag.slot,)
+
+
 def number_tags(parts: list[Part]) -> int:
-    """How many data tags show a number; a name or a unit such as RAT or mg/kg is not one."""
-    return sum(isinstance(p, DataTag) and bool(re.search(r"\d", p.text)) for p in parts)
+    """How many distinct figures the data tags show; an id (PDS2014) or a name is not one."""
+    return len(
+        {_origin(p) for p in parts if isinstance(p, DataTag) and FIGURE.fullmatch(p.text.strip())}
+    )
 
 
 def tag_counts(parts: list[Part]) -> dict[str, int]:
-    """How many tags of each kind: data, quote and decision."""
-    return {
-        k: sum(getattr(p, "kind", "") == k for p in parts) for k in ("data", "quote", "decision")
-    }
+    """How many distinct tags of each kind: data, quote and decision (one per origin)."""
+    found: dict[str, set[tuple[Any, ...]]] = {"data": set(), "quote": set(), "decision": set()}
+    for p in parts:
+        if isinstance(p, DataTag | QuoteTag | DecisionTag):
+            found[p.kind].add(_origin(p))
+    return {k: len(v) for k, v in found.items()}

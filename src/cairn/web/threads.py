@@ -163,6 +163,10 @@ async def _record(request: Request, thread_id: str, body: Record) -> dict[str, A
     graph, config, state, waiting = await _load(request, thread_id)
     if detail := _at(waiting, "await_decisions"):
         await _refuse(request, thread_id, body.actor, "decisions", 409, detail)
+    if body.actor != REVIEWER or body.actor == state.get("author"):
+        await _refuse(
+            request, thread_id, body.actor, "decisions", 403, "Only the reviewer decides."
+        )
     slots = {s.slot: s for s in enumerate_slots(build_ledger(state))}
     now = _now()
     records = []

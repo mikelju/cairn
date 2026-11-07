@@ -31,11 +31,6 @@
 </footer>
 {% endmacro %}
 
-{% macro page_header(title, sentence) %}
-<h1>{{ title }}</h1>
-<p class="lede">{{ sentence }}</p>
-{% endmacro %}
-
 {# One screen of four: the counter, the title and the lede; screen_nav closes it with Back and Next. #}
 {% macro screen_head(number, title, sentence) %}
 <p class="stepcount">{{ t.step_counter.format(n=number) }}</p>
@@ -93,9 +88,7 @@
 {# A disclosure pill without a size: the label alone, for a note whose length is not the point. #}
 {% macro pill(key) %}<details class="pill"><summary class="pill">{{ t["disc_" ~ key] }}</summary>{{ caller() }}</details>{% endmacro %}
 
-{# Reading cues: a numbered path for the page header and matching number badges on the parts it names. #}
-{% macro reading_path(labels, label) %}<ol class="path" aria-label="{{ label }}">{% for text in labels %}<li><span class="cue solid" aria-hidden="true">{{ loop.index }}</span>{{ text }}</li>{% endfor %}</ol>{% endmacro %}
-
+{# A reading cue: a number badge on a part of the page. #}
 {% macro cue(number) %}<span class="cue" aria-hidden="true">{{ number }}</span>{% endmacro %}
 
 {# A highlighted figure: number big, label small, an optional cue that the reading path names. #}
@@ -133,5 +126,3 @@
 
 {# The same parts on the white sheet; a decision nobody has taken is a yellow gap. #}
 {% macro sheet_parts(parts) %}{% for p in parts %}{% if p.kind is defined %}{% if p.kind == "hole" %}<span class="hl">{{ p.text }}</span>{% else %}{{ prov_tag(p) }}{% endif %}{% else %}{{ p.text }}{% endif %}{% endfor %}{% endmacro %}
-
-{% macro prov_legend(kinds) %}{% if kinds %}<p class="prov-legend">{% for k in kinds %}<span class="prov-key prov-{{ k }}">{{ t["prov_legend_" ~ k] }}</span>{% endfor %}</p>{% endif %}{% endmacro %}

@@ -18,6 +18,16 @@ from cairn.fetch import VENDORED_DIR
 from cairn.ingest import DEFAULT_DB, ingest
 from cairn.web import HERE, i18n
 from cairn.web.i18n import COOKIE
+from cairn.web.people import _mean_rows
+from cairn.web.provenance import (
+    DataTag,
+    DecisionTag,
+    SourceTable,
+    TextPart,
+    number_tags,
+    plain_terms,
+    tag_counts,
+)
 from screens import LANGS, STATE_MARKERS, main_copy, rendered_state
 
 
@@ -752,7 +762,6 @@ def test_decide_pages_redirect_on_409_and_reject_bad_input() -> None:
         for reply in (
             client.get("/draft?actor=Mallory"),
             client.post("/draft/approve", data={"actor": "Mallory"}),
-            client.post("/decide/confirm", data={"actor": "Mallory"}),
         ):
             assert reply.status_code == 422
         client.cookies.clear()
@@ -1151,14 +1160,10 @@ def test_change_before_confirming_and_start_over() -> None:
         assert _decisions(client) == []
 
 
-def test_confirm_refusals_are_shown_not_redirected() -> None:
+def test_decide_confirm_route_is_gone() -> None:
     with TestClient(create_app(), follow_redirects=False) as client:
-        client.cookies.set(COOKIE, "en")
-        client.get("/decide")
-        none = client.post("/decide/confirm", data={"actor": "R. Reviewer", "sex": "F"})
-        assert none.status_code == 409 and "has no decision yet" in none.text
-        both = client.post("/decide/confirm", data={"actor": "R. Reviewer"})
-        assert both.status_code == 409 and "has no decision yet" in both.text
+        reply = client.post("/decide/confirm", data={"actor": "A. Author", "sex": "F"})
+        assert reply.status_code in (404, 405)
 
 
 def test_noael_unit_is_per_day_on_decide_and_draft() -> None:
@@ -1346,3 +1351,114 @@ def test_no_screen_has_upper_case_send_terms_outside_the_prose() -> None:
             copy = main_copy(rendered_state(state, lang), prose=False)
             shown = re.sub(r"PDS2014-\d+|\b(GLOSSARY|REFERENCES)\b", "", copy)
             assert set(re.findall(r"\b[A-Z]{3,}\b", shown)) <= allowed, (state, lang)
+
+
+def _tag(text: str, column: str = "n", tool: str = "tool", population: str = "all") -> DataTag:
+    table = SourceTable([column], [[text]], (0, 0))
+    return DataTag(text, tool, column, population, table, [], 0)
+
+
+def test_species_after_a_count_of_animals_is_plural() -> None:
+    en = i18n.CATALOGUES["en"]
+    count, strain = _tag("124", "n_examined"), _tag("Sprague-Dawley", "strain")
+    species = _tag("RAT", "species")
+    many = plain_terms([count, TextPart(" "), strain, TextPart(" "), species], en)
+    assert "".join(p.text for p in many[1:]) == " Sprague-Dawley rats"
+    one = plain_terms([_tag("1", "n_examined"), TextPart(" "), species], en)
+    assert "".join(p.text for p in one[1:]) == " rat"
+    assert plain_terms([species], en)[0].text == "rat"  # alone it stays singular
+
+
+def test_draft_sentence_says_rats_after_the_count() -> None:
+    with TestClient(create_app()) as client:
+        client.cookies.set(COOKIE, "en")
+        _filled(client)
+        page = unescape(client.get("/draft").text)
+    assert "Sprague-Dawley rats were dosed" in page and "rat were dosed" not in page
+
+
+def test_number_tags_count_distinct_figures_and_never_ids() -> None:
+    parts = [
+        _tag("PDS2014", "study_id"),
+        _tag("PDS2014-0032", "usubjid"),
+        _tag("124", "n_examined"),
+        _tag("124", "n_examined"),  # the same figure again is not a new one
+        _tag("124", "n_other"),  # the same value from another source is
+        _tag("12.5", "mean"),
+        _tag("RAT", "species"),
+    ]
+    assert number_tags(parts) == 3  # type: ignore[arg-type]
+
+
+def test_tag_counts_are_distinct_per_origin() -> None:
+    def decision(slot: str) -> DecisionTag:
+        return DecisionTag("20", slot, "R. Reviewer", "Reviewer", "20")
+
+    found = tag_counts([decision("D1"), decision("D1"), decision("D2"), _tag("5")])
+    assert found == {"data": 1, "quote": 0, "decision": 2}
+
+
+def test_draft_counts_line_and_inside_panel_agree_and_examples_are_not_people() -> None:
+    with TestClient(create_app()) as client:
+        client.cookies.set(COOKIE, "en")
+        _filled(client)
+        page = client.get("/draft").text
+    line = re.search(
+        r"(\d+) numbers placed by code, (\d+) by the AI, (\d+) decisions by people, "
+        r"(\d+) from preloaded examples, (\d+) quotations",
+        page,
+    )
+    assert line is not None
+    numbers, _, people, examples, quotes = (int(x) for x in line.groups())
+    tile = r'<span class="num">(\d+)</span><span class="lbl">'
+    inside = {
+        key: re.search(tile + label, page)
+        for key, label in (
+            ("numbers", "numbers by code"),
+            ("quotes", "quotes verbatim"),
+            ("decisions", "decisions by people"),
+        )
+    }
+    assert all(found is not None for found in inside.values())
+    assert [int(f.group(1)) for f in inside.values() if f] == [numbers, quotes, people]
+    assert examples == 9 and people == 4  # two decisions and two NOAELs, never the examples
+
+
+def test_mean_rows_follow_the_including_excluding_wording() -> None:
+    first, second = _tag("11.2", "mean"), _tag("10.8", "mean")
+    parts = [
+        TextPart("Mean "),
+        first,
+        TextPart(" including the quarantined value, "),
+        second,
+        TextPart(" excluding it."),
+    ]
+    assert _mean_rows(parts) == [  # type: ignore[arg-type]
+        ("Including the quarantined value", first),
+        ("Excluding the quarantined value", second),
+    ]
+
+
+@pytest.mark.parametrize(("path", "actor"), [("/decide", "reviewer"), ("/draft", "author")])
+def test_language_links_keep_the_actor_and_the_thread(path: str, actor: str) -> None:
+    with TestClient(create_app()) as client:
+        client.cookies.set(COOKIE, "en")
+        thread = _filled(client)
+        page = client.get(f"{path}?actor={actor}&thread={thread}").text
+    for code in ("es", "en"):
+        href = re.search(rf'<a href="([^"]+)" hreflang="{code}"', page)
+        assert href is not None
+        link = unescape(href.group(1))
+        assert f"actor={actor}" in link and f"thread={thread}" in link and f"lang={code}" in link
+
+
+def test_language_links_on_the_author_refusal_page_keep_the_actor_and_the_thread() -> None:
+    with TestClient(create_app()) as client:
+        client.cookies.set(COOKIE, "en")
+        thread = _filled(client)
+        reply = client.post("/draft/approve", data={"actor": "A. Author", "thread": thread})
+    assert reply.status_code == 403
+    href = re.search(r'<a href="([^"]+)" hreflang="es"', reply.text)
+    assert href is not None
+    link = unescape(href.group(1))
+    assert "actor=A.+Author" in link and f"thread={thread}" in link
