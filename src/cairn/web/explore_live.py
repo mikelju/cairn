@@ -2,9 +2,11 @@
 
 This is the only web module that reaches Bedrock (decision D8 reversed for this one route).
 Without the code, with a wrong code, over the length limit or at the cap it makes no model call.
+The daily spend counter lives in process memory: it resets if the container restarts.
 """
 
 import hmac
+import logging
 import math
 import os
 import threading
@@ -14,14 +16,14 @@ from typing import Annotated
 from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse
 
-from cairn import live
+from cairn import live, tools
 from cairn.gateway import DEFAULT_MODEL, REGION
 from cairn.loop import LoopStatus
 from cairn.pricing import call_cost
-from cairn.questions import QUESTIONS
 from cairn.tools import LIVE_SEARCH
-from cairn.web import result_context, templates
+from cairn.web import i18n, result_context, templates
 
+log = logging.getLogger(__name__)
 explore_live = APIRouter()
 MAX_QUESTION_CHARS = 500
 DEFAULT_CAP_USD = 2.0
@@ -58,29 +60,35 @@ def _add_spend(amount: float) -> None:
     _spend[today] = _spend.get(today, 0.0) + amount
 
 
-def _refused(request: Request, message: str) -> HTMLResponse:
-    context = {"refused": message, "questions": QUESTIONS}
-    return templates.TemplateResponse(request, "explore_refused.html", context)
+def _refused(request: Request, key: str, **values: object) -> HTMLResponse:
+    """A refusal in the visitor's language: `key` names a catalogue message."""
+    shell = i18n.context(request)
+    message = shell["t"][key].format(**values)
+    return templates.TemplateResponse(
+        request, "explore_refused.html", {**shell, "refused": message}
+    )
 
 
 @explore_live.post("/explore/live", response_class=HTMLResponse)
 def explore_ask_live(
     request: Request,
-    question: Annotated[str, Form()],
+    question: Annotated[str, Form()] = "",
     code: Annotated[str, Form()] = "",
 ) -> HTMLResponse:
     question = question.strip()
     if not code_ok(code):
-        return _refused(request, "Live questions need the access code. Try a recorded question.")
-    if not question or len(question) > MAX_QUESTION_CHARS:
-        return _refused(request, f"A question has 1 to {MAX_QUESTION_CHARS} characters.")
+        return _refused(request, "live_need_code")
+    if not question:
+        return _refused(request, "live_empty")
+    if len(question) > MAX_QUESTION_CHARS:
+        return _refused(request, "live_length", n=MAX_QUESTION_CHARS)
     if spent_today() >= daily_cap():
-        return _refused(request, "The daily live budget is used up. Try a recorded question.")
+        return _refused(request, "live_budget")
     if not _busy.acquire(blocking=False):
-        return _refused(request, "Another live question is running. Try again in a minute.")
-    try:
+        return _refused(request, "live_busy")
+    try:  # whatever happens, the lock is released and the visitor gets a 200 with a message
         if spent_today() >= daily_cap():  # a question that just finished may have used it up
-            return _refused(request, "The daily live budget is used up. Try a recorded question.")
+            return _refused(request, "live_budget")
         gateway: live.SpendGateway | None = None
         token = LIVE_SEARCH.set(True)
         try:
@@ -88,18 +96,42 @@ def explore_ask_live(
             result = live.ask_live(question, DEFAULT_MODEL, gateway)
         except Exception as error:  # a timeout or a Bedrock error: count what the calls cost
             _add_spend(gateway.spent if gateway else 0.0)
-            return _refused(request, f"The live call failed ({type(error).__name__}).")
+            return _refused(request, "live_failed", error=type(error).__name__)
         finally:
             LIVE_SEARCH.reset(token)
         cost = call_cost(DEFAULT_MODEL, result.input_tokens, result.output_tokens)
         _add_spend(cost)
+        meta = (
+            f"{utc_today().isoformat()} | {REGION} | {DEFAULT_MODEL} | "
+            f"{result.latency_s:.1f} s | {cost:.2f} USD"
+        )
+        context = result_context(result, "REAL", meta)
+        if result.status is not LoopStatus.ANSWERED:  # shown as is, never as an answer
+            context["text"] = None
+        return templates.TemplateResponse(
+            request, "ask_answer.html", {**i18n.context(request), "r": context}
+        )
+    except Exception as error:  # building the answer failed: still a message, never a 500
+        return _refused(request, "live_failed", error=type(error).__name__)
     finally:
         _busy.release()
-    meta = (
-        f"{utc_today().isoformat()} | {REGION} | {DEFAULT_MODEL} | "
-        f"{result.latency_s:.1f} s | {cost:.2f} USD"
-    )
-    context = result_context(result, "REAL", meta)
-    if result.status is not LoopStatus.ANSWERED:  # shown as is, never as an answer
-        context["text"] = None
-    return templates.TemplateResponse(request, "step2_result.html", {"r": context})
+
+
+def _warm_index() -> None:
+    try:
+        tools._live_index()
+    except Exception:  # a failed warm-up is only logged; the first question retries the build
+        log.exception("live index warm-up failed")
+
+
+def start_warmup() -> threading.Thread | None:
+    """Build the guideline index in a daemon thread when live is on, so no question pays for it.
+
+    The first live question once built it inline, /healthz stopped answering and the host restarted
+    the container. Without CAIRN_ACCESS_CODE nothing is built.
+    """
+    if not os.environ.get("CAIRN_ACCESS_CODE"):
+        return None
+    thread = threading.Thread(target=_warm_index, name="live-index-warmup", daemon=True)
+    thread.start()
+    return thread

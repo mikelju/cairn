@@ -1,0 +1,44 @@
+{% import "_components.html" as a with context %}
+{% if stale %}
+{% call a.callout("stale") %}<p>{{ stale }}</p>{% endcall %}
+{% else %}
+<p class="prov-legend">{% for k in r.kinds %}<span class="prov-key prov-{{ k }}">{{ t["prov_legend_" ~ k] }}</span>{% endfor %}<span class="prov-key prov-ai">{{ t.prov_legend_ai }}</span></p>
+<article class="answer-panel">
+{% if r.trick %}{% call a.callout("blocked") %}<p>{{ t["trick_" ~ r.id] }}</p>{% endcall %}{% endif %}
+{% if r.parts %}
+{% if r.written %}<div class="answer-pair">{% endif %}
+<div class="card answer">
+{% if r.written %}<h3 class="pair-head">{{ t.ask_col_answer }}</h3>{% endif %}
+{% if r.text.strip() %}<div class="prose answer-unit">{{ a.prov(r.parts) }}</div>
+{% else %}<blockquote class="quote prose answer-unit">{{ a.prov(r.parts) }}</blockquote>{% endif %}
+</div>
+{% if r.written %}<div class="card answer"><h3 class="pair-head">{{ t.ask_col_ai }}</h3><p class="answer-unit">{{ r.written }}</p></div></div>{% endif %}
+{% endif %}
+{% if not r.trick and (r.message or r.failures) %}
+{% call a.callout("blocked" if (not r.answered or r.failures) else "note") %}
+{% if r.message %}<p>{{ t[r.message_key] if r.message_key else r.message }}</p>{% endif %}
+{% if r.failures %}<ul>{% for f in r.failures %}<li>{{ f }}</li>{% endfor %}</ul>{% endif %}
+{% endcall %}
+{% endif %}
+{% set ev = namespace(rows=[], pops=[]) %}
+{% for p in r.parts if p.kind is defined %}
+{% if p.kind == "data" %}
+{% set ev.rows = ev.rows + [[p.column, p.text]] %}
+{% if p.population not in ev.pops %}{% set ev.pops = ev.pops + [p.population] %}{% set ev.rows = ev.rows + [[t.prov_population, p.population]] %}{% endif %}
+{% elif p.kind == "quote" %}
+{% set ev.rows = ev.rows + [[p.guideline ~ ", " ~ p.section, p.citation]] %}
+{% else %}
+{% set ev.rows = ev.rows + [[p.who, p.value]] %}
+{% endif %}
+{% endfor %}
+{% if ev.rows or r.rows or r.evidence %}{% call a.disclosure("evidence", ev.rows|length, "items") %}
+{% if ev.rows %}{{ a.data_table([t.ev_th_item, t.ev_th_value], ev.rows) }}{% endif %}
+{% if r.rows %}
+{% set screen = namespace(rows=[]) %}
+{% for row in r.rows %}{% set screen.rows = screen.rows + [[t["s1_sex_" ~ row.sex] if ("s1_sex_" ~ row.sex) in t else row.sex, t[row.fkey] if row.fkey in t else ((row.tissue ~ " " ~ row.finding)|lower)] + row.cells] %}{% endfor %}
+{{ a.data_table([t.exp_th_sex, t.exp_th_finding] + r.doses, screen.rows) }}
+{% endif %}
+{{ a.evidence_list(r.evidence) }}
+{% endcall %}{% endif %}
+</article>
+{% endif %}

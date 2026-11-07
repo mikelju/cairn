@@ -181,20 +181,25 @@ def validate_study(frames: dict[str, pd.DataFrame], zeros: dict[str, int]) -> Va
     return Validation(clean=clean, quarantine=quarantine, report=report)
 
 
-def mean_auctau(
-    frames: dict[str, pd.DataFrame], sex: str, dose: float, day: float
-) -> dict[str, Any]:
-    """Naive mean AUCtau of a sex, dose group and study day, with the animals that count."""
+def auctau_rows(frames: dict[str, pd.DataFrame], sex: str, dose: float, day: float) -> pd.DataFrame:
+    """The PP rows with a quantified AUCtau for a sex, dose group and study day."""
     dm, tx, pp = frames["DM"], frames["TX"], frames["PP"]
     wide = tx.pivot(index="SETCD", columns="TXPARMCD", values="TXVAL")
     sets = wide[(wide["SEXPOP"] == sex) & (wide["TRTDOS"].astype(float) == dose)].index
     animals = dm.loc[dm["SETCD"].isin(sets), "USUBJID"]
-    chosen = pp[
+    return pp[
         (pp["PPTESTCD"] == "AUCTAU")
         & (pp["VISITDY"] == day)
         & pp["USUBJID"].isin(animals)
         & pp["PPSTRESN"].notna()
     ]
+
+
+def mean_auctau(
+    frames: dict[str, pd.DataFrame], sex: str, dose: float, day: float
+) -> dict[str, Any]:
+    """Naive mean AUCtau of a sex, dose group and study day, with the animals that count."""
+    chosen = auctau_rows(frames, sex, dose, day)
     return {
         "n": len(chosen),
         "mean": float(chosen["PPSTRESN"].mean()) if len(chosen) else None,

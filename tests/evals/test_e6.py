@@ -68,7 +68,7 @@ def decide(
 ) -> Any:
     path = f"/api/threads/{thread['thread_id']}"
     recorded = client.post(
-        f"{path}/decisions", json={"actor": AUTHOR, "decisions": form(thread, rule)}
+        f"{path}/decisions", json={"actor": REVIEWER, "decisions": form(thread, rule)}
     )
     assert recorded.status_code == 200
     return client.post(f"{path}/confirm", json={"actor": REVIEWER, "confirmed": list(confirmed)})
@@ -93,14 +93,14 @@ def test_api_decisions_example_set_recomputes_with_no_model_call(
     thread = start(client)
     path = f"/api/threads/{thread['thread_id']}"
     first = client.post(
-        f"{path}/decisions", json={"actor": AUTHOR, "decisions": form(thread, example)}
+        f"{path}/decisions", json={"actor": REVIEWER, "decisions": form(thread, example)}
     ).json()
     assert first["waiting"] == "await_decisions"
     assert (first["noael"]["F"]["dose"], first["noael"]["M"]["dose"]) == (20.0, 200.0)
     assert first["noael"]["M"]["flags"]  # incomplete examination is flagged for confirmation
     changed = client.post(
         f"{path}/decisions",
-        json={"actor": AUTHOR, "decisions": form(thread, lambda s: (None, None))},
+        json={"actor": REVIEWER, "decisions": form(thread, lambda s: (None, None))},
     ).json()
     assert changed["noael"]["F"]["dose"] == changed["noael"]["M"]["dose"] == 400.0
     assert len(model_calls) == 1  # the draft at start, nothing after
@@ -123,7 +123,7 @@ def test_api_confirm_example_set_reaches_approval_green(
 def test_api_confirm_is_reviewer_only(client: TestClient) -> None:
     thread = start(client)
     path = f"/api/threads/{thread['thread_id']}"
-    client.post(f"{path}/decisions", json={"actor": AUTHOR, "decisions": form(thread, example)})
+    client.post(f"{path}/decisions", json={"actor": REVIEWER, "decisions": form(thread, example)})
     reply = client.post(f"{path}/confirm", json={"actor": AUTHOR, "confirmed": ["F", "M"]})
     assert reply.status_code == 403
 
@@ -132,7 +132,7 @@ def test_api_409_confirm_with_an_unfilled_slot(client: TestClient) -> None:
     thread = start(client)
     path = f"/api/threads/{thread['thread_id']}"
     some = form(thread, example)[:-1]
-    client.post(f"{path}/decisions", json={"actor": AUTHOR, "decisions": some})
+    client.post(f"{path}/decisions", json={"actor": REVIEWER, "decisions": some})
     reply = client.post(f"{path}/confirm", json={"actor": REVIEWER, "confirmed": ["F", "M"]})
     assert reply.status_code == 409
     assert client.get(path).json()["waiting"] == "await_decisions"
@@ -231,7 +231,7 @@ def _twice(client: TestClient, path: str, body: dict[str, Any]) -> list[int]:
 def test_api_concurrent_confirm_and_approve_succeed_once(client: TestClient) -> None:
     thread = start(client)
     path = f"/api/threads/{thread['thread_id']}"
-    client.post(f"{path}/decisions", json={"actor": AUTHOR, "decisions": form(thread, example)})
+    client.post(f"{path}/decisions", json={"actor": REVIEWER, "decisions": form(thread, example)})
     assert _twice(client, f"{path}/confirm", {"actor": REVIEWER, "confirmed": ["F", "M"]}) == [
         200,
         409,
@@ -244,7 +244,7 @@ def test_api_author_is_always_the_author(client: TestClient) -> None:
     thread = reply.json()
     assert thread["author"] == AUTHOR
     path = f"/api/threads/{thread['thread_id']}"
-    client.post(f"{path}/decisions", json={"actor": AUTHOR, "decisions": form(thread, example)})
+    client.post(f"{path}/decisions", json={"actor": REVIEWER, "decisions": form(thread, example)})
     mine = client.post(f"{path}/confirm", json={"actor": AUTHOR, "confirmed": ["F", "M"]})
     assert mine.status_code == 403
     theirs = client.post(f"{path}/confirm", json={"actor": REVIEWER, "confirmed": ["F", "M"]})
@@ -261,7 +261,7 @@ def test_api_422_for_a_dose_the_slot_does_not_have(client: TestClient, dose: flo
     for field in ("adverse_from", "treatment_related_from"):
         bad = form(thread, example)
         bad[0][field] = dose
-        body = json.dumps({"actor": AUTHOR, "decisions": bad}, allow_nan=True)
+        body = json.dumps({"actor": REVIEWER, "decisions": bad}, allow_nan=True)
         reply = client.post(
             f"{path}/decisions", content=body, headers={"content-type": "application/json"}
         )
@@ -275,7 +275,7 @@ def test_api_422_when_treatment_related_comes_after_adverse(client: TestClient) 
     bad = form(thread, example)
     doses = sorted(d for d in thread["slots"][0]["doses"] if d > 0)
     bad[0].update(treatment_related_from=doses[-1], adverse_from=doses[0])
-    reply = client.post(f"{path}/decisions", json={"actor": AUTHOR, "decisions": bad})
+    reply = client.post(f"{path}/decisions", json={"actor": REVIEWER, "decisions": bad})
     assert reply.status_code == 422
 
 
@@ -289,5 +289,5 @@ def test_api_422_for_adverse_without_treatment_related_and_for_the_control_dose(
     for treatment_related, adverse in cases:
         bad = form(thread, example)
         bad[0].update(treatment_related_from=treatment_related, adverse_from=adverse)
-        reply = client.post(f"{path}/decisions", json={"actor": AUTHOR, "decisions": bad})
+        reply = client.post(f"{path}/decisions", json={"actor": REVIEWER, "decisions": bad})
         assert reply.status_code == 422, (treatment_related, adverse)

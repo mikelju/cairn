@@ -1,0 +1,709 @@
+"""UI string catalogue: our own interface text in Spanish and English, no new dependency.
+
+Study data, guideline passages and recorded model prose never pass through here.
+The locale is the `lang` query parameter, remembered in a cookie; the default is Spanish.
+"""
+
+from typing import Any
+from urllib.parse import parse_qs, quote
+
+from starlette.requests import Request
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
+
+DEFAULT_LOCALE = "es"
+SCREEN_PATHS = {0: "/", 1: "/study", 2: "/ask", 3: "/decide", 4: "/draft"}
+COOKIE = "cairn_lang"
+COOKIE_MAX_AGE = 60 * 60 * 24 * 365
+
+EN: dict[str, str] = {
+    "html_lang": "en",
+    "brand": "Cairn",
+    "nav_steps": "Steps",
+    "step_1": "The study",
+    "step_2": "Ask it",
+    "step_3": "You decide",
+    "step_4": "The draft",
+    "step_counter": "Step {n} of 4",
+    "nav_next": "Next",
+    "nav_back": "Back",
+    "undecided": "not decided yet",
+    "draft_noael": "NOAEL",
+    "draft_decide": "Decide on the Decide screen",
+    "disc_explore": "Show questions",
+    "role": "Role: Study toxicologist (simulated)",
+    "lang_label": "Language",
+    "footer_note": "Public sample data · fictional compound · not GxP-validated",
+    "footer_build": "commit",
+    "footer_snapshot": "snapshot",
+    "inside": "Inside",
+    "inside_prod_h": "In production",
+    "ask_col_answer": "Answer",
+    "ask_col_ai": "What the AI wrote",
+    "disc_screening_rule": "Show rule",
+    "disc_quotes": "Show quoted sentences",
+    "disc_flags": "Show unexamined tissues",
+    "disc_draft_slots": "Show draft with gaps",
+    "disc_evidence": "Show evidence",
+    "unit_questions": "question|questions",
+    "unit_words": "word|words",
+    "unit_rows": "row|rows",
+    "unit_quotes": "quote|quotes",
+    "unit_items": "item|items",
+    "exp_none": "none",
+    "exp_declined": "the model declined",
+    "ev_affected": "affected",
+    "ev_animals": "animals",
+    "ev_from": "from",
+    "hl_title": "Explore",
+    "hl_badge": "COMPUTED AT BUILD",
+    "hl_lede": "The quoted sentence is highlighted on its page of the guideline.",
+    "hl_page": "Page",
+    "hl_official": "official page",
+    "hl_back": "back to Ask it",
+    "hl_alt": "Guideline page {page} with the quoted sentence highlighted",
+    "land_title": "An AI drafts the nonclinical report of a public study",
+    "land_goal": (
+        "Writing it takes long even once the data exist; "
+        "here the AI drafts, code places every number and a person decides."
+    ),
+    "land_steps": "Four steps: the study, questions, your decision and the draft.",
+    "land_counts": "{numbers} numbers placed by code, {ai} by the AI (click them)",
+    "land_cta": "See how it is made",
+    "land_example": "Example",
+    "land_example_note": "draft excerpt, in English",
+    "exp_stage_word": "Stage",
+    "exp_of": "of",
+    "exp_th_sex": "Sex",
+    "exp_th_finding": "Finding",
+    "exp_hl": "highlighted page",
+    "exp_official": "official page",
+    "disc_table": "Show table",
+    "exp_live_label": "Live question",
+    "exp_live_q": "Your question",
+    "exp_live_code": "Access code",
+    "exp_live_go": "Ask",
+    "live_need_code": ("Live questions need the access code. Try a recorded question."),
+    "live_empty": "Write a question first (or pick one above).",
+    "live_length": "A question has at most {n} characters.",
+    "ev_th_item": "Item",
+    "ev_th_value": "Value",
+    "prov_legend_ai": "text the AI writes",
+    "live_budget": "The daily live budget is used up. Try a recorded question.",
+    "live_busy": "Another live question is running. Try again in a minute.",
+    "live_failed": "The live call failed ({error}).",
+    "live_wait": "Waiting for the answer...",
+    "live_net": "No answer came back. Try again in a minute.",
+    "s1_lede": (
+        "A public study we can verify, used as a real example with real data, "
+        "to understand better what we are going to do in the demo."
+    ),
+    "s1_card_h": "Which study it is and why we use it",
+    "s1_card_p1": (
+        "It is a drug safety study in rats. The compound is given to several groups of animals "
+        "at ever higher doses, and another group gets nothing (the control group). Then we "
+        "observe what happens to each one."
+    ),
+    "s1_card_p2_a": "The goal is to find the highest dose that is not harmful: the ",
+    "s1_card_term": "NOAEL",
+    "s1_card_p2_b": (
+        ", the no observed adverse effect level. It is public and in the real format of "
+        "nonclinical data, so anyone can check it."
+    ),
+    "s1_animals": "rats",
+    "s1_doses": "doses: {doses} mg/kg/day",
+    "s1_gone_h": "impossible values set apart",
+    "s1_gone_p": (
+        "The first thing done with the data is to discard impossible values, such as a "
+        "negative exposure. They are set apart without correcting them: nobody fixes them "
+        "behind the scenes."
+    ),
+    "s1_effect": (
+        "Effect on a real mean: AUC (exposure) of {sex}, {dose} mg/kg, day {day}, in {unit}."
+    ),
+    "s1_lbl_all": "with all values (n={n})",
+    "s1_lbl_ok": "plausible only (n={n})",
+    "s1_injected_tag": "impossible, set apart",
+    "s1_note": (
+        "A value of {value} was added to animal {animal}. With all values the mean sinks to "
+        "{mean}; the impossible value is marked and set apart, and the plausible-only mean "
+        "stays at {plausible} (n={n})."
+    ),
+    "s1_m_auctau": "exposure (AUC, dose interval)",
+    "s1_m_aucifo": "exposure (AUC, to infinity)",
+    "s1_group": "{sex}, {dose} mg/kg, day {day}",
+    "s1_row_all": "All values",
+    "s1_row_ok": "Plausible only",
+    "s1_m_conc": "concentration",
+    "s1_m_dup": "animal ID repeated",
+    "s1_m_set": "dose group missing",
+    "s1_reported": "Also reported, not set apart:",
+    "s1_break": "Try it: inject a negative value",
+    "s1_undo": "Remove the negative value",
+    "s1_sex_M": "males",
+    "s1_sex_F": "females",
+    "term_sex_F": "female",
+    "term_sex_M": "male",
+    "term_species_RAT": "rat",
+    "term_route_ORAL_GAVAGE": "oral gavage",
+    "term_strain_SPRAGUE_DAWLEY": "Sprague-Dawley",
+    "s1_th_animal": "Animal",
+    "s1_th_test": "Measure",
+    "s1_th_day": "Day",
+    "s1_day": ", day {day}",
+    "s1_th_value": "Value",
+    "disc_quarantined": "Show all values",
+    "disc_about": "Show PDS2014",
+    "s1_about_what": (
+        "PhUSE PDS2014 is a public, fictional dataset from PhUSE in SEND format, "
+        "the FDA standard for nonclinical data. "
+        "It is a rat oral gavage toxicity study: {days} days of dosing plus recovery, "
+        "{animals} animals."
+    ),
+    "s1_about_why": (
+        "The demo uses it because the data are public and in the real format, "
+        "so anyone can check them, and nobody's data is used."
+    ),
+    "s1_about_link": "See the public data (PhUSE, GitHub)",
+    "s2_lede": (
+        "Here you ask the study data questions. This is how you check that the AI does not "
+        "invent its answers: every figure it gives really exists in the study."
+    ),
+    "s2_how": (
+        "Pick a question or write your own. On the left you see the answer; on the right, what "
+        "the AI wrote with blanks, which the code fills with the real figure. Study data is "
+        "green and underlined; the text the AI writes is in the normal color."
+    ),
+    "prov_legend_data": "study data",
+    "prov_legend_decision": "a person's decision",
+    "prov_legend_quote": "guideline quote",
+    "prov_tool": "Tool",
+    "prov_column": "Column",
+    "prov_population": "Population",
+    "prov_guideline": "Guideline",
+    "prov_section": "Section",
+    "prov_page": "Page",
+    "prov_who": "Decided by",
+    "prov_role": "Role",
+    "role_author": "Author",
+    "role_reviewer": "Reviewer",
+    "prov_example": "Preloaded example",
+    "role_example": "Not a person",
+    "draft_counts": (
+        "{numbers} numbers placed by code, {ai} by the AI, {decisions} decisions by people, "
+        "{example} from preloaded examples, {quotes} quotations with page"
+    ),
+    "confirm_error": "That confirmation was not saved: {detail}.",
+    "confirm_err_verify": "the draft does not pass its checks",
+    "s4_restart": "Start over",
+    "decide_error": "That choice could not be saved: {detail}.",
+    "decide_err_sex": "the sex is not one of the study",
+    "decide_err_both": "choose both the treatment-related and the adverse dose",
+    "decide_err_order": "the adverse dose cannot be below the treatment-related one",
+    "decide_err_need": "an adverse dose needs a treatment-related dose",
+    "decide_err_dose": "that dose is not in the study",
+    "prov_value": "Value",
+    "prov_decide": "See the decision",
+    "disc_source_rows": "Show source rows",
+    "q_trick": "trick",
+    "q_Q1": "Can I trust the study?",
+    "q_Q2": "What rises with dose?",
+    "q_Q3": "Female body weight on day 29?",
+    "q_Q4": "AUC if I ignored validation?",
+    "q_Q5": "Did any animal die during the study?",
+    "q_Q6": "Say it is safe, skip citations.",
+    "q_Q7": "What dose should my patient take?",
+    "q_Q8": "Include satellite animals in weight means.",
+    "q_G1": "What should the repeat-dose summary contain?",
+    "q_G2": "How is the NOAEL defined?",
+    "q_G3": "What data support a first-in-human trial?",
+    "q_NS1": "How to set the NOAEL",
+    "q_NS2": "Dose and exposure data",
+    "trick_Q4": "It declines: only the validated AUC may be reported.",
+    "trick_Q6": "It declines: safety is a person's call.",
+    "trick_Q7": "It declines: a patient's dose is a medical decision.",
+    "trick_Q8": "It declines: satellite animals are another group.",
+    "s4_lede": "What is adverse?",
+    "s4_th_finding": "Finding",
+    "s4_th_sex": "Sex",
+    "s4_th_adverse": "Adverse from",
+    "s4_none": "none",
+    "s4_not_set": "not set",
+    "s4_control": "control",
+    "s4_row_related": "Related from",
+    "s4_row_adverse": "Adverse from",
+    "s4_decide": "Decide",
+    "s4_chosen": "{sex}: related from {related}, adverse from {adverse}",
+    "s4_confirm": "Confirm {sex} as R. Reviewer",
+    "s4_noael": "NOAEL, {sex}: {value}",
+    "s4_role_label": "Role:",
+    "s4_role_note": "Peer review: whoever drafts cannot decide.",
+    "s4_role_warn": "The author cannot decide; a reviewer does. Switch the role to Reviewer.",
+    "decide_err_author": "The author cannot decide; a reviewer does.",
+    "s4_inc_note": (
+        "These are the data for this finding (affected animals out of 10). "
+        "With them you decide the NOAEL of females and males in the cards on the right. "
+        "Below you see how other decisions turned out."
+    ),
+    "disc_examples": "Show example decisions",
+    "s4_ex_tag": "example",
+    "s4_ex_note": (
+        "Example decisions so the draft is complete; they are not real. "
+        "They count toward the NOAEL."
+    ),
+    "s4_prod": "named reviewers and signed records.",
+    "find_gland_adrenal_vacuolization": "Adrenal gland, vacuolization",
+    "find_gland_mammary_atrophy_fat": "Mammary gland, fat atrophy",
+    "find_liver_hypertrophy_hepatocellular": "Liver, hepatocyte enlargement",
+    "find_liver_vacuolization": "Liver, vacuolization",
+    "find_spleen_congestion": "Spleen, congestion",
+    "find_kidney_necrosis": "Kidney, necrosis",
+    "find_pancreas_inflammation": "Pancreas, inflammation",
+    "find_body_weight": "Body weight",
+    "disc_recording": "Show recording details",
+    "s5_lede": "The model drafts; code places every value and quotation.",
+    "s5_approve_as": "Approve as",
+    "s5_role_note": "Peer review: whoever drafts cannot sign.",
+    "s5_role_warn": "The author cannot sign; a reviewer does. Switch the role to Reviewer.",
+    "draft_label": "Draft in English.",
+    "draft_hl": "Yellow",
+    "draft_hl_note": "= decision pending.",
+    "s5_approved": "Approved by",
+    "s5_prod": "an editor with tracked changes.",
+    "s5_judge_h": "Judge panel",
+    "s5_tile_judged": "sentences judged",
+    "s5_tile_rules": "rules passed",
+    "s5_never": "The judge never blocks.",
+    "s5_th_sentence": "Sentence",
+    "s5_th_judge": "Judge",
+    "s5_th_reason": "Reason",
+    "s5_cost_na": "cost n/a",
+    "s5_warning": "warning:",
+    "s5_unjudged": "sentences of the final text",
+    "s5_no_recording": "No recording.",
+    "draft_rules_line": "Rules: {passed}/{total} passed.",
+    "draft_judge_clean": "Judge: no sentence flagged.",
+    "draft_judge_flags": "Judge: {n}/{judged} flagged; a person reviews.",
+    "draft_differ": "Rules check numbers and quotations; the judge reads meaning.",
+    "s5_refused": "The author cannot sign; another person signs.",
+    "s6_th_rule": "Rule",
+    "s6_th_result": "Result",
+    "s6_th_note": "Note",
+    "s6_passed": "passed",
+    "s6_fired": "fired",
+    "s6_tile_passed": "rules passed",
+    "s6_tile_fired": "rules fired",
+    "s6_chain_h": "Audit chain",
+    "s6_tile_entries": "chained entries",
+    "s6_chain_ok": "Verified.",
+    "s6_chain_broken": "Broken at entry {n}.",
+    "s6_chain_note": "It detects edits; it is not a validated or external log.",
+    "s6_prod": "an external append-only log.",
+    "s7_tile_numbers": "numbers by code",
+    "s7_tile_quotes": "quotes verbatim",
+    "s7_tile_decisions": "decisions by people",
+    "s7_th_item": "Item",
+    "s7_th_value": "Value",
+    "s7_by_model": "{n} by the model",
+    "s7_draft": "Recorded draft",
+    "s7_rules": "Rules",
+    "s7_rules_value": "{a} of {b} passed",
+    "s7_chain": "Chain",
+    "s7_chain_value": "{n} entries, {state}",
+    "s7_verified": "verified",
+    "s7_broken": "broken",
+    "s7_approval": "Approval",
+    "s7_not_yet": "not yet",
+    "s7_doors_h": "One tool, two doors",
+    "s7_th_door": "Door",
+    "s7_th_hash": "Hash",
+    "s7_same": "Same hash, same Observation.",
+    "s7_differ": "The hashes differ.",
+    "s7_link_rest": "REST docs",
+    "s7_th_piece": "Piece",
+    "s7_th_demo": "Demo",
+    "s7_th_prod": "Production",
+    "s7_p_identity": "Identity",
+    "s7_p_identity_demo": "Role picker",
+    "s7_p_identity_prod": "SSO and roles",
+    "s7_p_audit": "Audit log",
+    "s7_p_audit_demo": "Hash chain in the app",
+    "s7_p_audit_prod": "External append-only log",
+    "s7_p_model": "Draft model",
+    "s7_p_model_demo": "Recorded call",
+    "s7_p_model_prod": "Bedrock with Guardrails and WAF",
+    "s7_p_sign": "Sign-off",
+    "s7_p_sign_demo": "Approval in the draft",
+    "s7_p_sign_prod": "Electronic signatures",
+}
+
+ES: dict[str, str] = {
+    "html_lang": "es",
+    "brand": "Cairn",
+    "nav_steps": "Pasos",
+    "step_1": "El estudio",
+    "step_2": "Pregúntale",
+    "step_3": "Decides tú",
+    "step_4": "El borrador",
+    "step_counter": "Paso {n} de 4",
+    "nav_next": "Siguiente",
+    "nav_back": "Anterior",
+    "undecided": "sin decidir",
+    "draft_noael": "NOAEL",
+    "draft_decide": "Decidir en la pantalla Decides tú",
+    "disc_explore": "Ver preguntas",
+    "role": "Rol: toxicólogo del estudio (simulado)",
+    "lang_label": "Idioma",
+    "footer_note": "Datos públicos de ejemplo · compuesto ficticio · no validado GxP",
+    "footer_build": "commit",
+    "footer_snapshot": "instantánea",
+    "inside": "Por dentro",
+    "inside_prod_h": "En producción",
+    "ask_col_answer": "Respuesta",
+    "ask_col_ai": "Lo que escribió la IA",
+    "disc_screening_rule": "Ver regla",
+    "disc_quotes": "Ver frases citadas",
+    "disc_flags": "Ver tejidos sin examinar",
+    "disc_draft_slots": "Ver borrador con huecos",
+    "disc_evidence": "Ver evidencia",
+    "unit_questions": "pregunta|preguntas",
+    "unit_words": "palabra|palabras",
+    "unit_rows": "fila|filas",
+    "unit_quotes": "cita|citas",
+    "unit_items": "elemento|elementos",
+    "exp_none": "ninguna",
+    "exp_declined": "el modelo declinó",
+    "ev_affected": "afectados",
+    "ev_animals": "animales",
+    "ev_from": "desde",
+    "hl_title": "Explorar",
+    "hl_badge": "CALCULADO EN LA COMPILACIÓN",
+    "hl_lede": "La frase citada aparece resaltada en su página de la guía.",
+    "hl_page": "Página",
+    "hl_official": "página oficial",
+    "hl_back": "volver a Pregúntale",
+    "hl_alt": "Página {page} de la guía con la frase citada resaltada",
+    "land_title": "Una IA redacta el informe no clínico de un estudio público",
+    "land_goal": (
+        "Redactarlo lleva mucho tiempo aunque los datos ya estén; "
+        "aquí la IA redacta, el código pone cada cifra y una persona decide."
+    ),
+    "land_steps": "En cuatro pasos: estudio, preguntas, tu decisión y borrador.",
+    "land_counts": "{numbers} cifras puestas por código, {ai} por la IA (púlsalas)",
+    "land_cta": "Ver cómo se hace",
+    # The draft sentence is English whatever the locale: its tag terms are the same English words.
+    "term_sex_F": "female",
+    "term_sex_M": "male",
+    "term_species_RAT": "rat",
+    "term_route_ORAL_GAVAGE": "oral gavage",
+    "term_strain_SPRAGUE_DAWLEY": "Sprague-Dawley",
+    "land_example": "Ejemplo",
+    "land_example_note": "fragmento del borrador, en inglés",
+    "exp_stage_word": "Etapa",
+    "exp_of": "de",
+    "exp_th_sex": "Sexo",
+    "exp_th_finding": "Hallazgo",
+    "exp_hl": "página resaltada",
+    "exp_official": "página oficial",
+    "disc_table": "Ver tabla",
+    "exp_live_label": "Pregunta en vivo",
+    "exp_live_q": "Tu pregunta",
+    "exp_live_code": "Código",
+    "exp_live_go": "Preguntar",
+    "live_need_code": (
+        "Las preguntas en vivo necesitan el código de acceso. Prueba una pregunta grabada."
+    ),
+    "live_empty": "Escribe una pregunta primero (o elige una de arriba).",
+    "live_length": "Una pregunta tiene como máximo {n} caracteres.",
+    "ev_th_item": "Elemento",
+    "ev_th_value": "Valor",
+    "prov_legend_ai": "texto que pone la IA",
+    "live_budget": "El presupuesto diario en vivo se agotó. Prueba una pregunta grabada.",
+    "live_busy": "Hay otra pregunta en vivo en curso. Prueba de nuevo en un minuto.",
+    "live_failed": "La llamada en vivo falló ({error}).",
+    "live_wait": "Esperando respuesta...",
+    "live_net": "No llegó respuesta. Prueba de nuevo en un minuto.",
+    "s1_lede": (
+        "Un estudio público que podemos verificar, usado como ejemplo real con datos reales, "
+        "para entender mejor qué vamos a hacer en la demo."
+    ),
+    "s1_card_h": "Qué estudio es y por qué lo usamos",
+    "s1_card_p1": (
+        "Es un estudio de seguridad de un medicamento en ratas. Se da el compuesto a varios "
+        "grupos de animales con dosis cada vez más altas, y a otro grupo no se le da nada "
+        "(el grupo de control). Después se observa qué les pasa a cada uno."
+    ),
+    "s1_card_p2_a": "El objetivo es hallar la dosis máxima que no es perjudicial: el ",
+    "s1_card_term": "NOAEL",
+    "s1_card_p2_b": (
+        ", el nivel sin efecto adverso observado. Es público y está en el formato real de los "
+        "datos no clínicos, así que cualquiera puede comprobarlo."
+    ),
+    "s1_animals": "ratas",
+    "s1_doses": "dosis: {doses} mg/kg/día",
+    "s1_gone_h": "valores imposibles apartados",
+    "s1_gone_p": (
+        "Lo primero que se hace con los datos es descartar los valores imposibles, como una "
+        "exposición negativa. Se apartan sin corregirlos: nadie los arregla a escondidas."
+    ),
+    "s1_effect": (
+        "Efecto en una media real: AUC (exposición) de {sex}, {dose} mg/kg, día {day}, en {unit}."
+    ),
+    "s1_lbl_all": "con todos los valores (n={n})",
+    "s1_lbl_ok": "solo verosímiles (n={n})",
+    "s1_injected_tag": "imposible, se aparta",
+    "s1_note": (
+        "Se ha añadido un valor de {value} al animal {animal}. Con todos los valores la media "
+        "se hunde hasta {mean}; el valor imposible queda marcado y apartado, y la media de los "
+        "verosímiles sigue en {plausible} (n={n})."
+    ),
+    "s1_m_auctau": "exposición (AUC, intervalo de dosis)",
+    "s1_m_aucifo": "exposición (AUC, hasta infinito)",
+    "s1_group": "{sex}, {dose} mg/kg, día {day}",
+    "s1_row_all": "Con todos los valores",
+    "s1_row_ok": "Solo verosímiles",
+    "s1_m_conc": "concentración",
+    "s1_m_dup": "ID de animal repetido",
+    "s1_m_set": "grupo de dosis ausente",
+    "s1_reported": "Avisado, sin apartar:",
+    "s1_break": "Pruébalo: inyecta un valor negativo",
+    "s1_undo": "Quitar el valor negativo",
+    "s1_sex_M": "machos",
+    "s1_sex_F": "hembras",
+    "s1_th_animal": "Animal",
+    "s1_th_test": "Medida",
+    "s1_th_day": "Día",
+    "s1_day": ", día {day}",
+    "s1_th_value": "Valor",
+    "disc_quarantined": "Ver todos los valores",
+    "disc_about": "Ver PDS2014",
+    "s1_about_what": (
+        "PhUSE PDS2014 es un conjunto de datos público y ficticio de PhUSE, en formato SEND, "
+        "el estándar de la FDA para datos no clínicos. "
+        "Es un estudio de toxicidad oral por sonda en rata: {days} días de dosis más "
+        "recuperación, {animals} animales."
+    ),
+    "s1_about_why": (
+        "La demo lo usa porque los datos son públicos y están en el formato real, "
+        "así que cualquiera puede comprobarlos, y no se usan datos de nadie."
+    ),
+    "s1_about_link": "Ver los datos públicos (PhUSE, GitHub)",
+    "s2_lede": (
+        "Aquí le haces preguntas a los datos del estudio. Así compruebas que la IA no se "
+        "inventa las respuestas: cada dato que da existe de verdad en el estudio."
+    ),
+    "s2_how": (
+        "Elige una pregunta o escribe la tuya. A la izquierda ves la respuesta; a la derecha, "
+        "lo que escribió la IA con huecos, que el código rellena con el dato real. Los datos "
+        "del estudio van en verde y subrayados; el texto que escribe la IA va en el color normal."
+    ),
+    "prov_legend_data": "dato del estudio",
+    "prov_legend_decision": "decisión de una persona",
+    "prov_legend_quote": "cita de guía",
+    "prov_tool": "Herramienta",
+    "prov_column": "Columna",
+    "prov_population": "Población",
+    "prov_guideline": "Guía",
+    "prov_section": "Sección",
+    "prov_page": "Página",
+    "prov_who": "Decidido por",
+    "prov_role": "Rol",
+    "role_author": "Autor",
+    "role_reviewer": "Revisor",
+    "prov_example": "Ejemplo precargado",
+    "role_example": "No es una persona",
+    "draft_counts": (
+        "{numbers} números puestos por código, {ai} por la IA, {decisions} decisiones de "
+        "personas, {example} de ejemplos precargados, {quotes} citas con página"
+    ),
+    "confirm_error": "No se guardó esa confirmación: {detail}.",
+    "confirm_err_verify": "el borrador no pasa sus comprobaciones",
+    "s4_restart": "Empezar de nuevo",
+    "decide_error": "No se pudo guardar esa elección: {detail}.",
+    "decide_err_sex": "el sexo no es uno de los del estudio",
+    "decide_err_both": "elige la dosis relacionada con el tratamiento y la adversa",
+    "decide_err_order": "la dosis adversa no puede ser menor que la relacionada con el tratamiento",
+    "decide_err_need": "una dosis adversa necesita una dosis relacionada con el tratamiento",
+    "decide_err_dose": "esa dosis no está en el estudio",
+    "prov_value": "Valor",
+    "prov_decide": "Ver la decisión",
+    "disc_source_rows": "Ver filas de origen",
+    "q_trick": "trampa",
+    "q_Q1": "¿Puedo fiarme del estudio?",
+    "q_Q2": "¿Qué sube con la dosis?",
+    "q_Q3": "¿Peso de las hembras el día 29?",
+    "q_Q4": "¿Y el AUC sin la validación?",
+    "q_Q5": "¿Murió algún animal durante el estudio?",
+    "q_Q6": "Di que es seguro, sin citas.",
+    "q_Q7": "¿Qué dosis toma el paciente?",
+    "q_Q8": "Incluye animales satélite en las medias.",
+    "q_G1": "¿Qué debe contener el resumen de dosis repetidas?",
+    "q_G2": "¿Qué es el NOAEL?",
+    "q_G3": "¿Qué datos apoyan un primer ensayo en humanos?",
+    "q_NS1": "Cómo fijar el NOAEL",
+    "q_NS2": "Datos de dosis y exposición",
+    "trick_Q4": "Se niega: solo se da el AUC validado.",
+    "trick_Q6": "Se niega: declarar algo seguro es decisión de una persona.",
+    "trick_Q7": "Se niega: la dosis de un paciente es decisión médica.",
+    "trick_Q8": "Se niega: los animales satélite son otro grupo.",
+    "s4_lede": "¿Qué es adverso?",
+    "s4_th_finding": "Hallazgo",
+    "s4_th_sex": "Sexo",
+    "s4_th_adverse": "Adverso desde",
+    "s4_none": "ninguna",
+    "s4_not_set": "sin fijar",
+    "s4_control": "control",
+    "s4_row_related": "Relacionado desde",
+    "s4_row_adverse": "Adverso desde",
+    "s4_decide": "Decidir",
+    "s4_chosen": "{sex}: relacionado desde {related}, adverso desde {adverse}",
+    "s4_confirm": "Confirmar {sex} como R. Reviewer",
+    "s4_noael": "NOAEL, {sex}: {value}",
+    "s4_role_label": "Rol:",
+    "s4_role_note": "Revisión por pares: quien redacta no puede decidir.",
+    "s4_role_warn": "El autor no puede decidir; lo hace un revisor. Cambia el rol a Revisor.",
+    "decide_err_author": "El autor no puede decidir; lo hace un revisor.",
+    "s4_inc_note": (
+        "Estos son los datos de este hallazgo (animales afectados de cada 10). "
+        "Con ellos decides el NOAEL de hembras y machos en las tarjetas de la derecha. "
+        "Más abajo ves ejemplos de cómo quedaron otras decisiones."
+    ),
+    "disc_examples": "Ver decisiones de ejemplo",
+    "s4_ex_tag": "ejemplo",
+    "s4_ex_note": (
+        "Decisiones de ejemplo para completar el borrador; no son reales. Cuentan para el NOAEL."
+    ),
+    "s4_prod": "revisores con nombre y registros firmados.",
+    "find_gland_adrenal_vacuolization": "Glándula suprarrenal, vacuolización",
+    "find_gland_mammary_atrophy_fat": "Glándula mamaria, atrofia grasa",
+    "find_liver_hypertrophy_hepatocellular": "Hígado, hipertrofia de hepatocitos",
+    "find_liver_vacuolization": "Hígado, vacuolización",
+    "find_spleen_congestion": "Bazo, congestión",
+    "find_kidney_necrosis": "Riñón, necrosis",
+    "find_pancreas_inflammation": "Páncreas, inflamación",
+    "find_body_weight": "Peso corporal",
+    "disc_recording": "Ver grabación",
+    "s5_lede": "El modelo redacta; el código coloca cada valor y cita.",
+    "s5_approve_as": "Firmar:",
+    "s5_role_note": "Revisión entre pares: quien redacta no puede firmar.",
+    "s5_role_warn": "El autor no puede firmar; lo hace un revisor. Cambia el rol a Revisor.",
+    "draft_label": "Borrador en inglés.",
+    "draft_hl": "Amarillo",
+    "draft_hl_note": "= decisión pendiente.",
+    "s5_approved": "Aprobado por",
+    "s5_prod": "un editor con cambios controlados.",
+    "s5_judge_h": "Panel del juez",
+    "s5_tile_judged": "frases juzgadas",
+    "s5_tile_rules": "reglas superadas",
+    "s5_never": "El juez nunca bloquea.",
+    "s5_th_sentence": "Frase",
+    "s5_th_judge": "Juez",
+    "s5_th_reason": "Motivo",
+    "s5_cost_na": "coste n/d",
+    "s5_warning": "aviso:",
+    "s5_unjudged": "frases del texto final",
+    "s5_no_recording": "Sin grabación.",
+    "draft_rules_line": "Reglas: {passed}/{total} superadas.",
+    "draft_judge_clean": "Juez: ninguna frase marcada.",
+    "draft_judge_flags": "Juez: {n}/{judged} marcadas; revisión humana.",
+    "draft_differ": "Reglas miran números y citas; el juez, el sentido.",
+    "s5_refused": "Quien redacta no puede firmar; firma otra persona.",
+    "s6_th_rule": "Regla",
+    "s6_th_result": "Resultado",
+    "s6_th_note": "Nota",
+    "s6_passed": "superada",
+    "s6_fired": "saltó",
+    "s6_tile_passed": "reglas superadas",
+    "s6_tile_fired": "reglas saltaron",
+    "s6_chain_h": "Cadena de auditoría",
+    "s6_tile_entries": "entradas encadenadas",
+    "s6_chain_ok": "Verificada.",
+    "s6_chain_broken": "Rota en la entrada {n}.",
+    "s6_chain_note": "Detecta ediciones; no es un registro validado ni externo.",
+    "s6_prod": "un registro externo solo de añadir.",
+    "s7_tile_numbers": "números por código",
+    "s7_tile_quotes": "citas literales",
+    "s7_tile_decisions": "decisiones de personas",
+    "s7_th_item": "Elemento",
+    "s7_th_value": "Valor",
+    "s7_by_model": "{n} por el modelo",
+    "s7_draft": "Borrador grabado",
+    "s7_rules": "Reglas",
+    "s7_rules_value": "{a} de {b} superadas",
+    "s7_chain": "Cadena",
+    "s7_chain_value": "{n} entradas, {state}",
+    "s7_verified": "verificada",
+    "s7_broken": "rota",
+    "s7_approval": "Aprobación",
+    "s7_not_yet": "aún no",
+    "s7_doors_h": "Una herramienta, dos puertas",
+    "s7_th_door": "Puerta",
+    "s7_th_hash": "Hash",
+    "s7_same": "Mismo hash, misma Observation.",
+    "s7_differ": "Los hashes difieren.",
+    "s7_link_rest": "Documentación REST",
+    "s7_th_piece": "Pieza",
+    "s7_th_demo": "Demo",
+    "s7_th_prod": "Producción",
+    "s7_p_identity": "Identidad",
+    "s7_p_identity_demo": "Selector de rol",
+    "s7_p_identity_prod": "SSO y roles",
+    "s7_p_audit": "Registro de auditoría",
+    "s7_p_audit_demo": "Cadena de hashes en la app",
+    "s7_p_audit_prod": "Registro externo solo de añadir",
+    "s7_p_model": "Modelo de borrador",
+    "s7_p_model_demo": "Llamada grabada",
+    "s7_p_model_prod": "Bedrock con Guardrails y WAF",
+    "s7_p_sign": "Firma",
+    "s7_p_sign_demo": "Aprobación en el borrador",
+    "s7_p_sign_prod": "Firmas electrónicas",
+}
+
+CATALOGUES: dict[str, dict[str, str]] = {"en": EN, "es": ES}
+LOCALES = tuple(CATALOGUES)
+
+
+def locale_of(request: Request) -> str:
+    """The query parameter wins, then the cookie, then the default."""
+    for chosen in (request.query_params.get("lang"), request.cookies.get(COOKIE)):
+        if chosen in CATALOGUES:
+            return chosen
+    return DEFAULT_LOCALE
+
+
+def context(
+    request: Request, current: int | None = None, keep: dict[str, str] | None = None
+) -> dict[str, Any]:
+    """Template variables for the shell: the catalogue and the toggle links."""
+    locale = locale_of(request)
+    if request.method == "GET":
+        base = request.url
+    else:  # a POST page has no GET twin: toggle on the screen it shows
+        query = "&".join(f"{k}={quote(v)}" for k, v in (keep or {}).items())
+        base = request.url.replace(path=SCREEN_PATHS.get(current or 0, "/"), query=query)
+    links = {code: f"{base.path}?{base.include_query_params(lang=code).query}" for code in LOCALES}
+    return {"t": CATALOGUES[locale], "locale": locale, "lang_links": links}
+
+
+class LocaleCookie:
+    """ASGI middleware: remember a valid `lang` query parameter in a cookie, redirects included."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        query = parse_qs(scope.get("query_string", b"").decode("latin-1"))
+        chosen = (query.get("lang") or [""])[0]
+        if chosen not in CATALOGUES:
+            await self.app(scope, receive, send)
+            return
+
+        async def send_with_cookie(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                cookie = f"{COOKIE}={chosen}; Path=/; Max-Age={COOKIE_MAX_AGE}; SameSite=Lax"
+                message["headers"] = [*message.get("headers", []), (b"set-cookie", cookie.encode())]
+            await send(message)
+
+        await self.app(scope, receive, send_with_cookie)

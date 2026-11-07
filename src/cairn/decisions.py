@@ -6,6 +6,7 @@ slot with a Decision; the NOAEL of a sex is a pure function of those decisions a
 only once a person confirms it.
 """
 
+import re
 from dataclasses import dataclass, field
 
 from pydantic import BaseModel
@@ -15,6 +16,9 @@ from cairn.content import DecisionRef, ObservationLedger, QuoteRef, Sentence, Te
 SEX_WORDS = {"F": "females", "M": "males"}
 # The step 3 definition of the NOAEL (FDA 2005, section IV), returned by fixed query NS1.
 NOAEL_DEFINITION = QuoteRef(passage_id="FDA-IV-01", sentence_ids=["FDA-IV-01.s2"])
+
+
+EXAMPLE_ACTOR = "Example"  # the actor of a preloaded example decision: never a person
 
 
 class Decision(BaseModel):
@@ -41,6 +45,14 @@ class Noael:
     sex: str
     dose: float | None  # None: not established
     flags: list[str] = field(default_factory=list)  # adverse findings not fully examined at dose
+
+
+KEY_FINDING = "GLAND, ADRENAL Vacuolization"  # the one finding a visitor decides on screen 3
+
+
+def finding_key(finding: str) -> str:
+    """The catalogue key of a finding's plain name, for example find_gland_adrenal_vacuolization."""
+    return "find_" + re.sub(r"\W+", "_", finding.lower()).strip("_")
 
 
 def enumerate_slots(ledger: ObservationLedger) -> list[Slot]:

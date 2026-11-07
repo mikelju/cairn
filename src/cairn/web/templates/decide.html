@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% import "_components.html" as a with context %}
+{% block main %}
+{% set is_author = actor == "A. Author" %}
+<section class="step decide">
+{{ a.screen_head(3, t.step_3, t.s4_lede) }}
+<div class="card role-bar">
+<span class="label">{{ t.s4_role_label }}</span>
+<span class="role-toggle">
+<a class="seg{% if is_author %} on{% endif %}" href="/decide?actor=author&amp;thread={{ thread }}">{{ t.role_author }}</a>
+<a class="seg{% if not is_author %} on{% endif %}" href="/decide?actor=reviewer&amp;thread={{ thread }}">{{ t.role_reviewer }}</a>
+</span>
+<span class="meta">{{ t.s4_role_note }}</span>
+{% if is_author %}<span class="warn" role="alert">{{ t.s4_role_warn }}</span>{% endif %}
+</div>
+{% if error %}{% call a.callout("blocked") %}<p>{{ error }}</p>{% endcall %}{% endif %}
+<div class="decide-grid">
+<div class="card">
+<h2>{{ t.find_gland_adrenal_vacuolization }}</h2>
+<p class="meta">{{ t.s4_inc_note }}</p>
+{{ a.data_table(inc_heads, inc_rows) }}
+</div>
+<div class="decide-sexes">
+{% for x in sexes %}
+<div class="card decide-sex">
+<form method="post" action="/decide/choose" hx-post="/decide/choose" hx-target="main" hx-select="main" hx-swap="outerHTML"><input type="hidden" name="thread" value="{{ thread }}"><input type="hidden" name="sex" value="{{ x.sex }}"><input type="hidden" name="actor" value="{{ actor }}">
+<fieldset class="choice-grid"><legend>{{ x.name }}</legend>
+<span></span>{% for d in ["none"] + x.doses %}<span class="dose-head">{{ t.s4_none if d == "none" else d }}</span>{% endfor %}
+{% for field, ask in (("related", t.s4_row_related), ("adverse", t.s4_row_adverse)) %}{% set pick = x.related_pick if field == "related" else x.adverse_pick %}<span class="row-head">{{ ask }}</span>
+{% for d in ["none"] + x.doses %}<input type="radio" name="{{ field }}" value="{{ d }}" aria-label="{{ x.name }}: {{ ask }} {{ t.s4_none if d == 'none' else d }}"{% if d == pick %} checked{% endif %}{% if d == "none" and not is_author %} required{% endif %}>{% endfor %}
+{% endfor %}</fieldset>
+<p class="noael-line">{{ t.s4_noael.format(sex=x.name, value=x.noael) }}</p>
+<button type="submit" class="sm{% if is_author %} locked{% endif %}">{{ t.s4_decide }}</button></form>
+</div>
+{% endfor %}
+</div>
+</div>
+{% if started %}<form method="post" action="/restart"><button type="submit">{{ t.s4_restart }}</button></form>{% endif %}
+{% call a.disclosure("examples", examples|length, "items") %}<p class="meta">{{ t.s4_ex_note }}</p>
+{{ a.data_table([t.s4_th_finding, t.s4_th_sex, t.s4_th_adverse, ""], examples) }}{% endcall %}
+{{ a.screen_nav(3, screens) }}
+{% call a.inside([[t.step_3, "-", t.s4_prod]]) %}{% endcall %}
+</section>
+{% endblock %}

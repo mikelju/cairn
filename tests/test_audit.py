@@ -50,7 +50,7 @@ def form(thread: dict[str, Any]) -> list[dict[str, Any]]:
 
 def decide(client: TestClient, thread: dict[str, Any], decisions: list[dict[str, Any]]) -> Any:
     path = f"/api/threads/{thread['thread_id']}"
-    client.post(f"{path}/decisions", json={"actor": AUTHOR, "decisions": decisions})
+    client.post(f"{path}/decisions", json={"actor": REVIEWER, "decisions": decisions})
     return client.post(f"{path}/confirm", json={"actor": REVIEWER, "confirmed": ["F", "M"]})
 
 
@@ -166,9 +166,9 @@ def test_audit_events_follow_the_walkthrough(client: TestClient, db_path: Path) 
     assert [(r[1], r[3], r[4]) for r in rows] == [
         (1, AUTHOR, "thread_started"),
         (2, REVIEWER, "refused"),
-        (3, AUTHOR, "decisions_recorded"),
+        (3, REVIEWER, "decisions_recorded"),
         (4, REVIEWER, "refused"),
-        (5, AUTHOR, "decisions_recorded"),
+        (5, REVIEWER, "decisions_recorded"),
         (6, REVIEWER, "noael_confirmed"),
         (7, "system", "verify_final"),
         (8, "sonnet-4-6", "judge_run"),
@@ -206,7 +206,7 @@ def test_audit_422_and_404_add_no_entry(client: TestClient, db_path: Path) -> No
     bad = form(thread)
     bad[0]["adverse_from"] = 30.0  # not a dose of the slot
     assert (
-        client.post(f"{path}/decisions", json={"actor": AUTHOR, "decisions": bad}).status_code
+        client.post(f"{path}/decisions", json={"actor": REVIEWER, "decisions": bad}).status_code
         == 422
     )
     missing = client.post("/api/threads/nope/approve", json={"actor": REVIEWER})
@@ -275,6 +275,26 @@ def test_snapshot_gather_refuses_a_changed_build(monkeypatch: pytest.MonkeyPatch
     )
     with pytest.raises(StaleBuild):
         gather_state()
+
+
+def test_audit_an_author_cannot_record_decisions_even_as_example(
+    client: TestClient, db_path: Path
+) -> None:
+    thread = start(client)
+    path = f"/api/threads/{thread['thread_id']}/decisions"
+    labelled = [{**d, "example": True} for d in form(thread)]
+    for decisions in (form(thread), labelled):
+        assert client.post(path, json={"actor": AUTHOR, "decisions": decisions}).status_code == 403
+    rows = stored(db_path, thread["thread_id"])
+    assert [(r[3], r[4]) for r in rows] == [
+        (AUTHOR, "thread_started"),
+        (AUTHOR, "refused"),
+        (AUTHOR, "refused"),
+    ]
+    assert json.loads(rows[-1][5])["step"] == "decisions"
+    assert client.get(f"/api/threads/{thread['thread_id']}").json()["decisions"] == []
+    saved = client.post(path, json={"actor": REVIEWER, "decisions": labelled})
+    assert saved.status_code == 200 and len(saved.json()["decisions"]) == len(labelled)
 
 
 def test_audit_a_decisions_post_after_confirm_is_chained_as_refused(

@@ -1,13 +1,15 @@
 {% extends "base.html" %}
-{% import "_components.html" as a %}
+{% import "_components.html" as a with context %}
 {% block main %}
 <section class="step landing">
-  {{ a.page_header("Traceable drug safety science", "From a public SEND study to a draft nonclinical summary, with every number placed by code.") }}
-  <ul class="legend">
-    <li>{{ a.badge("REAL") }} computed live from the data</li>
-    <li>{{ a.badge("RECORDED") }} replayed from a saved run</li>
-    <li>{{ a.badge("SIMULATED") }} a stand-in for production</li>
-  </ul>
-  <p class="actions"><a class="button" href="/step/1">Start with step 1</a></p>
+  <h1>{{ t.land_title }}</h1>
+  <p class="lede">{{ t.land_goal }}</p>
+  <p class="meta">{{ t.land_steps }}</p>
+  <div class="answer-unit">
+    <span class="lang-tag">{{ t.land_example }}</span> <span class="meta">{{ t.land_example_note }}</span>
+    <div class="lede answer" lang="en">{{ a.prov(parts) }}</div>
+  </div>
+  <p class="meta">{{ counts_line }}</p>
+  <p class="btn-row"><a class="btn-primary" href="/study">{{ t.land_cta }} &rarr;</a></p>
 </section>
 {% endblock %}

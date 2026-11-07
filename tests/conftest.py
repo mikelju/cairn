@@ -11,12 +11,19 @@ from cairn.incidence import incidence
 from cairn.ingest import DEFAULT_DB, ingest
 from cairn.tk_summary import tk_summary
 from cairn.tools import study_design
+from cairn.web import explore_live
 
 
 @pytest.fixture(scope="session", autouse=True)
 def app_database() -> None:
     if not DEFAULT_DB.exists():
         ingest()
+
+
+@pytest.fixture(autouse=True)
+def no_index_warmup(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Starting the app never builds the real guideline index (it embeds with ONNX on the CPU)."""
+    monkeypatch.setattr(explore_live, "start_warmup", lambda: None)
 
 
 @dataclass

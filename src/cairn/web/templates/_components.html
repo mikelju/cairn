@@ -3,33 +3,46 @@
 
 {% macro badge_meta(kind, meta) %}<p class="meta">{{ badge(kind) }} {{ meta }}</p>{% endmacro %}
 
-{% macro shell_header(steps, current, role, actor=none) %}
+{% macro shell_header(steps, current, t, locale, lang_links) %}
 <header>
-  <a class="brand" href="/">Cairn</a>
-  <nav class="steps" aria-label="Steps">
-    {% for name in steps %}
-      {% set n = loop.index %}
-      {% if n <= 7 %}
-        <a href="/step/{{ n }}"{% if current == n %} aria-current="step"{% endif %}>{{ n }} {{ name }}</a>
-      {% else %}
-        <span class="locked" aria-disabled="true">{{ n }} {{ name }}</span>
-      {% endif %}
-    {% endfor %}
-  </nav>
-  <span class="role">{% if actor %}Acting as: {{ actor }} {{ badge("SIMULATED") }}{% else %}Role: {{ role }} (simulated){% endif %}</span>
+  <div class="bar">
+    <a class="brand" href="/">{{ t.brand }}</a>
+    <nav class="steps" aria-label="{{ t.nav_steps }}">
+      {% for n, path in steps %}
+        <a href="{{ path }}"{% if current == n %} aria-current="page"{% endif %}><span class="n">{{ n }}</span>{{ t["step_" ~ n] }}</a>
+      {% endfor %}
+    </nav>
+    <span class="role">{{ t.role }}</span>
+    <div class="lang" role="group" aria-label="{{ t.lang_label }}">
+      {% for code in ("es", "en") %}
+      <a href="{{ lang_links[code] }}" hreflang="{{ code }}" lang="{{ code }}"{% if locale == code %} aria-current="true"{% endif %}>{{ code|upper }}</a>
+      {% endfor %}
+    </div>
+  </div>
 </header>
 {% endmacro %}
 
-{% macro shell_footer(footer) %}
+{% macro build_line(footer, t) %}v{{ footer.version }} · {{ t.footer_build }} {{ footer.commit }} · {{ t.footer_snapshot }} {{ footer.snapshot[:12] }}{% endmacro %}
+
+{% macro shell_footer(footer, t, current) %}
 <footer>
-  <span>Public sample data · fictional compound · not GxP-validated</span>
-  <span>v{{ footer.version }} · commit {{ footer.commit }} · snapshot {{ footer.snapshot[:12] }}</span>
+  <span>{{ t.footer_note }}</span>
+  {% if not current %}<span>{{ build_line(footer, t) }}</span>{% endif %}
 </footer>
 {% endmacro %}
 
-{% macro page_header(title, sentence) %}
+{# One screen of four: the counter, the title and the lede; screen_nav closes it with Back and Next. #}
+{% macro screen_head(number, title, sentence) %}
+<p class="stepcount">{{ t.step_counter.format(n=number) }}</p>
 <h1>{{ title }}</h1>
 <p class="lede">{{ sentence }}</p>
+{% endmacro %}
+
+{% macro screen_nav(number, screens) %}
+<p class="btn-row screen-nav">
+  {% if number > 1 %}<a class="btn-secondary" href="{{ screens[number - 2][1] }}">&larr; {{ t.nav_back }}</a>{% endif %}
+  {% if number < 4 %}<a class="btn-primary" href="{{ screens[number][1] }}">{{ t.nav_next }} &rarr;</a>{% endif %}
+</p>
 {% endmacro %}
 
 {% macro step_header(number, title, kind, sentence) %}
@@ -44,33 +57,72 @@
 </section>
 {% endmacro %}
 
-{# headers: list of column names; rows: list of lists of cells; new: highlight every row as new. #}
-{% macro data_table(headers, rows, new=false) %}
+{# headers: list of column names; rows: list of lists of cells; new: highlight every row as new; mark: (row, column) of the used cell. #}
+{% macro data_table(headers, rows, new=false, mark=none) %}
 <table>
   <thead><tr>{% for h in headers %}<th>{{ h }}</th>{% endfor %}</tr></thead>
   <tbody>
   {% for row in rows %}
-  <tr{% if new %} class="new"{% endif %}>{% for cell in row %}<td{% if cell == "not examined" %} class="not-examined"{% endif %}>{{ cell }}</td>{% endfor %}</tr>
+  <tr{% if new %} class="new"{% endif %}>{% set ri = loop.index0 %}{% for cell in row %}<td{% if mark and mark[0] == ri and mark[1] == loop.index0 %} class="hit"{% elif cell == "not examined" %} class="not-examined"{% endif %}>{{ cell }}</td>{% endfor %}</tr>
   {% endfor %}
   </tbody>
 </table>
 {% endmacro %}
 
-{% macro trace(steps) %}<p class="trace">Trace: {{ steps }}</p>{% endmacro %}
+{% macro trace(steps, label="Trace") %}<p class="trace">{{ label }}: {{ steps }}</p>{% endmacro %}
 
-{% macro evidence_panel(items) %}
-<div class="evidence">
+{% macro evidence_list(items) %}
+{% if items %}<div class="evidence">
 {% for e in items %}
-<p>{{ e.tool }}, {{ e.population }}, n={{ e.n }}, {{ e.sources }}</p>
+<p>{{ e.tool }}, {{ e.population }}, n={{ e.n }}, {% if e.count %}{{ e.count }} {{ t[e.label] }}, {{ t.ev_from }} {{ e.first }}{% else %}{{ t.exp_none }}{% endif %}</p>
 {% endfor %}
-</div>
+</div>{% endif %}
 {% endmacro %}
 
 {# kind: rules, blocked, stale or note. #}
 {% macro callout(kind) %}<div class="callout {{ kind }}">{{ caller() }}</div>{% endmacro %}
 
-{% macro disclosure(summary) %}<details><summary>{{ summary }}</summary>{{ caller() }}</details>{% endmacro %}
+{# A disclosure pill: key names the catalogue label, n and unit give the size ("Show passage ranking · 3 rows"), tag tells repeats apart. #}
+{% macro disclosure(key, n, unit, tag=none) %}{% set forms = t["unit_" ~ unit].split("|") %}<details class="pill"><summary class="pill">{{ t["disc_" ~ key] }}{% if tag %} ({{ tag }}){% endif %} · {{ n }} {{ forms[0] if n == 1 else forms[1] }}</summary>{{ caller() }}</details>{% endmacro %}
 
-{% macro in_production(text, kind=none, lead=none) %}
-<p class="prod">{% if kind %}{{ badge(kind) }} {{ lead }} <strong>In production →</strong>{% else %}In production →{% endif %} {{ text }}</p>
+{# A disclosure pill without a size: the label alone, for a note whose length is not the point. #}
+{% macro pill(key) %}<details class="pill"><summary class="pill">{{ t["disc_" ~ key] }}</summary>{{ caller() }}</details>{% endmacro %}
+
+{# A reading cue: a number badge on a part of the page. #}
+{% macro cue(number) %}<span class="cue" aria-hidden="true">{{ number }}</span>{% endmacro %}
+
+{# A highlighted figure: number big, label small, an optional cue that the reading path names. #}
+{% macro tile(number, label, n=none, tone="") %}<div class="tile {{ tone }}">{% if n %}{{ cue(n) }}{% endif %}<span class="num">{{ number }}</span><span class="lbl">{{ label }}</span></div>{% endmacro %}
+
+{# The one folded panel at the foot of a screen: technical detail in the caller, then the In production table (rows of piece, demo, production), then version and commit. #}
+{% macro inside(prod) %}
+<details class="inside"><summary>{{ t.inside }}</summary>
+<div class="inside-body">
+{{ caller() }}
+<h2>{{ t.inside_prod_h }}</h2>
+{{ data_table([t.s7_th_piece, t.s7_th_demo, t.s7_th_prod], prod) }}
+<p class="meta">{{ build_line(footer, t) }}</p>
+</div></details>
 {% endmacro %}
+
+{# Provenance: the sentence as text and tags; each tag opens the source of the piece it shows. #}
+{% macro prov_facts(rows) %}<dl class="prov-facts">{% for label, value in rows %}<dt>{{ t[label] }}</dt><dd>{{ value }}</dd>{% endfor %}</dl>{% endmacro %}
+
+{% macro prov_tag(p) %}<details class="prov prov-{{ p.kind }}"><summary class="prov-chip">{% if p.kind == "quote" %}{{ p.text.removesuffix(" (" ~ p.citation ~ ")") }} <span class="prov-cite">({{ p.citation }})</span>{% else %}{{ p.text }}{% endif %}</summary><div class="prov-body">
+{%- if p.kind == "data" -%}
+{{ prov_facts([("prov_tool", p.tool), ("prov_column", p.column), ("prov_population", p.population)]) }}
+{{ data_table(p.table.columns, p.table.rows, mark=p.table.mark) }}
+{%- if p.source_rows %}{% set cols = p.source_rows[0].keys()|list %}{% set cols = cols[:8] %}{% set grid = namespace(rows=[]) %}{% for r in p.source_rows %}{% set cells = [] %}{% for c in cols %}{% set _ = cells.append(r.get(c, "")) %}{% endfor %}{% set grid.rows = grid.rows + [cells] %}{% endfor %}{% call disclosure("source_rows", p.source_row_count, "rows") %}{{ data_table(cols, grid.rows) }}{% endcall %}{% endif %}
+{%- elif p.kind == "quote" -%}
+{{ prov_facts([("prov_guideline", p.guideline), ("prov_section", p.section), ("prov_page", p.page)]) }}
+<p class="meta">{% if p.highlight %}<a href="{{ p.highlight }}">{{ t.exp_hl }}</a> · {% endif %}<a href="{{ p.link }}">{{ t.exp_official }}</a></p>
+{%- else -%}
+{{ prov_facts([("prov_who", p.who), ("prov_role", p.role), ("prov_value", p.value)]) }}
+<p class="meta"><a href="/decide">{{ t.prov_decide }}</a></p>
+{%- endif -%}
+</div></details>{% endmacro %}
+
+{% macro prov(parts) %}{% for p in parts %}{% if p.kind is defined %}{{ prov_tag(p) }}{% else %}{{ p.text }}{% endif %}{% endfor %}{% endmacro %}
+
+{# The same parts on the white sheet; a decision nobody has taken is a yellow gap. #}
+{% macro sheet_parts(parts) %}{% for p in parts %}{% if p.kind is defined %}{% if p.kind == "hole" %}<span class="hl">{{ p.text }}</span>{% else %}{{ prov_tag(p) }}{% endif %}{% else %}{{ p.text }}{% endif %}{% endfor %}{% endmacro %}

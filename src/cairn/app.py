@@ -14,7 +14,7 @@ from cairn.jobs import Job, JobRunner
 from cairn.observation import check_build
 from cairn.retrieval import StaleRetrievalCache
 from cairn.tools import REGISTRY, argument_problems, call_tool
-from cairn.web import mount_web
+from cairn.web import explore_live, mount_web
 
 
 class JobRequest(BaseModel):
@@ -32,6 +32,7 @@ def create_app() -> FastAPI:
     async def lifespan(app: FastAPI) -> Any:
         check_build()  # SEC-002: refuse to start on a stale or unstamped DuckDB build
         app.state.runner = JobRunner()
+        explore_live.start_warmup()  # with an access code, build the guideline index off-thread
         threads_db = os.environ.get("CAIRN_THREADS_DB", ":memory:")
         async with AsyncSqliteSaver.from_conn_string(threads_db) as saver, mcp_app.lifespan(app):
             app.state.saver = saver

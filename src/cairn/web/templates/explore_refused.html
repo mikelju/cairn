@@ -1,7 +1,2 @@
-{% import "_components.html" as a %}
-<div class="col-left">
+{% import "_components.html" as a with context %}
 {% call a.callout("blocked") %}<p>{{ refused }}</p>{% endcall %}
-<div class="controls" role="group" aria-label="Recorded questions">
-{% for id, text in questions.items() %}<button type="button" hx-post="/explore/run" hx-vals='{"question": "{{ id }}"}' hx-target="#result" title="{{ text }}">{{ id }}</button>{% endfor %}
-</div>
-</div>

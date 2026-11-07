@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% import "_components.html" as a with context %}
+{% block main %}
+{% set g = r.group %}
+{% set heads = [t.s1_th_animal, t.s1_th_test, t.s1_th_value] %}
+<section class="step">
+{{ a.screen_head(1, t.step_1, t.s1_lede) }}
+<div class="card about">
+  <h2>{{ t.s1_card_h }}</h2>
+  <p>{{ t.s1_card_p1 }}</p>
+  <p>{{ t.s1_card_p2_a }}<strong>{{ t.s1_card_term }}</strong>{{ t.s1_card_p2_b }}</p>
+</div>
+<div class="tiles two">
+  {{ a.tile(animals, t.s1_animals) }}
+  {{ a.tile(n_doses, t.s1_doses.format(doses=doses)) }}
+</div>
+{% call a.pill("about") %}
+<p>{{ t.s1_about_what.format(days=days, animals=animals) }} {{ t.s1_about_why }}</p>
+<p><a href="https://github.com/phuse-org/phuse-scripts/tree/master/data/send/PDS" target="_blank" rel="noopener">{{ t.s1_about_link }}</a></p>
+{% endcall %}
+<div class="gone">
+  <div class="tiles one">
+    <div class="tile big"><span class="num">{{ r.total }}</span><span><span class="big-h">{{ t.s1_gone_h }}</span><span class="lbl">{{ t.s1_gone_p }}</span></span></div>
+  </div>
+  <p class="meta effect">{{ t.s1_effect.format(sex=t["s1_sex_" ~ g.sex], dose=g.dose|int, day=g.day|int, unit=r.unit) }}</p>
+  <div class="tiles two">
+    <div class="tile"><span class="num">{{ a.prov([r.means.all.tag]) }}</span><span class="lbl">{{ t.s1_lbl_all.format(n=r.means.all.n) }}</span></div>
+    <div class="tile"><span class="num">{{ a.prov([r.means.plausible.tag]) }}</span><span class="lbl">{{ t.s1_lbl_ok.format(n=r.means.plausible.n) }}</span></div>
+  </div>
+  {% set out = namespace(rows=[]) %}
+  {% for q in r.rows %}{% set out.rows = out.rows + [[q.animal, t[q.measure] ~ (t.s1_day.format(day=q.day) if q.day != "-" else ""), q.value ~ (" · " ~ t.s1_injected_tag if loop.first and r.injected else "")]] %}{% endfor %}
+  {% call a.disclosure("quarantined", r.total, "rows") %}{{ a.data_table(heads, out.rows, new=true) }}{% endcall %}
+  {% if r.reported %}<p class="meta">{{ t.s1_reported }} {{ r.reported[0].animal }}, {{ t[r.reported[0].measure] }}</p>{% endif %}
+  <form hx-post="/study/run" hx-target="main" hx-select="main" hx-swap="outerHTML" method="post" action="/study/run">
+    <input type="hidden" name="switch" value="{{ 'none' if r.injected else 'negative' }}">
+    <button type="submit" class="sm sec">{{ t.s1_undo if r.injected else t.s1_break }}</button>
+  </form>
+  {% if r.injected %}<p class="meta note">{{ t.s1_note.format(value=r.injected_value, animal=r.injected_animal, mean=r.means.all.tag.text, plausible=r.means.plausible.tag.text, n=r.means.plausible.n) }}</p>{% endif %}
+</div>
+{{ a.screen_nav(1, screens) }}
+</section>
+{% endblock %}

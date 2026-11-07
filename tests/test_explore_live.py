@@ -63,13 +63,29 @@ def live_box(monkeypatch: pytest.MonkeyPatch) -> LiveFake:
 
 def ask_box(code: str, question: str = "How many animals?") -> str:
     with TestClient(create_app()) as client:
-        return client.post("/explore/live", data={"question": question, "code": code}).text
+        return client.post("/explore/live?lang=en", data={"question": question, "code": code}).text
 
 
 def test_explore_live_refuses_without_code_wrong_code_or_long_question(live_box: LiveFake) -> None:
     for code, question in (("", "q"), ("wrong", "q"), ("s3cret", "x" * 501), ("s3cret", " ")):
         page = ask_box(code, question)
-        assert "Recorded questions" in page and "s3cret" not in page
+        assert "callout blocked" in page and "s3cret" not in page
+    assert live_box.calls == 0
+
+
+def test_explore_live_empty_question_says_live_empty_but_the_code_is_checked_first(
+    live_box: LiveFake,
+) -> None:
+    from cairn.web.i18n import CATALOGUES
+
+    cat = CATALOGUES["en"]
+    for question in ("", "   "):
+        assert cat["live_empty"] in ask_box("s3cret", question)
+        wrong = ask_box("wrong", question)
+        assert cat["live_need_code"] in wrong and cat["live_empty"] not in wrong
+    with TestClient(create_app()) as client:  # no question field at all
+        bare = client.post("/explore/live?lang=en", data={"code": "s3cret"}).text
+    assert cat["live_empty"] in bare
     assert live_box.calls == 0
 
 
@@ -77,15 +93,43 @@ def test_explore_live_is_off_without_a_configured_code(
     live_box: LiveFake, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.delenv("CAIRN_ACCESS_CODE")
-    assert "Recorded questions" in ask_box("")
+    assert "callout blocked" in ask_box("")
     assert live_box.calls == 0
 
 
 def test_explore_live_answers_with_real_badge_and_never_shows_the_code(live_box: LiveFake) -> None:
+    incidence = {
+        "stop_reason": "tool_use",
+        "content": [{"type": "tool_use", "id": "t3", "name": "incidence", "input": {}}],
+        "usage": {"input_tokens": 1000, "output_tokens": 100},
+    }
+    cited = {  # rule 1: a sentence needs a value placed by code, so it cites the incidence result
+        "stop_reason": "tool_use",
+        "content": [
+            {
+                "type": "tool_use",
+                "id": "t4",
+                "name": "write_answer",
+                "input": {
+                    "sentences": [
+                        {
+                            "parts": [
+                                {"type": "text", "text": "Examined: "},
+                                {"type": "ref", "obs_id": "O1", "field": "n_examined"},
+                            ]
+                        }
+                    ]
+                },
+            }
+        ],
+        "usage": {"input_tokens": 1000, "output_tokens": 100},
+    }
+    live_box.replies = [LIVE_RUN, incidence, cited]
     page = ask_box("s3cret")
-    assert 'class="badge real"' in page and "opus-4-6" in page and "USD" in page
-    assert "No data." in page and "s3cret" not in page
-    assert live_box.calls == 2
+    # the Step2 design has no badge or model line on the answer: only the sentence the code filled
+    assert 'class="badge' not in page and "USD" not in page
+    assert "Examined:" in page and "s3cret" not in page
+    assert live_box.calls == 3
 
 
 def test_explore_live_shows_a_cut_or_a_failure_as_is(live_box: LiveFake) -> None:
@@ -105,21 +149,23 @@ def test_explore_live_box_shows_only_with_a_code(
     live_box: LiveFake, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     with TestClient(create_app()) as client:
-        assert "/explore/live" in client.get("/explore").text
+        assert "/explore/live" in client.get("/ask").text
         monkeypatch.delenv("CAIRN_ACCESS_CODE")
-        assert "/explore/live" not in client.get("/explore").text
+        assert "/explore/live" not in client.get("/ask").text
 
 
 def test_live_cap_blocks_at_the_cap_and_reopens_next_utc_day(
     live_box: LiveFake, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv("CAIRN_LIVE_CAP_USD", "0.01")
-    assert 'class="badge real"' in ask_box("s3cret")  # two calls, about 0.0165 USD
+    first = ask_box("s3cret")  # two calls, about 0.0165 USD; the Step2 answer has no badge
+    assert "daily live budget" not in first and "prov-legend" in first
     calls = live_box.calls
     assert "daily live budget" in ask_box("s3cret")
     assert live_box.calls == calls
     monkeypatch.setattr(explore_live, "utc_today", lambda: date(2099, 1, 2))
-    assert 'class="badge real"' in ask_box("s3cret")
+    reopened = ask_box("s3cret")
+    assert "daily live budget" not in reopened and "prov-legend" in reopened
 
 
 def test_live_cap_counts_a_failed_call_and_refuses_a_second_question_while_one_runs(
@@ -253,3 +299,120 @@ def test_live_question_reaches_the_search_tool_with_the_live_flag(
     live_box.replies = [LIVE_RUN, {**LIVE_RUN, "content": [search]}, LIVE_ANSWER]
     ask_box("s3cret")
     assert seen == ["x"]
+
+
+REAL_START_WARMUP = explore_live.start_warmup  # the autouse fixture in conftest replaces it
+
+
+def test_live_failure_after_the_model_returns_is_a_200_message_and_frees_the_lock(
+    live_box: LiveFake, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def broken(*args: Any) -> float:
+        raise ValueError("pricing broke")
+
+    monkeypatch.setattr(explore_live, "call_cost", broken)
+    with TestClient(create_app()) as client:
+        reply = client.post("/explore/live?lang=en", data={"question": "q", "code": "s3cret"})
+        assert reply.status_code == 200 and "The live call failed (ValueError)" in reply.text
+        monkeypatch.undo()
+        monkeypatch.setenv("CAIRN_ACCESS_CODE", "s3cret")
+        live_box.calls = 0
+        monkeypatch.setattr(live, "make_client", lambda mode: live_box)
+        again = client.post("/explore/live?lang=en", data={"question": "q", "code": "s3cret"})
+    assert "Another live question is running" not in again.text
+    assert "The live call failed" not in again.text and "prov-legend" in again.text
+
+
+def test_live_lock_is_free_after_a_cancellation(
+    live_box: LiveFake, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class Abandoned(BaseException):
+        pass
+
+    def cancelled(*args: Any) -> None:
+        raise Abandoned
+
+    monkeypatch.setattr(live, "ask_live", cancelled)
+    with pytest.raises(Abandoned):  # the request is only used to render, which never happens
+        explore_live.explore_ask_live(None, "q", "s3cret")  # type: ignore[arg-type]
+    assert explore_live._busy.acquire(blocking=False)
+    explore_live._busy.release()
+
+
+def test_live_form_waits_visibly_and_cannot_be_sent_twice(live_box: LiveFake) -> None:
+    with TestClient(create_app()) as client:
+        page = client.get("/ask?lang=en").text
+    form = page[page.index('<form class="live') :].split(">", 1)[0]
+    for attribute in (
+        'hx-indicator="#live-wait"',
+        'hx-disabled-elt="find button"',
+        'hx-sync="this:drop"',
+    ):
+        assert attribute in form
+    assert 'id="live-wait"' in page and "Waiting for the answer..." in page
+    assert '<script src="/static/live.js?v=' in page
+    with TestClient(create_app()) as client:
+        assert "Esperando respuesta..." in client.get("/ask?lang=es").text
+
+
+def test_live_script_names_the_three_failures_and_the_timeout(
+    live_box: LiveFake, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with TestClient(create_app()) as client:
+        script = client.get("/static/live.js")
+        assert script.status_code == 200
+        for name in ("htmx:responseError", "htmx:sendError", "htmx:timeout"):
+            assert name in script.text
+        assert "htmx.config.timeout = 55000" in script.text
+        monkeypatch.delenv("CAIRN_ACCESS_CODE")
+        assert "live.js" not in client.get("/ask").text
+
+
+def test_warmup_builds_the_index_in_a_daemon_thread_only_with_a_code(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    built: list[str] = []
+    monkeypatch.setattr(tools, "_live_index", lambda: built.append(threading.current_thread().name))
+    monkeypatch.delenv("CAIRN_ACCESS_CODE", raising=False)
+    assert REAL_START_WARMUP() is None and built == []
+    monkeypatch.setenv("CAIRN_ACCESS_CODE", "s3cret")
+    thread = REAL_START_WARMUP()
+    assert thread is not None and thread.daemon
+    thread.join(5)
+    assert built == [thread.name] and thread.name != threading.current_thread().name
+
+
+def test_healthz_answers_while_the_index_is_still_building(
+    live_box: LiveFake, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    started, release = threading.Event(), threading.Event()
+
+    def slow_index() -> object:
+        started.set()
+        release.wait(10)
+        return object()
+
+    monkeypatch.setattr(tools, "_live_index", slow_index)
+    monkeypatch.setattr(explore_live, "start_warmup", REAL_START_WARMUP)
+    try:
+        with TestClient(create_app()) as client:
+            assert started.wait(5)
+            assert not release.is_set()
+            assert client.get("/healthz").status_code == 200
+    finally:
+        release.set()
+
+
+def test_a_failed_warmup_is_logged_and_does_not_stop_the_app(
+    live_box: LiveFake, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    def broken() -> object:
+        raise OSError("no weights")
+
+    monkeypatch.setattr(tools, "_live_index", broken)
+    thread = REAL_START_WARMUP()
+    assert thread is not None
+    thread.join(5)
+    assert "live index warm-up failed" in caplog.text
+    with TestClient(create_app()) as client:
+        assert client.get("/healthz").status_code == 200

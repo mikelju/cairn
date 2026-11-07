@@ -210,7 +210,7 @@ def walk(client: TestClient) -> dict[str, Any]:
         }
         for s in thread["slots"]
     ]
-    client.post(f"{path}/decisions", json={"actor": AUTHOR, "decisions": decisions})
+    client.post(f"{path}/decisions", json={"actor": REVIEWER, "decisions": decisions})
     done = client.post(f"{path}/confirm", json={"actor": REVIEWER, "confirmed": ["F", "M"]})
     assert done.status_code == 200
     body: dict[str, Any] = done.json()

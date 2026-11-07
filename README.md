@@ -13,6 +13,10 @@ Video walkthrough: VIDEO_URL (pending, recorded after the merge).
 - `make live AWS_PROFILE=<profile> QUESTION=Q2` asks one question to the live model (laptop only; spends money and prints its ceiling first).
 - `make record AWS_PROFILE=<profile>` records the questions again; `record-draft`, `record-memo` and `record-judge` do the same for the nonclinical-summary draft, the data-quality memo and the judge.
 - `make deploy` pushes the image to one Lightsail container service; see [docs/production.md](docs/production.md).
+  It keeps the environment of the active deployment (for example the AWS keys and region set once in the console), so a redeploy never wipes them.
+  `CAIRN_ACCESS_CODE` and `CAIRN_LIVE_CAP_USD` set in your shell (`$env:` or `export`, never on the command line) override the stored value; unset ones keep it.
+  `make deploy-dry-run` lists the variable names with kept, overridden or added and creates nothing.
+  Values are written to a temporary file for the AWS CLI, deleted afterwards, and never printed.
 - `make changelog` regenerates `CHANGELOG.md` from the merged PR titles.
 - `make smoke`, `make weights`, `make guidance` and `make guidance-check` cover the model profiles and the guidance index (a clean clone needs `make weights` before `npm run check`).
 

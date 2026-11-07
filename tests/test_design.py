@@ -12,7 +12,9 @@ from fastapi.testclient import TestClient
 
 from cairn.app import create_app
 from cairn.web import HERE, templates
-from test_word_cap import rendered_lede, rendered_problems, rendered_words
+from main_counter import rendered_lede, rendered_problems, rendered_words
+
+MOCKUP_WORD_CAP = 93  # the static mockups keep the cap they were drawn under
 
 STATIC = HERE / "static"
 REAL_RECORDINGS = Path(__file__).parent / "fixtures" / "recordings_real_shape"
@@ -24,7 +26,8 @@ COLOUR_LITERAL = re.compile(
     r"(?<![-\w])(?:white|black|red|green|blue|gray|grey|orange|yellow|purple)(?![-\w])"
 )
 RAW_FONT_SIZE = re.compile(r"(?<![-\w])font-size\s*:(?!\s*var\()")
-FONT_FAMILY = re.compile(r"(?<![-\w])font-family\s*:(?!\s*var\()")
+# A family must come from a token, or be inherited (as `font: inherit` already may); never a name.
+FONT_FAMILY = re.compile(r"(?<![-\w])font-family\s*:(?!\s*(?:var\(|inherit\b))")
 FONT_SHORTHAND = re.compile(r"(?<![-\w])font\s*:(?!\s*inherit\b)")
 RULE = re.compile(r"([^{}]+)\{([^{}]*)\}")
 URL = re.compile(r"url\(\s*[\"']?([^\"')]+)[\"']?\s*\)")
@@ -53,8 +56,12 @@ def design_token_violations(css: str) -> list[str]:
     return problems
 
 
+# D14 allows linking to the public PhUSE repository; an anchor loads nothing.
+PHUSE_ANCHOR = re.compile(r'<a href="https://github\.com/phuse-org/[^"\s]*"')
+
+
 def external_references(text: str) -> list[str]:
-    return EXTERNAL.findall(text)
+    return EXTERNAL.findall(PHUSE_ANCHOR.sub("<a", text))
 
 
 def unresolved_css_urls(css: str, client: TestClient) -> list[str]:
@@ -81,15 +88,20 @@ def test_design_tokens_single_root_block() -> None:
 def test_design_tokens_define_the_adopted_values() -> None:
     css = CSS_PATH.read_text()
     for token, value in {
-        "--color-paper": "#fbfaf7",
-        "--color-ink": "#1b2430",
-        "--color-accent": "#0e4d5c",
-        "--color-recorded": "#1d4f91",
-        "--color-block": "#a12622",
+        "--color-paper": "#0e1316",
+        "--color-surface": "#151c20",
+        "--color-ink": "#e6ecee",
+        "--color-accent": "#6cbcf5",
+        "--color-recorded": "#8fc3f2",
+        "--color-block": "#ff8f86",
+        "--tracking-display": "-0.025em",
+        "--tracking-eyebrow": "0.14em",
         "--text-2xs": "11px",
-        "--text-2xl": "40px",
+        "--text-xl": "30px",
+        "--text-2xl": "52px",
         "--space-7": "48px",
-        "--radius-md": "8px",
+        "--radius-md": "10px",
+        "--radius-pill": "999px",
     }.items():
         assert re.search(rf"{token}:\s*{re.escape(value)}\s*;", css), token
     assert "IBM Plex Sans" in css and "IBM Plex Mono" in css
@@ -124,6 +136,9 @@ def test_no_external_resources_in_templates_and_css() -> None:
 def test_no_external_resources_failing_sample() -> None:
     assert external_references('<link href="https://cdn.example/x.css">')
     assert external_references("@import url(http://fonts.example/x.css);")
+    assert external_references('<img src="https://github.com/phuse-org/x.png">')
+    assert external_references('<a href="https://example.com/phuse-org/">x</a>')
+    assert external_references('<a href="https://github.com/phuse-org/p">x</a>') == []
 
 
 def test_no_external_resources_css_urls_resolve_to_served_static_files() -> None:
@@ -167,7 +182,10 @@ BADGE_KINDS = ["REAL", "RECORDED", "SIMULATED", "FIXTURE"]
 
 def component_leaks(template_text: str) -> list[str]:
     """Component markup written by hand in a page template instead of through a macro."""
-    return [name for name, pattern in LEAKS.items() if pattern.search(template_text)]
+    # The draft sheet is the document itself: its tables are document markup (Step4), not
+    # the UI data_table component, so the sheet is not checked for component leaks.
+    ui = re.sub(r'<article class="sheet".*?</article>', "", template_text, flags=re.S)
+    return [name for name, pattern in LEAKS.items() if pattern.search(ui)]
 
 
 def badge_css_problems(css: str) -> list[str]:
@@ -218,10 +236,10 @@ def test_shared_components_exist_and_replace_anatomy() -> None:
         "badge_meta",
         "data_table",
         "trace",
-        "evidence_panel",
+        "evidence_list",
         "callout",
         "disclosure",
-        "in_production",
+        "inside",
     ):
         assert re.search(rf"\{{% macro {macro}\(", text), macro
     for name, pattern in LEAKS.items():
@@ -245,6 +263,9 @@ def test_shared_components_failing_sample() -> None:
         "callout",
     ]
     assert component_leaks("{{ a.data_table(h, rows) }}") == []
+    sheet = '<article class="sheet"><table><tr><td>x</td></tr></table></article>'
+    assert component_leaks(sheet) == []  # document tables inside the draft sheet
+    assert component_leaks(sheet + "<table></table>") == ["table"]  # but not beside it
     assert component_leaks("<p>x <strong>In production</strong> y</p>") == ["production"]
     assert component_leaks('<p class="prod">x</p>') == ["production"]
     assert component_leaks('<div class="col-prod">x</div>') == []
@@ -296,18 +317,14 @@ def test_badge_recorded_keeps_its_metadata_and_simulated_its_production_line(
         data["source"] = "bedrock"
         (served / source.name).write_text(json.dumps(data), encoding="utf-8")
     monkeypatch.setenv("CAIRN_RECORDINGS", str(served))
-    recorded = json.loads((served / "q2.json").read_text(encoding="utf-8"))
     with TestClient(create_app()) as client:
-        result = client.post("/step/2/run", data={"question": "Q2"}).text
-        step1 = client.get("/step/1").text
-    meta = re.search(r'<p class="meta">(.*?)</p>', result, flags=re.S)
-    assert meta is not None and 'class="badge recorded"' in meta.group(1)
-    assert str(recorded["date"]) in meta.group(1) and str(recorded["region"]) in meta.group(1)
-    assert "opus-4-6" in meta.group(1)
-    assert re.search(r"\| \d+\.\d s \|", meta.group(1)) and "USD" in meta.group(1)
-    prod = re.search(r'<p class="prod">(.*?)</p>', step1, flags=re.S)
-    assert prod is not None
-    assert 'class="badge simulated"' in prod.group(1) and "In production" in prod.group(1)
+        client.cookies.set("cairn_lang", "en")
+        result = client.post("/ask/run", data={"question": "Q2"}).text
+        study = client.get("/decide").text  # /study has no Inside panel since E58 (D24)
+    # E59: the Step2 answer carries no badge or metadata line, its Inside panel is gone
+    assert 'class="badge' not in result and 'class="meta"' not in result and "USD" not in result
+    panel = re.search(r'<details class="inside">.*?</details>', study, flags=re.S)
+    assert panel is not None and "In production" in panel.group(0)
 
 
 # --- Contrast and focus (C7) ---
@@ -327,6 +344,9 @@ CONTRAST_PAIRS: list[tuple[str, str, float, str]] = [
     ("muted", "new-row", BODY, "tr.new td.not-examined"),
     ("simulated", "warning-tint", LARGE, ".stamp border"),
     ("accent", "paper", BODY, "summary toggle, step links"),
+    ("ink", "surface-2", BODY, "summary.pill label"),
+    ("accent", "accent-tint", BODY, "summary.pill plus glyph"),
+    ("on-accent", "accent", BODY, ".cue.solid"),
     ("accent", "surface", BODY, ".brand, summary"),
     ("on-accent", "accent", BODY, ".num, button"),
     ("on-accent", "real", BODY, ".badge.real"),
@@ -334,6 +354,9 @@ CONTRAST_PAIRS: list[tuple[str, str, float, str]] = [
     ("simulated", "surface", BODY, ".badge.simulated"),
     ("fixture", "fixture-tint", BODY, ".badge.fixture (hatch tint)"),
     ("fixture", "surface", BODY, ".badge.fixture (hatch white)"),
+    ("real", "ok-tint", BODY, ".prov-data chip and key"),
+    ("simulated", "warning-tint", BODY, ".prov-decision chip and key"),
+    ("fixture", "fixture-tint", BODY, ".prov-quote chip and key"),
     ("ink", "accent-tint", BODY, ".callout.rules"),
     ("ink", "block-tint", BODY, ".callout.blocked"),
     ("ink", "warning-tint", BODY, ".callout.stale"),
@@ -343,6 +366,13 @@ CONTRAST_PAIRS: list[tuple[str, str, float, str]] = [
     ("accent", "paper", LARGE, "focus outline on paper"),
     ("accent", "surface", LARGE, "focus outline on surface"),
     ("accent", "accent-tint", LARGE, "focus outline on tinted callouts"),
+    ("sheet-ink", "sheet-paper", BODY, "draft sheet text"),
+    ("sheet-label", "sheet-paper", BODY, "draft sheet labels"),
+    ("sheet-faint", "sheet-paper", BODY, "draft sheet header and footer"),
+    ("sheet-chip-data", "sheet-paper", BODY, "data chip on the sheet"),
+    ("sheet-chip-quote", "sheet-paper", BODY, "quote chip on the sheet"),
+    ("sheet-chip-decision", "sheet-paper", BODY, "decision chip on the sheet"),
+    ("on-highlight", "highlight", BODY, "highlighted gap"),
 ]
 
 
@@ -380,6 +410,23 @@ def contrast_failures(
 def test_contrast_every_pair_in_use_meets_its_threshold() -> None:
     colours = root_colours(CSS_PATH.read_text())
     assert contrast_failures(colours) == []
+
+
+def test_sheet_chips_use_the_sheet_tokens_that_the_contrast_pairs_cover() -> None:
+    """Inside the white sheet each tag kind takes its --sheet-chip token, which has a pair above."""
+    css = _strip_comments(CSS_PATH.read_text())
+    covered = {fg for fg, bg, _min, _where in CONTRAST_PAIRS if bg == "sheet-paper"}
+    for kind in ("data", "quote", "decision"):
+        rule = re.search(rf"\.sheet \.prov-{kind} > summary\.prov-chip\s*\{{([^}}]*)\}}", css)
+        assert rule is not None, kind
+        assert f"color: var(--sheet-chip-{kind})" in rule.group(1)
+        assert f"sheet-chip-{kind}" in covered
+        assert (
+            contrast_failures(
+                root_colours(css), [(f"sheet-chip-{kind}", "sheet-paper", BODY, kind)]
+            )
+            == []
+        )
 
 
 def test_contrast_known_ratios() -> None:
@@ -495,6 +542,12 @@ def callout_css_problems(css: str) -> list[str]:
     return problems
 
 
+def test_callout_links_use_the_accent_not_the_browser_default_blue() -> None:
+    found = RULE.findall(_strip_comments(CSS_PATH.read_text(encoding="utf-8")))
+    rules = {selector.strip(): body for selector, body in found}
+    assert "var(--color-accent)" in rules.get(".callout a", "")
+
+
 def test_callout_kinds_differ_by_glyph_and_border_style_not_only_colour() -> None:
     assert callout_css_problems(CSS_PATH.read_text(encoding="utf-8")) == []
     sample = (
@@ -517,6 +570,13 @@ def test_locked_steps_are_not_told_apart_only_by_colour() -> None:
     locked = rules[".steps .locked"]
     glyph = rules.get(".steps .locked::before", "")
     assert "line-through" in locked or "content" in glyph
+
+
+def test_current_screen_link_is_told_apart_by_weight_and_underline() -> None:
+    css = _strip_comments(CSS_PATH.read_text(encoding="utf-8"))
+    rules = dict((s.strip(), b) for s, b in RULE.findall(css))
+    current = rules['.steps a[aria-current="page"]']
+    assert "font-weight: 700" in current and "text-decoration: underline" in current
 
 
 def _media_rules(css: str) -> dict[str, str]:
@@ -576,7 +636,7 @@ def mockup_problems(html: str) -> list[str]:
     stylesheets = [m for m in RESOURCE_LINK.findall(html) if "stylesheet" in m.lower()]
     if len(stylesheets) != 1 or REAL_STYLESHEET not in stylesheets[0]:
         problems.append("stylesheet")
-    problems += rendered_problems(html)
+    problems += rendered_problems(html, MOCKUP_WORD_CAP)
     return problems
 
 
