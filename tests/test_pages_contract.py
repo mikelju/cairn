@@ -87,7 +87,9 @@ def test_no_page_shows_text_from_the_other_locale(lang: str) -> None:
     assert len(foreign) > 100
     leaks = []
     for name, page in pages.items():
-        text = _main(page)
+        # The draft sheet is the English document in both UIs (its footer is the English
+        # footer_note), so it is cut out; everything around it must stay in one language.
+        text = _main(re.sub(r'<article class="sheet".*?</article>', " ", page, flags=re.S))
         # D4/D13: the recorded prose and the draft always show the study terms in English
         # (as the study records them); only the English term names are allowed there, in
         # the draft states, and every other text of the page still has to be one language.

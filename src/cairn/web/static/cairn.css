@@ -422,7 +422,9 @@ details.prov[open] > summary.prov-chip { outline: var(--border-focus) solid curr
 .sheet-note { margin: var(--space-5) 0 var(--space-2); }
 .sheetwrap { background: var(--color-surface-2); border: var(--border-1) solid var(--color-line); border-radius: var(--radius-md); padding: var(--space-6) var(--space-4); overflow-x: auto; }
 .sheet { background: var(--sheet-paper); color: var(--sheet-ink); max-width: var(--sheet-max-width); margin: 0 auto; padding: var(--space-8) 72px var(--space-6); box-shadow: var(--shadow-sheet); font-family: var(--font-serif); font-size: var(--text-sheet); line-height: var(--leading-sheet); min-width: 560px; }
-.sheet p, .sheet li, .sheet blockquote, .sheet td, .sheet th { font-size: var(--text-sheet); color: var(--sheet-ink); }
+.sheet p, .sheet .sh-p, .sheet li, .sheet blockquote, .sheet td, .sheet th { font-size: var(--text-sheet); color: var(--sheet-ink); }
+/* Sheet paragraphs are divs: a <details> tag inside a <p> would make the parser close the paragraph. */
+.sheet .sh-p { margin: var(--space-3) 0; }
 .sheet table { font-variant-numeric: tabular-nums; border-collapse: collapse; }
 .sheet th, .sheet td { border-bottom: var(--border-1) solid var(--sheet-line); padding: 6px var(--space-3); text-align: left; color: var(--sheet-ink); }
 .sheet th { border-bottom: var(--border-badge) solid var(--sheet-ink-soft); font-weight: var(--weight-bold); }

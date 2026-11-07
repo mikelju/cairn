@@ -84,7 +84,10 @@ def test_c2_menu_counter_and_next(client: TestClient, lang: str) -> None:
         assert [label for _, label, _ in menu] == MENU[lang]
         assert [href for href, _, _ in menu] == list(SCREENS)
         assert COUNTER[lang].format(n=i) in html
-        assert "<ol" not in _main(html)
+        # No numbered lists in the UI; the draft sheet is a document, and its References
+        # section (inside .sheet) is the one numbered list allowed (Step4 design).
+        interface = re.sub(r"<h2>References</h2>\s*<ol>.*?</ol>", "", _main(html), flags=re.S)
+        assert "<ol" not in interface
         nav = _screen_nav(html)
         nexts = [href for href, label in nav if label == NEXT[lang]]
         if i < 4:

@@ -17,7 +17,7 @@
 {% endfor %}</table>
 
 <h2>1. Study design</h2>
-<p>{{ a.sheet_parts(sheet.intro) }}</p>
+<div class="sh-p">{{ a.sheet_parts(sheet.intro) }}</div>
 <table class="sh-tab">
 <thead><tr><th>Parameter</th><th>Value</th></tr></thead>
 <tbody>
@@ -35,7 +35,7 @@
 </table>
 
 <h2>3. Toxicokinetics</h2>
-<p>{{ a.sheet_parts(sheet.tk_intro) }}</p>
+<div class="sh-p">{{ a.sheet_parts(sheet.tk_intro) }}</div>
 {% if sheet.tk_means %}<table class="sh-tab">
 <thead><tr><th>Quarantined value</th><th>Mean {{ sheet.tk_head }}</th></tr></thead>
 <tbody>
@@ -48,7 +48,7 @@
 
 <h2>4. No-observed-adverse-effect level (NOAEL)</h2>
 {% for n in sheet.noael %}<h3>{{ n.heading }}</h3>
-<p>{{ a.sheet_parts(n.text) }}</p>
+<div class="sh-p">{{ a.sheet_parts(n.text) }}</div>
 {% if n.quote %}<blockquote>{{ a.sheet_parts(n.quote) }}</blockquote>{% endif %}
 {% endfor %}
 <h2>References</h2>

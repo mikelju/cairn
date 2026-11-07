@@ -253,6 +253,9 @@ def _sheet(state: Any, t: dict[str, str]) -> dict[str, Any]:
                 "quote": show(parts[cut:]),
             }
         )
+    # The prose is placed before counting: every tag shown on the sheet is in the counts line.
+    intro, tk_intro = prose(sections["design"]), prose(sections["tk"][:1])
+    tk_notes = [prose([s]) for s in notes]
     tags = [p for p in shown if not isinstance(p, Hole)]
     counts = tag_counts(tags)
     example = sum(getattr(p, "who", "") == t["prov_example"] for p in tags)
@@ -267,11 +270,11 @@ def _sheet(state: Any, t: dict[str, str]) -> dict[str, Any]:
         "meta": meta,
         "parameters": parameters,
         "decisions": decisions,
-        "intro": prose(sections["design"]),
-        "tk_intro": prose(sections["tk"][:1]),
+        "intro": intro,
+        "tk_intro": tk_intro,
         "tk_head": _word(heads[0]) if heads else "",
         "tk_means": means,
-        "tk_notes": [prose([s]) for s in notes],
+        "tk_notes": tk_notes,
         "noael": noael,
         "guidelines": list(dict.fromkeys(guidelines)),
         "footer": CATALOGUES["en"]["footer_note"],

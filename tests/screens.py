@@ -217,4 +217,6 @@ def main_copy(html: str, prose: bool = True) -> str:
         main = _drop(main, re.compile(r'<details class="prov '), "details")
         for tag in ("div", "blockquote", "p"):
             main = _drop(main, re.compile(rf'<{tag} class="[^"]*\banswer-unit\b'), tag)
+        # The draft sheet is the English document itself (headings, DRAFT, References), not UI copy.
+        main = _drop(main, re.compile(r'<article class="sheet"'), "article")
     return " ".join(unescape(re.sub(r"<[^>]+>", " ", main)).split())

@@ -86,7 +86,8 @@ def people_decide() -> bool:
     approved = post("/draft/approve", {"actor": "R. Reviewer"})
     draft = get("/draft")[1].decode()
     checks = {
-        "step 5 has the final text": any(c["disc_final_text"] in final for c in CATALOGUES.values())
+        "step 5 has the final text": any(c["draft_label"] in final for c in CATALOGUES.values())
+        and '<article class="sheet"' in final
         and "RECORDED" in final,
         "step 5 has the judge panel": CATALOGUES["en"]["s5_judge_h"] in final,
         "step 5 panel shows the recorded n and kappa": bool(calibration) and calibration in final,

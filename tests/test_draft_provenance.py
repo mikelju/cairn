@@ -17,7 +17,6 @@ from cairn.web.provenance import (
     QuoteTag,
     TextPart,
     stray_digits,
-    tag_counts,
 )
 from test_ask_provenance import _parse, _squash
 
@@ -34,68 +33,108 @@ def _decided(client: TestClient, lang: str) -> None:
 
 
 def _draft(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, lang: str) -> tuple[str, list[Part]]:
+    """The decided draft page and the prose parts (draft_parts) the sheet was written from."""
+    page, prose, _every = _draft_all(monkeypatch, tmp_path, lang)
+    return page, prose
+
+
+def _draft_all(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, lang: str
+) -> tuple[str, list[Part], list[Part]]:
+    """The page, the prose parts and every tagged part the sheet used (tables repeat tags)."""
     monkeypatch.setenv("CAIRN_THREADS_DB", str(tmp_path / "threads.db"))
-    shown: list[list[Part]] = []
-    real = provenance.draft_parts
+    prose: list[Part] = []
+    every: list[Part] = []
+    real_prose, real_every = provenance.draft_parts, provenance.provenance_parts
 
-    def spy(*args: object) -> list[Part]:
-        shown.append(real(*args))  # type: ignore[arg-type]
-        return shown[-1]
+    def spy_prose(*args: object) -> list[Part]:
+        prose.extend(found := real_prose(*args))  # type: ignore[arg-type]
+        return found
 
-    monkeypatch.setattr(provenance, "draft_parts", spy)
+    def spy_every(*args: object) -> list[Part]:
+        every.extend(found := real_every(*args))  # type: ignore[arg-type]
+        return found
+
     with TestClient(create_app()) as client:
         _decided(client, lang)
-        page = client.get("/draft?actor=R.%20Reviewer").text
-    return page, shown[-1]
+        monkeypatch.setattr(provenance, "draft_parts", spy_prose)
+        monkeypatch.setattr(provenance, "provenance_parts", spy_every)
+        page = client.get("/draft?actor=reviewer").text
+    return page, prose, every
+
+
+# Digits the sheet may show outside every tag: numbered headings and the Ref. column
+# (D1 to D11), both fixed text written in code. The References list is cut out first
+# because it names the guidance documents by their published title.
+FIXED_NUMBERING = re.compile(r"<h[23]>[\d.]+\s|<td>D\d+</td>")
+DETAILS_EDGE = re.compile(r"<details\b|</details>")
 
 
 def _strip_tags(html: str) -> str:
-    """The text of the draft body with every provenance tag removed."""
-    body = html.split('<div class="card answer"><div class="answer-unit">', 1)[1].split(
-        '<p class="prov-legend">'
-    )[0]
+    """The text of the draft sheet with every provenance tag and the fixed numbering removed."""
+    body = html.split('<article class="sheet"', 1)[1].split("</article>")[0]
+    body = body.split("<h2>References</h2>")[0]
     while (tag := re.search(r'<details class="prov ', body)) is not None:
         depth, pos = 0, tag.start()
-        for found in re.finditer(r"<details\b|</details>", body[pos:]):
+        for found in DETAILS_EDGE.finditer(body, pos):
             depth += 1 if found.group().startswith("<d") else -1
             if depth == 0:
-                body = body[:pos] + " " + body[pos + found.end() :]
+                body = body[:pos] + " " + body[found.end() :]
                 break
-    return unescape(re.sub(r"<[^>]+>", " ", body))
+    return unescape(re.sub(r"<[^>]+>", " ", FIXED_NUMBERING.sub("<x>", body)))
 
 
 @pytest.mark.parametrize("lang", ["en", "es"])
 def test_every_tag_on_the_draft_matches_its_source(
     lang: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    page, parts = _draft(monkeypatch, tmp_path, lang)
+    page, prose, every = _draft_all(monkeypatch, tmp_path, lang)
     shown = _parse(page).tags
-    expected = [p for p in parts if not isinstance(p, TextPart)]
-    assert expected and [t["kind"] for t in shown] == [p.kind for p in expected]
-    for tag, part in zip(shown, expected, strict=True):
-        assert _squash(tag["chip"]) == _squash(part.text)
+    # The sheet repeats a tag in the meta table, the parameters, the decisions and the TK
+    # table, so each shown tag is matched with the source tag that has the same kind and chip.
+    sources: dict[tuple[str, str], list[Part]] = {}
+    for part in every:
+        if not isinstance(part, TextPart):
+            sources.setdefault((part.kind, _squash(part.text)), []).append(part)
+
+    def matches(tag: dict[str, str], part: Part) -> bool:
         body = _squash(tag["body"])
         if isinstance(part, DataTag):
-            assert _squash(tag["hit"]) == part.text
-            assert all(f in body for f in (part.tool, part.column, part.population))
-        elif isinstance(part, QuoteTag):
-            assert all(f in body for f in (part.guideline, part.section, str(part.page)))
-            assert part.link in tag["links"]
-        else:
-            assert isinstance(part, DecisionTag)
-            assert part.who and part.who in body and part.value in body
-            assert "/decide" in tag["links"]
+            return _squash(tag["hit"]) == part.text and all(
+                f in body for f in (part.tool, part.column, part.population)
+            )
+        if isinstance(part, QuoteTag):
+            facts = (part.guideline, part.section, str(part.page))
+            return all(f in body for f in facts) and part.link in tag["links"]
+        assert isinstance(part, DecisionTag)
+        return (
+            bool(part.who) and part.who in body and part.value in body and "/decide" in tag["links"]
+        )
+
+    assert shown
+    for tag in shown:
+        candidates = sources[(tag["kind"], _squash(tag["chip"]))]
+        assert any(matches(tag, c) for c in candidates), tag["chip"]
+    # Every tag of the prose sentences is on the sheet.
+    on_sheet = {(t["kind"], _squash(t["chip"])) for t in shown}
+    wanted = {(p.kind, _squash(p.text)) for p in prose if not isinstance(p, TextPart)}
+    assert wanted and wanted <= on_sheet
 
 
 @pytest.mark.parametrize("lang", ["en", "es"])
-def test_the_draft_legend_names_exactly_the_kinds_used(
+def test_the_decided_sheet_uses_all_three_kinds_and_has_only_the_one_line_legend(
     lang: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    # The Step4 sheet has no per-kind legend: only "Draft in English." (and the yellow key).
     page, _parts = _draft(monkeypatch, tmp_path, lang)
     parsed = _parse(page)
-    used = {t["kind"] for t in parsed.tags}
-    assert used == {"data", "quote", "decision"}
-    assert set(parsed.legend) == used and len(parsed.legend) == len(used)
+    assert {t["kind"] for t in parsed.tags} == {"data", "quote", "decision"}
+    assert parsed.legend == [] and "prov-legend" not in page
+    note = re.search(r'<p class="meta sheet-note">(.*?)</p>', page, re.S)
+    assert note is not None and _squash(re.sub(r"<[^>]+>", "", note.group(1))) == (
+        "Draft in English." if lang == "en" else "Borrador en inglés."
+    )
+    assert 'class="hl"' not in page.split('<article class="sheet"', 1)[1]  # nothing pending
 
 
 @pytest.mark.parametrize("lang", ["en", "es"])
@@ -108,30 +147,33 @@ def test_without_tags_the_draft_has_no_digit_but_the_fixed_words(
         plain = plain.replace(word, "")
     assert not re.search(r"\d", plain), plain
     assert stray_digits(parts) == ""
+    # The References list is the only place the guidance titles (with numbers) are written.
+    refs = page.split("<h2>References</h2>", 1)[1].split("</article>")[0]
+    assert refs.count("<li>") >= 1
 
 
 @pytest.mark.parametrize(("lang", "tail"), [("en", "by the AI"), ("es", "por la IA")])
 def test_the_counts_line_equals_the_rendered_tags(
     lang: str, tail: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    page, parts = _draft(monkeypatch, tmp_path, lang)
-    counts = tag_counts(parts)
+    page, _parts = _draft(monkeypatch, tmp_path, lang)
     shown = _parse(page).tags
-    for kind in counts:
-        assert counts[kind] == sum(t["kind"] == kind for t in shown)
+    # The sheet repeats tags in its tables; the line counts the tags as they are shown.
     with_digits = sum(t["kind"] == "data" and bool(re.search(r"\d", t["chip"])) for t in shown)
-    assert with_digits > 0 and with_digits == counts["data"]  # only figures carry a source label
+    assert with_digits > 0 and with_digits == sum(t["kind"] == "data" for t in shown)
     outside = _strip_tags(page)
     for word in FIXED_DIGIT_WORDS:
         outside = outside.replace(word, "")
     stray = len(re.findall(r"\d+(?:[.,]\d+)*", outside))
     line = _squash(re.search(r'<p class="meta prov-counts">(.*?)</p>', page, re.S).group(1))  # type: ignore[union-attr]
     numbers = [int(n) for n in re.findall(r"\d+", line)]
+    decisions = [t for t in shown if t["kind"] == "decision"]
     example = sum(
-        getattr(p, "who", "") in ("Preloaded example", "Ejemplo precargado") for p in parts
+        "Preloaded example" in t["body"] or "Ejemplo precargado" in t["body"] for t in decisions
     )
     assert example > 0
-    assert numbers == [with_digits, stray, counts["decision"] - example, example, counts["quote"]]
+    quotes = sum(t["kind"] == "quote" for t in shown)
+    assert numbers == [with_digits, stray, len(decisions) - example, example, quotes]
     assert tail in line
 
 
@@ -180,7 +222,7 @@ def test_a_refused_choice_is_an_html_page_with_a_plain_message(
     [
         (
             "en",
-            "Show draft in English",
+            "Draft in English.",
             "Rules: 8/8 passed.",
             "Judge: 1/16 flagged; a person reviews.",
             "Rules check numbers and quotations; the judge reads meaning.",
@@ -188,7 +230,7 @@ def test_a_refused_choice_is_an_html_page_with_a_plain_message(
         ),
         (
             "es",
-            "Ver borrador en inglés",
+            "Borrador en inglés.",
             "Reglas: 8/8 superadas.",
             "Juez: 1/16 marcadas; revisión humana.",
             "Reglas miran números y citas; el juez, el sentido.",

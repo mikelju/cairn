@@ -26,7 +26,8 @@ COLOUR_LITERAL = re.compile(
     r"(?<![-\w])(?:white|black|red|green|blue|gray|grey|orange|yellow|purple)(?![-\w])"
 )
 RAW_FONT_SIZE = re.compile(r"(?<![-\w])font-size\s*:(?!\s*var\()")
-FONT_FAMILY = re.compile(r"(?<![-\w])font-family\s*:(?!\s*var\()")
+# A family must come from a token, or be inherited (as `font: inherit` already may); never a name.
+FONT_FAMILY = re.compile(r"(?<![-\w])font-family\s*:(?!\s*(?:var\(|inherit\b))")
 FONT_SHORTHAND = re.compile(r"(?<![-\w])font\s*:(?!\s*inherit\b)")
 RULE = re.compile(r"([^{}]+)\{([^{}]*)\}")
 URL = re.compile(r"url\(\s*[\"']?([^\"')]+)[\"']?\s*\)")
@@ -181,7 +182,10 @@ BADGE_KINDS = ["REAL", "RECORDED", "SIMULATED", "FIXTURE"]
 
 def component_leaks(template_text: str) -> list[str]:
     """Component markup written by hand in a page template instead of through a macro."""
-    return [name for name, pattern in LEAKS.items() if pattern.search(template_text)]
+    # The draft sheet is the document itself: its tables are document markup (Step4), not
+    # the UI data_table component, so the sheet is not checked for component leaks.
+    ui = re.sub(r'<article class="sheet".*?</article>', "", template_text, flags=re.S)
+    return [name for name, pattern in LEAKS.items() if pattern.search(ui)]
 
 
 def badge_css_problems(css: str) -> list[str]:
@@ -259,6 +263,9 @@ def test_shared_components_failing_sample() -> None:
         "callout",
     ]
     assert component_leaks("{{ a.data_table(h, rows) }}") == []
+    sheet = '<article class="sheet"><table><tr><td>x</td></tr></table></article>'
+    assert component_leaks(sheet) == []  # document tables inside the draft sheet
+    assert component_leaks(sheet + "<table></table>") == ["table"]  # but not beside it
     assert component_leaks("<p>x <strong>In production</strong> y</p>") == ["production"]
     assert component_leaks('<p class="prod">x</p>') == ["production"]
     assert component_leaks('<div class="col-prod">x</div>') == []
@@ -403,6 +410,23 @@ def contrast_failures(
 def test_contrast_every_pair_in_use_meets_its_threshold() -> None:
     colours = root_colours(CSS_PATH.read_text())
     assert contrast_failures(colours) == []
+
+
+def test_sheet_chips_use_the_sheet_tokens_that_the_contrast_pairs_cover() -> None:
+    """Inside the white sheet each tag kind takes its --sheet-chip token, which has a pair above."""
+    css = _strip_comments(CSS_PATH.read_text())
+    covered = {fg for fg, bg, _min, _where in CONTRAST_PAIRS if bg == "sheet-paper"}
+    for kind in ("data", "quote", "decision"):
+        rule = re.search(rf"\.sheet \.prov-{kind} > summary\.prov-chip\s*\{{([^}}]*)\}}", css)
+        assert rule is not None, kind
+        assert f"color: var(--sheet-chip-{kind})" in rule.group(1)
+        assert f"sheet-chip-{kind}" in covered
+        assert (
+            contrast_failures(
+                root_colours(css), [(f"sheet-chip-{kind}", "sheet-paper", BODY, kind)]
+            )
+            == []
+        )
 
 
 def test_contrast_known_ratios() -> None:

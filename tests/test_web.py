@@ -719,7 +719,7 @@ def test_decide_and_draft_people_decide_and_the_author_cannot_approve() -> None:
         )
         assert "Acting as" not in confirmed.text and "NOAEL, Males: 200 mg/kg" in confirmed.text
         confirmed = client.get("/draft")
-        assert "Show draft in English" in confirmed.text
+        assert "Draft in English." in confirmed.text and 'class="sheet"' in confirmed.text
         refused = client.post("/draft/approve", data={"actor": "A. Author"})
         assert (
             refused.status_code == 403
@@ -1235,6 +1235,96 @@ def test_decide_reviewer_decides_both_sexes_and_stays_on_decide(
     assert reviewer.count("decisions_recorded") == 2 and reviewer.count("noael_confirmed") == 2
 
 
+@pytest.mark.parametrize(
+    ("lang", "message"),
+    [
+        ("en", "The author cannot sign; another person signs."),
+        ("es", "Quien redacta no puede firmar; firma otra persona."),
+    ],
+)
+def test_draft_author_signing_gets_403_shown_on_the_page_and_an_audit_entry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, lang: str, message: str
+) -> None:
+    db = tmp_path / "threads.db"
+    monkeypatch.setenv("CAIRN_THREADS_DB", str(db))
+    with TestClient(create_app()) as client:
+        client.cookies.set(COOKIE, lang)
+        thread = _filled(client)
+        page = client.get("/draft?actor=author")
+        # one signature button, posting through htmx so the refusal is shown on the page
+        assert page.text.count('hx-post="/draft/approve"') == 1
+        assert 'class="seg on" href="/draft?actor=author' in page.text
+        reply = client.post("/draft/approve", data={"actor": "A. Author", "thread": thread})
+        assert reply.status_code == 403
+        assert message in reply.text and '<article class="sheet"' in reply.text  # on the page
+        assert '{"detail"' not in reply.text and "Approved by" not in reply.text
+        assert client.get(f"/api/threads/{thread}").json()["approved_by"] in (None, "")
+    assert _audit(db, thread)[-1] == ("A. Author", "refused")
+
+
+def test_draft_reviewer_signs_and_the_page_says_approved_by(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db = tmp_path / "threads.db"
+    monkeypatch.setenv("CAIRN_THREADS_DB", str(db))
+    with TestClient(create_app()) as client:
+        client.cookies.set(COOKIE, "en")
+        thread = _filled(client)
+        signed = client.post("/draft/approve", data={"actor": "R. Reviewer", "thread": thread})
+        assert signed.status_code == 200
+        assert "Approved by R. Reviewer" in signed.text
+        assert 'hx-post="/draft/approve"' not in signed.text  # nothing left to sign
+    assert _audit(db, thread)[-1] == ("R. Reviewer", "approved")
+
+
+@pytest.mark.parametrize(
+    ("lang", "legend"),
+    [
+        ("en", "Draft in English. Yellow = decision pending."),
+        ("es", "Borrador en inglés. Amarillo = decisión pendiente."),
+    ],
+)
+def test_draft_before_deciding_has_yellow_gaps_and_the_yellow_legend(
+    lang: str, legend: str
+) -> None:
+    with TestClient(create_app()) as client:
+        client.cookies.set(COOKIE, lang)
+        client.get("/decide")
+        page = client.get("/draft?actor=reviewer").text
+    sheet = page.split('<article class="sheet"', 1)[1].split("</article>")[0]
+    gaps = re.findall(r'<span class="hl">([^<]*)</span>', sheet)
+    assert len(gaps) >= 13  # D1 to D11 and the two NOAEL sentences, never filled in
+    assert all("no decision yet" in gap for gap in gaps)
+    assert {"D1: no decision yet", "NOAEL-F: no decision yet"} <= set(gaps)
+    note = re.search(r'<p class="meta sheet-note">(.*?)</p>', page, re.S)
+    assert note is not None
+    assert " ".join(re.sub(r"<[^>]+>", "", note.group(1)).split()) == legend
+
+
+def test_draft_sheet_keeps_tags_out_of_p_elements() -> None:
+    """A <details> inside a <p> makes the HTML parser close the paragraph and split the sentence."""
+    with TestClient(create_app()) as client:
+        _filled(client)
+        page = client.get("/draft").text
+    sheet = page.split('<article class="sheet"', 1)[1].split("</article>")[0]
+    assert '<details class="prov ' in sheet
+    assert not [p for p in re.findall(r"<p\b[^>]*>(.*?)</p>", sheet, re.S) if "<details" in p]
+    assert sheet.count('class="sh-p"') == 4  # the design, TK and the two NOAEL sentences
+
+
+@pytest.mark.parametrize("lang", ["en", "es"])
+def test_draft_never_says_it_is_ready_to_send(lang: str) -> None:
+    with TestClient(create_app()) as client:
+        client.cookies.set(COOKIE, lang)
+        before = client.get("/draft").text
+        _filled(client)
+        after = client.get("/draft").text
+        signed = client.post("/draft/approve", data={"actor": "R. Reviewer"}).text
+    for page in (before, after, signed):
+        text = page.lower()
+        assert "ready to send" not in text and "listo para enviar" not in text
+
+
 @pytest.mark.parametrize("lang", ["en", "es"])
 def test_decide_with_actor_reviewer_is_200(lang: str) -> None:
     with TestClient(create_app()) as client:
@@ -1246,7 +1336,9 @@ def test_decide_with_actor_reviewer_is_200(lang: str) -> None:
 
 def test_no_screen_has_upper_case_send_terms_outside_the_prose() -> None:
     """The landing and the four screens, every state: only AUC and FDA stay in capitals."""
-    allowed = {"AUC", "FDA", "NOAEL", "SEND"}  # SEND: the format named in the PDS2014 note (E48)
+    # SEND: the format named in the PDS2014 note (E48); NON: the recorded judge reason on the
+    # draft quotes the study's own "NON-TK" group label (E61)
+    allowed = {"AUC", "FDA", "NOAEL", "NON", "SEND"}
     for state in STATE_MARKERS:
         for lang in LANGS:
             # names of a source stay as printed: the study id and the unnumbered FDA sections
