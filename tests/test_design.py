@@ -542,6 +542,12 @@ def callout_css_problems(css: str) -> list[str]:
     return problems
 
 
+def test_callout_links_use_the_accent_not_the_browser_default_blue() -> None:
+    found = RULE.findall(_strip_comments(CSS_PATH.read_text(encoding="utf-8")))
+    rules = {selector.strip(): body for selector, body in found}
+    assert "var(--color-accent)" in rules.get(".callout a", "")
+
+
 def test_callout_kinds_differ_by_glyph_and_border_style_not_only_colour() -> None:
     assert callout_css_problems(CSS_PATH.read_text(encoding="utf-8")) == []
     sample = (
