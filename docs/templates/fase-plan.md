@@ -7,11 +7,13 @@ Base: rama y commit de partida
 ## Incrementos
 Cada incremento deja el producto funcionando y cubre criterios concretos.
 Este archivo es el estado durable: una sesión nueva reanuda desde aquí y desde Git.
+El supervisor marca cada incremento al validar el informe (evidencia en una línea, máximo 160 caracteres: hash de commit, comando y resultado corto; sin volcados largos).
 
 - [ ] 1. Incremento (C1) - evidencia:
 
 ## Encargos
 Los mantiene el supervisor. Estados: en curso, bloqueado, necesita decisión, hecho, fallido, cancelado.
+`Resultado o bloqueo`: máximo 160 caracteres (commit, comando y resultado corto).
 
 | ID | Agente | Encargo | Estado | Resultado o bloqueo |
 |---|---|---|---|---|

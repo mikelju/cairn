@@ -32,20 +32,28 @@ Plantillas en `docs/templates/`. Todo cambio sustancial sube: desviación a spec
    Conversa con el usuario hasta entender el producto; si hace falta, un explorador reconoce el terreno.
    Encarga el borrador de `docs/plans/0_plan_maestro.md`, juzga que proponga fases pequeñas que dejen algo funcionando y preséntalo con sus decisiones abiertas.
    Aprobado el plan maestro, un ejecutor lo entrega en la rama `inicio` con el pipeline de `../sdd-delivery/SKILL.md`.
+   Repositorio con código ya existente (lo incluyó `scripts/incluir.mjs` en la rama `sdd-lite`): no ejecutes `npm run arrancar` y trabaja en esa rama.
+   Un explorador reconoce el código, sus comprobaciones y sus convenciones.
+   El ejecutor adapta `AGENTS.md` fusionando `AGENTS.sdd-lite.md` si existe, y lo borra;
+   la comprobación de calidad apunta a lo que el repositorio ya tenga, con un script `check` en `package.json` o `comprobar` en `.sdd-lite.json`.
+   El plan maestro empieza con una fase 00 de estado heredado: qué hay, qué pasa las comprobaciones y qué deuda se acepta.
 2. Especificar una fase: encarga `spec.md` con objetivo, alcance y criterios observables, suposiciones declaradas y dudas en "Decisiones abiertas".
    Lleva cada duda al usuario y anota su respuesta literal; al aprobarla queda congelada.
 3. Planear: encarga `plan.md` con incrementos verificables ligados a criterios. No requiere nueva aprobación.
 4. Ejecutar: crea o cambia a la rama de trabajo (`fase-NN-nombre` o `cambio-NNN`) y relee los incrementos pendientes de `plan.md`.
-   Encarga los incrementos a ejecutores, de uno en uno o en grupos coherentes, y registra cada encargo en la tabla Encargos.
-   Juzga cada informe antes de lanzar el siguiente: evidencia vigente, plan marcado y comprobaciones en verde.
+   Encarga los incrementos a ejecutores copiando en el brief el incremento y sus criterios (el ejecutor no lee ni edita `plan.md`), y registra cada encargo en la tabla Encargos.
+   Juzga cada informe antes de lanzar el siguiente: con evidencia vigente y comprobaciones en verde, marca tú la casilla en `plan.md` y cierra la fila en Encargos en una sola línea corta (máximo 160 caracteres: commit, comando y resultado). No releas fases ya integradas.
 5. Validar: carga `../sdd-delivery/SKILL.md`, que incluye la revisión adversarial de `../sdd-review/SKILL.md`.
 6. Cerrar: un ejecutor entrega en rama y PR, nunca fusiona; tú actualizas el plan maestro, juzgas los resultados por criterio
    y presentas al usuario la PR, los pendientes y los aprendizajes candidatos.
+   Al integrarse la fase o el cambio, actualiza su `Estado: integrada` o `integrado` para que `rumbo.mjs` deje de listarlo como trabajo abierto.
 Si el usuario pidió solo plan, termina en el paso que corresponda.
 Una lista de tareas del harness, si existe, es copia efímera; la fuente es `plan.md` o el documento del cambio.
 
 ## Delegación
 - Solo tres tipos de agente: `ejecutor`, `explorador` y `revisor`, definidos en `.claude/agents/`; un hook rechaza otros y briefs incompletos.
+- No lances un `explorador` para dudas que se resuelven con `Grep`, `Glob` o leyendo uno o dos archivos conocidos.
+- Ajusta el `model` del subagente a la dificultad del encargo y fija el nivel de comprobación proporcional al radio de impacto (`local` o `profundo`).
 - Cada encargo lleva su brief según `references/encargos.md`; nunca la conversación ni tu razonamiento.
 - Lectura y revisión en abanico: hasta cuatro agentes en paralelo, cada uno devuelve un resumen.
 - Escritura: un ejecutor a la vez por carpeta de trabajo; en paralelo solo con un worktree por ejecutor y archivos disjuntos.
@@ -73,4 +81,4 @@ Las ediciones aceptadas las hace un ejecutor.
 ## Contexto bajo demanda
 Encargos: `references/encargos.md`. Supervisión: `references/supervision.md`. Trabajo del ejecutor: `references/ejecucion.md`.
 Revisión: `../sdd-review/SKILL.md`. Entrega y No Mistakes: `../sdd-delivery/SKILL.md`.
-GitHub: `../github/SKILL.md`. Planes visuales: `../lavish/SKILL.md`.
+GitHub: `../github/SKILL.md`. Planes visuales: `../lavish/SKILL.md`. Aprendizaje y poda: `../sdd-ablate/SKILL.md`.
