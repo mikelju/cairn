@@ -1,6 +1,6 @@
 # Phase 02b - An agent that writes no numbers, live and recorded: plan and results
 
-Status: done
+Status: integrated
 Spec: `spec.md` (approved, frozen)
 Base: branch `fase-02b-live-agent` from `main` at ce1a81f (phase 02a merged)
 

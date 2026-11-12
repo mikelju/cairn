@@ -1,6 +1,6 @@
 # 005 - Final README
 
-Status: ready locally
+Status: integrated
 
 ## Contract
 Goal and reason: the project is finished and the README is its public face (the repository is public).
@@ -40,7 +40,7 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 
 | ID | Agent | Brief | Status | Result or blocker |
 |---|---|---|---|---|
-| E2 | ejecutor | Review the README against the project, rewrite it with diagrams, no video; record the change and open the PR | in progress | See Evidence and Delivery |
+| E2 | ejecutor | Review the README against the project, rewrite it with diagrams, no video; record the change and open the PR | done | README rewrite delivered and merged in PR 17 (ddf99e4) |
 
 ## User decisions
 | ID | Question | Options and recommendation | Status | User answer |
