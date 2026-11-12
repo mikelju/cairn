@@ -69,4 +69,8 @@ Nunca le pases el informe, el resumen ni el razonamiento del ejecutor: confirmar
 - `description`: el ID del encargo y tres a cinco palabras.
 - En segundo plano cuando el usuario pueda seguir hablando o haya varios en paralelo; su fin llega como notificación.
   En primer plano cuando lo siguiente depende del resultado y no hay nada más que hacer.
+- Dimensiona cada brief para un contexto de Sonnet: como máximo dos incrementos que creen un módulo, y ningún brief que reescriba un registro y código a la vez.
+  Un lote que falló por contexto se divide antes de relanzarlo; nunca se reenvía entero.
+- No encargues a un ejecutor desplegar a producción ni ejecutar llamadas a Bedrock o AWS con el perfil del usuario.
+  Pide al usuario que lo ejecute y registra el resultado.
 - Paralelo con escritura: cada ejecutor en su worktree (`git worktree add ../<proyecto>-E<n> -b <rama>`), indicado en "Dónde".

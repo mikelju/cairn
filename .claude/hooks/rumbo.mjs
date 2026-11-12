@@ -87,7 +87,14 @@ function rumbo(raiz) {
     const cambios = git(raiz, "status", "--porcelain").split(/\r?\n/).filter(Boolean).length;
     lineas.push(`Rama: ${rama}. Archivos con cambios sin commit: ${cambios}.`);
   } catch {
-    lineas.push("El proyecto aun no esta arrancado (sin repositorio Git o sin commits): /iniciar ejecuta npm run arrancar.");
+    let hayArrancar = false;
+    try {
+      hayArrancar = Boolean(JSON.parse(leer(join(raiz, "package.json")) ?? "{}").scripts?.arrancar);
+    } catch {}
+    lineas.push(
+      "El proyecto aun no esta arrancado (sin repositorio Git o sin commits)" +
+        (hayArrancar ? ": /iniciar ejecuta npm run arrancar." : "."),
+    );
   }
 
   const maestro = leer(join(raiz, "docs", "plans", "0_plan_maestro.md"));

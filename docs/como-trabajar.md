@@ -36,7 +36,7 @@ Repositorio ajeno o evaluación (adopción local / modo aporte):
 
 Actualizar un proyecto con SDD Lite previo:
 1. Para poner al día un repositorio con una versión anterior del marco: ejecuta `node "<ruta al esqueleto>/scripts/actualizar.mjs"`.
-   Actualiza carpetas del método, guías y esquemas interactivos, limpia scripts viejos como `test-hooks.mjs` y sanea el estado de fases anteriores en `docs/plans/`.
+   Actualiza carpetas del método, guías y esquemas interactivos, limpia scripts viejos y sanea el estado de fases anteriores en `docs/plans/`.
    Admite `--dry-run` para previsualizar los cambios, `--no-commit` para omitir el commit y `--force` si hay cambios pendientes.
 
 Sabes que el framework está activo porque el supervisor empieza cada respuesta con "Jefe:".
