@@ -6,47 +6,65 @@ import {
   ThreadView,
   ViewId,
   confirmThreadNoael,
+  noaelDisplay,
   recordThreadDecisions,
 } from '../api';
-import { EXAMPLE_DECISIONS_MAP, Locale } from '../i18n';
+import { Icon, Spinner } from '../components/Icon';
+import { NoaelPill, noaelLabel } from '../components/Noael';
+import { EXAMPLE_DECISIONS_MAP, Locale, UI_TEXT } from '../i18n';
 
 interface AssessmentViewProps {
   locale: Locale;
   actor: Actor;
-  onChangeActor: (actor: Actor) => void;
   thread: ThreadView | null;
-  onThreadUpdated: (updated: ThreadView, actionLabel: string) => void;
-  onAuditRefusal: (actionLabel: string, status: number, detail: string) => void;
+  onThreadUpdated: (updated: ThreadView, actionLabel: string, effectiveActor?: Actor) => void | Promise<void>;
+  onAuditRefusal: (
+    actionLabel: string,
+    status: number,
+    detail: string,
+    effectiveActor?: Actor,
+  ) => void | Promise<void>;
   onResetThread: () => Promise<void>;
   onNavigate: (view: ViewId) => void;
 }
 
+type SlotDraft = { related: number | null; adverse: number | null; example: boolean };
+
+const KEY_FINDING = 'GLAND, ADRENAL Vacuolization';
+
+const BARS: Record<'F' | 'M', Array<{ dose: number; text: string; pct: number; exam: boolean }>> = {
+  F: [
+    { dose: 0, text: '0/10', pct: 0, exam: true },
+    { dose: 20, text: '2/5', pct: 40, exam: true },
+    { dose: 200, text: '4/5', pct: 80, exam: true },
+    { dose: 400, text: '9/10', pct: 90, exam: true },
+  ],
+  M: [
+    { dose: 0, text: '0/10', pct: 0, exam: true },
+    { dose: 20, text: 'n/e', pct: 0, exam: false },
+    { dose: 200, text: 'n/e', pct: 0, exam: false },
+    { dose: 400, text: '7/10', pct: 70, exam: true },
+  ],
+};
+
 export const AssessmentView: React.FC<AssessmentViewProps> = ({
   locale,
   actor,
-  onChangeActor,
   thread,
   onThreadUpdated,
   onAuditRefusal,
   onResetThread,
   onNavigate,
 }) => {
-  const [draftMap, setDraftMap] = useState<
-    Record<string, { related: number | null; adverse: number | null; example: boolean }>
-  >({});
+  const t = UI_TEXT[locale];
+  const [draftMap, setDraftMap] = useState<Record<string, SlotDraft>>({});
   const [showAllSlots, setShowAllSlots] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [feedback, setFeedback] = useState<{
-    kind: 'success' | 'warn' | 'danger';
-    text: string;
-  } | null>(null);
+  const [feedback, setFeedback] = useState<{ kind: 'success' | 'warn' | 'danger'; text: string } | null>(null);
 
   useEffect(() => {
     if (!thread) return;
-    const bySlot: Record<
-      string,
-      { related: number | null; adverse: number | null; example: boolean }
-    > = {};
+    const bySlot: Record<string, SlotDraft> = {};
     thread.slots.forEach((s) => {
       const existing = thread.decisions.find((d) => d.dec_id === s.slot);
       if (existing) {
@@ -56,14 +74,8 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
           example: existing.actor === 'Example',
         };
       } else {
-        const key = `${s.sex}|${s.finding}`;
-        const preset = EXAMPLE_DECISIONS_MAP[key] || [null, null];
-        const isKey = s.finding === 'GLAND, ADRENAL Vacuolization';
-        bySlot[s.slot] = {
-          related: preset[0],
-          adverse: preset[1],
-          example: !isKey,
-        };
+        const preset = EXAMPLE_DECISIONS_MAP[`${s.sex}|${s.finding}`] || [null, null];
+        bySlot[s.slot] = { related: preset[0], adverse: preset[1], example: s.finding !== KEY_FINDING };
       }
     });
     setDraftMap(bySlot);
@@ -71,41 +83,32 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
 
   if (!thread) {
     return (
-      <div className="panel">
-        <div className="callout">Loading workflow thread…</div>
+      <div className="center-pad">
+        <Spinner />
       </div>
     );
   }
 
-  const updateSlotDraft = (
-    slotId: string,
-    field: 'related' | 'adverse',
-    valStr: string,
-  ) => {
+  const updateSlotDraft = (slotId: string, field: 'related' | 'adverse', valStr: string) => {
     const num = valStr === 'none' ? null : Number(valStr);
     setDraftMap((prev) => {
       const cur = prev[slotId] || { related: null, adverse: null, example: false };
       const next = { ...cur, [field]: num, example: false };
-      // Keep related <= adverse automatically for UX convenience
+      // Keep related <= adverse automatically
       if (field === 'adverse' && num !== null && (next.related === null || next.related > num)) {
         next.related = num;
       }
       if (field === 'related' && num === null) {
         next.adverse = null;
-      } else if (
-        field === 'related' &&
-        num !== null &&
-        next.adverse !== null &&
-        num > next.adverse
-      ) {
+      } else if (field === 'related' && num !== null && next.adverse !== null && num > next.adverse) {
         next.adverse = num;
       }
       return { ...prev, [slotId]: next };
     });
   };
 
-  const buildDecisionPayload = (): DecisionInput[] => {
-    return thread.slots.map((s) => {
+  const buildDecisionPayload = (): DecisionInput[] =>
+    thread.slots.map((s) => {
       const d = draftMap[s.slot] || { related: null, adverse: null, example: false };
       return {
         dec_id: s.slot,
@@ -114,6 +117,23 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
         example: d.example,
       };
     });
+
+  // True when the form differs from what the checkpoint holds (or nothing is saved yet).
+  const draftDiffersFromSaved = (): boolean =>
+    thread.slots.some((s) => {
+      const saved = thread.decisions.find((d) => d.dec_id === s.slot);
+      const d = draftMap[s.slot] || { related: null, adverse: null, example: false };
+      if (!saved) return true;
+      return saved.treatment_related_from !== d.related || saved.adverse_from !== d.adverse;
+    });
+
+  const refuse = async (label: string, err: unknown) => {
+    if (err instanceof ApiError) {
+      await onAuditRefusal(label, err.status, err.detail, actor);
+      setFeedback({ kind: 'danger', text: `HTTP ${err.status} · ${actor}: ${err.detail}` });
+    } else {
+      setFeedback({ kind: 'danger', text: String(err) });
+    }
   };
 
   const handleSaveDecisions = async () => {
@@ -122,24 +142,10 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
     try {
       const payload = buildDecisionPayload();
       const updated = await recordThreadDecisions(thread.thread_id, actor, payload);
-      onThreadUpdated(updated, `record_decisions (${payload.length} slots) by ${actor}`);
-      setFeedback({
-        kind: 'success',
-        text:
-          locale === 'en'
-            ? `Recorded ${payload.length} slot decisions (D1–D11) in checkpoint and recomputed deterministic NOAEL.`
-            : `Se registraron las ${payload.length} decisiones (D1–D11) en el checkpoint y se recalculó el NOAEL determinista.`,
-      });
+      await onThreadUpdated(updated, `record_decisions (${payload.length} slots) by ${actor}`, actor);
+      setFeedback({ kind: 'success', text: t.savedMsg });
     } catch (err) {
-      if (err instanceof ApiError) {
-        onAuditRefusal('record_decisions', err.status, err.detail);
-        setFeedback({
-          kind: 'danger',
-          text: `HTTP ${err.status} (${actor}): ${err.detail} — Recorded in SHA-256 audit chain.`,
-        });
-      } else {
-        setFeedback({ kind: 'danger', text: String(err) });
-      }
+      await refuse('record_decisions', err);
     } finally {
       setBusy(false);
     }
@@ -149,229 +155,101 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
     setBusy(true);
     setFeedback(null);
     try {
-      // If no decisions have been saved yet and actor is Reviewer, save them first
       let currentThread = thread;
-      if (actor === 'R. Reviewer' && currentThread.decisions.length === 0) {
+      // Save first when nothing is saved or the dropdowns were edited after the last save.
+      if (actor === 'R. Reviewer' && (currentThread.decisions.length === 0 || draftDiffersFromSaved())) {
         const payload = buildDecisionPayload();
         currentThread = await recordThreadDecisions(currentThread.thread_id, actor, payload);
-        onThreadUpdated(currentThread, `record_decisions (${payload.length} slots) by ${actor}`);
+        await onThreadUpdated(currentThread, `record_decisions (${payload.length} slots) by ${actor}`, actor);
       }
       const updated = await confirmThreadNoael(currentThread.thread_id, actor, sexes);
-      onThreadUpdated(
+      await onThreadUpdated(
         updated,
         `confirm_noael (${sexes.join(', ')}) by ${actor} -> waiting=${updated.waiting}`,
+        actor,
       );
       setFeedback({
         kind: 'success',
         text:
-          locale === 'en'
-            ? `NOAEL confirmed for ${sexes.join(' & ')} by ${actor}. Workflow transitioned to ${updated.waiting} and ran 8 verifier rules + Sonnet 4.6 Judge.`
-            : `NOAEL confirmado para ${sexes.join(' y ')} por ${actor}. El flujo avanzó a ${updated.waiting} y ejecutó las 8 reglas y el Juez Sonnet 4.6.`,
+          updated.waiting === 'await_approval'
+            ? t.bothConfirmed
+            : `${sexes.join(' & ')} ${t.oneConfirmed}`,
       });
     } catch (err) {
-      if (err instanceof ApiError) {
-        onAuditRefusal('confirm_noael', err.status, err.detail);
-        setFeedback({
-          kind: 'danger',
-          text: `HTTP ${err.status} (${actor}): ${err.detail} — Refusal chained in SHA-256 audit log.`,
-        });
-      } else {
-        setFeedback({ kind: 'danger', text: String(err) });
-      }
+      await refuse('confirm_noael', err);
     } finally {
       setBusy(false);
     }
   };
 
-  const keyFemaleSlot = thread.slots.find(
-    (s) => s.finding === 'GLAND, ADRENAL Vacuolization' && s.sex === 'F',
-  );
-  const keyMaleSlot = thread.slots.find(
-    (s) => s.finding === 'GLAND, ADRENAL Vacuolization' && s.sex === 'M',
-  );
-
   const isLocked = thread.waiting !== 'await_decisions';
+
+  const optionList = (
+    <>
+      <option value="none">{t.noneOpt}</option>
+      <option value="20">20 mg/kg</option>
+      <option value="200">200 mg/kg</option>
+      <option value="400">400 mg/kg</option>
+    </>
+  );
 
   return (
     <div className="stack">
       <div className="page-head">
-        <div>
-          <div className="eyebrow">
-            {locale === 'en'
-              ? 'STAGE 4 · HUMAN-IN-THE-LOOP SCIENTIFIC ASSESSMENT & NOAEL DERIVATION'
-              : 'ETAPA 4 · EVALUACIÓN CIENTÍFICA HUMANA Y DERIVACIÓN DETERMINISTA DEL NOAEL'}
-          </div>
-          <h1>
-            {locale === 'en'
-              ? 'Adversity Classification & Deterministic NOAEL'
-              : 'Clasificación de Adversidad y NOAEL Determinista'}
-          </h1>
-          <p className="lede">
-            {locale === 'en'
-              ? 'A qualified reviewer classifies treatment-related and adverse onset doses; Python code deterministically derives the NOAEL per sex and flags any unexamined tissues at that dose.'
-              : 'Un revisor cualificado clasifica las dosis de inicio relacionadas con el tratamiento y adversas; el código deriva de forma determinista el NOAEL por sexo y advierte de tejidos no examinados.'}
-          </p>
-        </div>
+        <h1>{t.assessment}</h1>
         <div className="head-actions">
-          <span className="status-pill info">Thread Step: {thread.waiting}</span>
+          <span className="status-pill info">{thread.waiting}</span>
+          {actor === 'A. Author' && (
+            <span className="status-pill warn" title="A. Author">
+              <Icon name="lock" size={12} /> {t.authorOnly}
+            </span>
+          )}
           {isLocked && (
             <button className="btn secondary sm" onClick={onResetThread}>
-              ↻ {locale === 'en' ? 'Start Fresh Thread to Edit' : 'Iniciar Nuevo Hilo para Editar'}
+              <Icon name="reset" size={13} /> {t.newThread}
             </button>
           )}
           <button className="btn" onClick={() => onNavigate('report')}>
-            {locale === 'en' ? 'Open CTD 2.6.6.3 Report →' : 'Abrir Informe CTD 2.6.6.3 →'}
-          </button>
-        </div>
-      </div>
-
-      {/* Role Gate Banner */}
-      <div
-        className={`callout ${actor === 'A. Author' ? 'warn' : 'success'}`}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 16,
-          flexWrap: 'wrap',
-        }}
-      >
-        <div>
-          <strong>
-            {locale === 'en' ? 'Active Session Role: ' : 'Rol Activo en Sesión: '}
-            <span className="mono">{actor}</span>
-          </strong>{' '}
-          —{' '}
-          {actor === 'A. Author'
-            ? locale === 'en'
-              ? 'In Cairn, the author of the draft cannot record adversity decisions or confirm a NOAEL. Try clicking "Save Decisions" or "Confirm NOAEL" below to trigger the live HTTP 403 refusal, or switch to R. Reviewer.'
-              : 'El autor del borrador no puede registrar decisiones de adversidad ni confirmar el NOAEL. Prueba a pulsar Guardar o Confirmar para ver el bloqueo HTTP 403 en vivo, o cambia a R. Reviewer.'
-            : locale === 'en'
-              ? 'R. Reviewer is active. You have full authority to record D1–D11 onset doses and confirm the NOAEL for Females and Males.'
-              : 'R. Reviewer activo. Tienes permisos completos para grabar las decisiones D1–D11 y confirmar el NOAEL.'}
-        </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            type="button"
-            className={`btn sm ${actor === 'A. Author' ? 'amber' : 'secondary'}`}
-            onClick={() => onChangeActor('A. Author')}
-          >
-            Switch to A. Author (Test 403)
-          </button>
-          <button
-            type="button"
-            className={`btn sm ${actor === 'R. Reviewer' ? '' : 'secondary'}`}
-            onClick={() => onChangeActor('R. Reviewer')}
-          >
-            Switch to R. Reviewer ✓
+            {t.report} <Icon name="chevron" size={14} />
           </button>
         </div>
       </div>
 
       {feedback && <div className={`callout ${feedback.kind}`}>{feedback.text}</div>}
 
-      {/* Key Finding Evaluation Cards (Female & Male Adrenal Vacuolization) */}
       <div className="grid two">
-        {[
-          {
-            sex: 'F' as const,
-            title:
-              locale === 'en'
-                ? 'Females (F) — Key Finding: GLAND, ADRENAL Vacuolization'
-                : 'Hembras (F) — Hallazgo Clave: GLAND, ADRENAL Vacuolization',
-            slot: keyFemaleSlot,
-            bars: [
-              { dose: 0, text: '0/10 (0%)', pct: 0, exam: true },
-              { dose: 20, text: '2/5 (40%)', pct: 40, exam: true },
-              { dose: 200, text: '4/5 (80%)', pct: 80, exam: true },
-              { dose: 400, text: '9/10 (90%)', pct: 90, exam: true },
-            ],
-            contextNote:
-              locale === 'en'
-                ? 'Accompanied by -14.2% lower Day-29 body weight vs control from 200 mg/kg/day (Slot D10).'
-                : 'Acompañado de peso corporal -14.2% menor que el control desde 200 mg/kg/día (Slot D10).',
-          },
-          {
-            sex: 'M' as const,
-            title:
-              locale === 'en'
-                ? 'Males (M) — Key Finding: GLAND, ADRENAL Vacuolization'
-                : 'Machos (M) — Hallazgo Clave: GLAND, ADRENAL Vacuolization',
-            slot: keyMaleSlot,
-            bars: [
-              { dose: 0, text: '0/10 (0%)', pct: 0, exam: true },
-              { dose: 20, text: 'not examined', pct: 0, exam: false },
-              { dose: 200, text: 'not examined', pct: 0, exam: false },
-              { dose: 400, text: '7/10 (70%)', pct: 70, exam: true },
-            ],
-            contextNote:
-              locale === 'en'
-                ? 'Note: Adrenals were not examined at 20 or 200 mg/kg/day in males; code automatically flags incomplete examination at NOAEL = 200 mg/kg/day.'
-                : 'Nota: No se examinaron suprarrenales a 20 ni 200 mg/kg/día en machos; el código señala automáticamente examen incompleto en el NOAEL.',
-          },
-        ].map((card) => {
-          const slotId = card.slot?.slot || (card.sex === 'F' ? 'D1' : 'D6');
-          const curDraft = draftMap[slotId] || { related: null, adverse: null, example: false };
-          const noaelObj = thread.noael[card.sex];
-          const isConfirmed = thread.confirmed.includes(card.sex);
+        {(['F', 'M'] as const).map((sex) => {
+          const slot = thread.slots.find((s) => s.finding === KEY_FINDING && s.sex === sex);
+          const slotId = slot?.slot || (sex === 'F' ? 'D1' : 'D6');
+          const cur = draftMap[slotId] || { related: null, adverse: null, example: false };
+          const nd = noaelDisplay(thread, sex);
+          const flags = nd.state === 'pending' ? [] : thread.noael[sex]?.flags || [];
 
           return (
-            <div key={card.sex} className="panel">
+            <div key={sex} className="panel">
               <div className="panel-head">
-                <div>
-                  <span className="eyebrow">SLOT {slotId}</span>
-                  <h2>{card.title}</h2>
-                </div>
-                <span className={`status-pill ${isConfirmed ? '' : 'warn'}`}>
-                  {isConfirmed ? 'NOAEL Confirmed' : 'Open for Decision'}
-                </span>
+                <h2>
+                  {sex} · {KEY_FINDING}
+                </h2>
+                <span className="chip">{slotId}</span>
               </div>
 
-              {/* Incidence Bars */}
-              <div
-                style={{
-                  background: '#071926',
-                  border: '1px solid #1d4c60',
-                  borderRadius: 10,
-                  padding: 12,
-                  marginBottom: 12,
-                  display: 'grid',
-                  gap: 8,
-                }}
-              >
-                {card.bars.map((b) => (
+              <div className="stack" style={{ gap: 6, marginBottom: 12 }}>
+                {BARS[sex].map((b) => (
                   <div
                     key={b.dose}
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '95px 1fr 95px',
+                      gridTemplateColumns: '42px 1fr 44px',
                       alignItems: 'center',
                       gap: 10,
                       fontSize: 12,
                     }}
                   >
-                    <span className="mono">{b.dose} mg/kg/day</span>
-                    <div
-                      style={{
-                        height: 10,
-                        background: '#123142',
-                        borderRadius: 99,
-                        overflow: 'hidden',
-                      }}
-                    >
-                      {b.exam && (
-                        <div
-                          style={{
-                            height: '100%',
-                            width: `${b.pct}%`,
-                            background:
-                              b.pct >= 70
-                                ? 'linear-gradient(90deg, #f5b84c, #f36b6b)'
-                                : 'linear-gradient(90deg, #29d7d4, #4d8df5)',
-                          }}
-                        />
-                      )}
-                    </div>
+                    <span className="mono muted">{b.dose}</span>
+                    <span className="bar" style={{ height: 10 }}>
+                      {b.exam && <i className={b.pct >= 70 ? 'hot' : ''} style={{ width: `${b.pct}%` }} />}
+                    </span>
                     <span
                       className="mono"
                       style={{
@@ -385,130 +263,67 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
                 ))}
               </div>
 
-              <p style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
-                {card.contextNote}
-              </p>
-
-              {/* Selectors for Treatment-Related & Adverse Onset */}
-              <div className="grid two" style={{ marginBottom: 14 }}>
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: 11.5,
-                      color: 'var(--cyan2)',
-                      fontFamily: 'var(--mono)',
-                      marginBottom: 5,
-                    }}
-                  >
-                    {locale === 'en'
-                      ? 'TREATMENT-RELATED FROM (MG/KG/DAY)'
-                      : 'RELACIONADO CON TRATAMIENTO DESDE'}
-                  </label>
+              <div className="grid two" style={{ marginBottom: 12 }}>
+                <label>
+                  <span className="tile-label" style={{ color: 'var(--cyan2)' }}>
+                    {t.related}
+                  </span>
                   <select
                     className="select"
-                    style={{ width: '100%' }}
+                    style={{ width: '100%', marginTop: 4 }}
                     disabled={isLocked}
-                    value={curDraft.related === null ? 'none' : String(curDraft.related)}
+                    value={cur.related === null ? 'none' : String(cur.related)}
                     onChange={(e) => updateSlotDraft(slotId, 'related', e.target.value)}
                   >
-                    <option value="none">None (Not treatment-related)</option>
-                    <option value="20">20 mg/kg/day (Low dose)</option>
-                    <option value="200">200 mg/kg/day (Mid dose)</option>
-                    <option value="400">400 mg/kg/day (High dose)</option>
+                    {optionList}
                   </select>
-                </div>
-
-                <div>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: 11.5,
-                      color: 'var(--amber)',
-                      fontFamily: 'var(--mono)',
-                      marginBottom: 5,
-                    }}
-                  >
-                    {locale === 'en' ? 'ADVERSE FROM (MG/KG/DAY)' : 'ADVERSO DESDE (MG/KG/DÍA)'}
-                  </label>
+                </label>
+                <label>
+                  <span className="tile-label" style={{ color: 'var(--amber)' }}>
+                    {t.adverse}
+                  </span>
                   <select
                     className="select"
-                    style={{ width: '100%' }}
+                    style={{ width: '100%', marginTop: 4 }}
                     disabled={isLocked}
-                    value={curDraft.adverse === null ? 'none' : String(curDraft.adverse)}
+                    value={cur.adverse === null ? 'none' : String(cur.adverse)}
                     onChange={(e) => updateSlotDraft(slotId, 'adverse', e.target.value)}
                   >
-                    <option value="none">None (Non-adverse at all doses)</option>
-                    <option value="20">20 mg/kg/day (Low dose)</option>
-                    <option value="200">200 mg/kg/day (Mid dose)</option>
-                    <option value="400">400 mg/kg/day (High dose)</option>
+                    {optionList}
                   </select>
-                </div>
+                </label>
               </div>
 
-              {/* Deterministic NOAEL Output Box */}
-              <div
-                style={{
-                  padding: 14,
-                  borderRadius: 11,
-                  background: 'linear-gradient(115deg, rgba(20, 96, 84, 0.24), rgba(11, 38, 52, 0.6))',
-                  border: '1px solid #267868',
-                }}
-              >
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: 10,
-                  }}
-                >
+              <div className={`tile ${nd.confirmed ? 'ok' : nd.state === 'pending' ? '' : 'warn'}`}>
+                <div className="row between">
                   <div>
-                    <div className="eyebrow" style={{ margin: 0 }}>
-                      {locale === 'en'
-                        ? `DETERMINISTIC NOAEL (${card.sex}) COMPUTED BY CODE`
-                        : `NOAEL DETERMINISTA (${card.sex}) CALCULADO POR CÓDIGO`}
+                    <div className="tile-label">
+                      {t.noael} {sex}
                     </div>
-                    <div
-                      className="mono"
-                      style={{ fontSize: 24, fontWeight: 700, color: 'var(--green)', marginTop: 2 }}
-                    >
-                      {noaelObj?.dose !== null && noaelObj?.dose !== undefined
-                        ? `${noaelObj.dose} mg/kg/day`
-                        : 'Not established (< 20 mg/kg/day)'}
+                    <div className="tile-value" style={{ color: nd.state === 'dose' ? 'var(--green)' : '#fff' }}>
+                      {noaelLabel(nd, t)}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    className="btn sm"
-                    disabled={busy || isLocked}
-                    onClick={() => handleConfirmNoael([card.sex])}
-                  >
-                    {isConfirmed
-                      ? locale === 'en'
-                        ? `Confirmed (${card.sex}) ✓`
-                        : `Confirmado (${card.sex}) ✓`
-                      : locale === 'en'
-                        ? `Confirm ${card.sex} NOAEL`
-                        : `Confirmar NOAEL ${card.sex}`}
-                  </button>
+                  <div className="row" style={{ gap: 8 }}>
+                    <NoaelPill d={nd} t={t} />
+                    <button
+                      type="button"
+                      className="btn sm"
+                      disabled={busy || isLocked}
+                      onClick={() => handleConfirmNoael([sex])}
+                    >
+                      {nd.confirmed ? <Icon name="check" size={13} /> : null}
+                      {nd.confirmed ? t.confirmed : `${t.confirm} ${sex}`}
+                    </button>
+                  </div>
                 </div>
-                {noaelObj?.flags && noaelObj.flags.length > 0 && (
-                  <div
-                    style={{
-                      marginTop: 8,
-                      paddingTop: 8,
-                      borderTop: '1px solid rgba(41, 215, 212, 0.2)',
-                      fontSize: 11.5,
-                      color: '#ffd58b',
-                    }}
-                  >
-                    <strong>Incomplete Examination Flags Placed in Report:</strong>
-                    <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
-                      {noaelObj.flags.map((fl, i) => (
-                        <li key={i}>{fl}</li>
-                      ))}
-                    </ul>
+                {flags.length > 0 && (
+                  <div className="row" style={{ marginTop: 8, gap: 6 }}>
+                    {flags.map((fl, i) => (
+                      <span key={i} className="status-pill warn" style={{ whiteSpace: 'normal' }}>
+                        <Icon name="alert" size={12} /> {fl}
+                      </span>
+                    ))}
                   </div>
                 )}
               </div>
@@ -517,83 +332,53 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
         })}
       </div>
 
-      {/* Action Bar + Full 11-Slot Ledger Inspector */}
       <div className="panel">
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 14,
-            flexWrap: 'wrap',
-          }}
-        >
-          <div>
-            <h2 style={{ margin: '0 0 4px', fontSize: 16 }}>
-              {locale === 'en'
-                ? 'All 11 Enumerated Study Decision Slots (D1–D11)'
-                : 'Los 11 Slots de Decisión Enumerados del Estudio (D1–D11)'}
-            </h2>
-            <p style={{ margin: 0, fontSize: 12.5, color: 'var(--muted)' }}>
-              {locale === 'en'
-                ? 'Slots D1–D9 cover the 9 screened histopathology findings; D10–D11 cover Day-29 body weight for Females and Males.'
-                : 'Los slots D1–D9 cubren los 9 hallazgos histopatológicos cribados; D10–D11 cubren el peso corporal en Día 29.'}
-            </p>
-          </div>
-
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              className="btn secondary sm"
-              onClick={() => setShowAllSlots((s) => !s)}
-            >
-              {showAllSlots ? '▼' : '▶'}{' '}
-              {locale === 'en'
-                ? 'Inspect / Edit All 11 Slots (D1–D11)'
-                : 'Inspeccionar / Editar los 11 Slots (D1–D11)'}
-            </button>
-
+        <div className="row between">
+          <button type="button" className="btn secondary sm" onClick={() => setShowAllSlots((s) => !s)}>
+            <span style={{ display: 'inline-flex', transform: showAllSlots ? 'rotate(90deg)' : undefined }}>
+              <Icon name="chevron" size={12} />
+            </span>
+            {t.slots}
+          </button>
+          <div className="row">
+            {busy && <Spinner />}
             <button
               type="button"
               className="btn secondary sm"
               disabled={busy || isLocked}
               onClick={handleSaveDecisions}
             >
-              {locale === 'en'
-                ? `Save Decisions (D1–D11) as ${actor}`
-                : `Guardar Decisiones (D1–D11) como ${actor}`}
+              {t.save}
             </button>
-
             <button
               type="button"
               className="btn sm"
               disabled={busy || isLocked}
               onClick={() => handleConfirmNoael(['F', 'M'])}
             >
-              {locale === 'en'
-                ? `Confirm Both Sexes (F & M) & Run Verifier as ${actor} →`
-                : `Confirmar Ambos Sexos (F y M) y Ejecutar Verificador como ${actor} →`}
+              {t.confirmBoth} <Icon name="chevron" size={12} />
             </button>
           </div>
         </div>
 
         {showAllSlots && (
-          <div className="table-wrap" style={{ marginTop: 14 }}>
+          <div className="table-wrap" style={{ marginTop: 12 }}>
             <table>
               <thead>
                 <tr>
-                  <th>Slot ID</th>
-                  <th>Sex</th>
-                  <th>Screened Finding / Endpoint</th>
-                  <th>Treatment-Related From</th>
-                  <th>Adverse From</th>
-                  <th>Recorded Actor</th>
+                  <th>{t.slot}</th>
+                  <th>{t.sex}</th>
+                  <th>{t.finding}</th>
+                  <th>{t.related}</th>
+                  <th>{t.adverse}</th>
+                  <th>{t.by}</th>
                 </tr>
               </thead>
               <tbody>
                 {thread.slots.map((s) => {
                   const d = draftMap[s.slot] || { related: null, adverse: null, example: false };
                   const savedDec = thread.decisions.find((x) => x.dec_id === s.slot);
+                  const doses = s.doses.filter((x) => x > 0);
                   return (
                     <tr key={s.slot}>
                       <td className="mono" style={{ color: 'var(--cyan2)', fontWeight: 700 }}>
@@ -601,54 +386,31 @@ export const AssessmentView: React.FC<AssessmentViewProps> = ({
                       </td>
                       <td className="mono">{s.sex}</td>
                       <td style={{ fontWeight: 600, color: '#fff' }}>{s.finding}</td>
-                      <td>
-                        <select
-                          className="select"
-                          style={{ padding: '4px 8px', fontSize: 12 }}
-                          disabled={isLocked}
-                          value={d.related === null ? 'none' : String(d.related)}
-                          onChange={(e) => updateSlotDraft(s.slot, 'related', e.target.value)}
-                        >
-                          <option value="none">no dose (none)</option>
-                          {s.doses
-                            .filter((x) => x > 0)
-                            .map((doseVal) => (
-                              <option key={doseVal} value={String(doseVal)}>
-                                {doseVal} mg/kg/day
-                              </option>
-                            ))}
-                        </select>
-                      </td>
-                      <td>
-                        <select
-                          className="select"
-                          style={{ padding: '4px 8px', fontSize: 12 }}
-                          disabled={isLocked}
-                          value={d.adverse === null ? 'none' : String(d.adverse)}
-                          onChange={(e) => updateSlotDraft(s.slot, 'adverse', e.target.value)}
-                        >
-                          <option value="none">no dose (none)</option>
-                          {s.doses
-                            .filter((x) => x > 0)
-                            .map((doseVal) => (
-                              <option key={doseVal} value={String(doseVal)}>
-                                {doseVal} mg/kg/day
-                              </option>
-                            ))}
-                        </select>
-                      </td>
-                      <td className="mono" style={{ fontSize: 11.5 }}>
-                        {savedDec ? (
-                          <span
-                            className={`status-pill ${
-                              savedDec.actor === 'R. Reviewer' ? '' : 'info'
-                            }`}
-                            style={{ padding: '1px 7px' }}
+                      {(['related', 'adverse'] as const).map((field) => (
+                        <td key={field}>
+                          <select
+                            className="select"
+                            style={{ padding: '3px 8px', fontSize: 12 }}
+                            disabled={isLocked}
+                            value={d[field] === null ? 'none' : String(d[field])}
+                            onChange={(e) => updateSlotDraft(s.slot, field, e.target.value)}
                           >
+                            <option value="none">{t.noneOpt}</option>
+                            {doses.map((doseVal) => (
+                              <option key={doseVal} value={String(doseVal)}>
+                                {doseVal} mg/kg
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                      ))}
+                      <td>
+                        {savedDec ? (
+                          <span className={`status-pill ${savedDec.actor === 'R. Reviewer' ? '' : 'info'}`}>
                             {savedDec.actor}
                           </span>
                         ) : (
-                          <span style={{ color: 'var(--muted)' }}>Unsaved preset</span>
+                          <span className="muted">{t.unsaved}</span>
                         )}
                       </td>
                     </tr>

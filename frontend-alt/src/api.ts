@@ -213,7 +213,7 @@ export interface ThreadDecision {
 
 export interface JudgeEntry {
   sentence: string;
-  verdict: 'supported' | 'overstated' | 'not_judged';
+  verdict: 'supported' | 'overstated' | 'not judged';
   category: string;
   reason: string;
 }
@@ -316,6 +316,7 @@ export interface ParsedDraftSheet {
     parts2: ParsedProvenanceItem[];
   }>;
   studyIntro: ParsedProvenanceItem[];
+  decisionIntro?: string;
   parameterRows: Array<{ label: string; parts: ParsedProvenanceItem[] }>;
   decisionRows: Array<{ slot: string; parts: ParsedProvenanceItem[] }>;
   tkIntro: ParsedProvenanceItem[];
@@ -484,6 +485,50 @@ export async function verifyThreadAudit(threadId: string): Promise<AuditVerifyRe
   return requestJson<AuditVerifyResponse>(`/api/threads/${threadId}/audit/verify`);
 }
 
+// --- Verifier rule count ---
+
+export const VERIFIER_RULE_TOTAL = 8;
+
+// Failures read "Rule N: ..." or "Rule N (sentence k): ..." (src/cairn/verify.py Failure.__str__).
+// Several failures can share a rule, so rules failed = distinct rule numbers.
+export function verifierFailedRules(final: ThreadView['final']): Set<number> {
+  const rules = new Set<number>();
+  if (final.ok) return rules;
+  for (const f of final.failures) {
+    const m = f.match(/^Rule (\d+)/);
+    if (m) rules.add(Number(m[1]));
+  }
+  return rules;
+}
+
+export function verifierRulesPassed(final: ThreadView['final']): number {
+  if (final.ok) return VERIFIER_RULE_TOTAL;
+  const failed = verifierFailedRules(final).size || (final.failures.length > 0 ? 1 : 0);
+  return Math.max(0, VERIFIER_RULE_TOTAL - failed);
+}
+
+// --- NOAEL display per sex ---
+
+// The backend fills noael with a default dose before any decision is recorded,
+// so the dose is only meaningful once there are decisions or the sex is confirmed.
+export interface NoaelDisplay {
+  state: 'pending' | 'not_established' | 'dose';
+  dose: number | null;
+  confirmed: boolean;
+}
+
+export function noaelDisplay(thread: ThreadView | null, sex: 'F' | 'M'): NoaelDisplay {
+  const hasDecisions = (thread?.decisions.length ?? 0) > 0;
+  const confirmed = thread?.confirmed.includes(sex) ?? false;
+  if (!thread || (!hasDecisions && !confirmed)) {
+    return { state: 'pending', dose: null, confirmed: false };
+  }
+  const dose = thread.noael?.[sex]?.dose ?? null;
+  return dose === null
+    ? { state: 'not_established', dose: null, confirmed }
+    : { state: 'dose', dose, confirmed };
+}
+
 // --- HTML Fragment Parsers ---
 
 function parseTableElement(table: Element): {
@@ -585,6 +630,47 @@ function parseDetailsProv(details: Element): ParsedProvenanceItem {
   };
 }
 
+function directTbodyRows(table: Element): Element[] {
+  const rows: Element[] = [];
+  for (const child of Array.from(table.children)) {
+    if (child.tagName === 'TBODY') {
+      for (const row of Array.from(child.children)) {
+        if (row.tagName === 'TR') rows.push(row);
+      }
+    } else if (child.tagName === 'TR' && !child.querySelector('th')) {
+      rows.push(child);
+    }
+  }
+  return rows;
+}
+
+function directTableRows(table: Element): Element[] {
+  const rows: Element[] = [];
+  for (const child of Array.from(table.children)) {
+    if (child.tagName === 'TBODY' || child.tagName === 'THEAD') {
+      for (const row of Array.from(child.children)) {
+        if (row.tagName === 'TR') rows.push(row);
+      }
+    } else if (child.tagName === 'TR') {
+      rows.push(child);
+    }
+  }
+  return rows;
+}
+
+function directRowCells(row: Element): { ths: Element[]; tds: Element[] } {
+  const ths: Element[] = [];
+  const tds: Element[] = [];
+  for (const child of Array.from(row.children)) {
+    if (child.tagName === 'TH') {
+      ths.push(child);
+    } else if (child.tagName === 'TD') {
+      tds.push(child);
+    }
+  }
+  return { ths, tds };
+}
+
 function parseContainerParts(container: Element | null): ParsedProvenanceItem[] {
   if (!container) return [];
   const items: ParsedProvenanceItem[] = [];
@@ -600,8 +686,25 @@ function parseContainerParts(container: Element | null): ParsedProvenanceItem[] 
         items.push(parseDetailsProv(el));
       } else if (el.classList.contains('hl')) {
         items.push({ kind: 'hole', text: el.textContent || '' });
+      } else if (el.classList.contains('prov-body')) {
+        // Explicitly ignore .prov-body if encountered
+        return;
       } else {
-        items.push({ kind: 'text', text: el.textContent || '' });
+        const hasProvOrHl = el.querySelector('details.prov, .hl');
+        if (hasProvOrHl) {
+          items.push(...parseContainerParts(el));
+        } else {
+          const body = el.querySelector('.prov-body');
+          if (body) {
+            const clone = el.cloneNode(true) as Element;
+            clone.querySelectorAll('.prov-body').forEach((b) => b.remove());
+            const txt = clone.textContent || '';
+            if (txt) items.push({ kind: 'text', text: txt });
+          } else {
+            const txt = el.textContent || '';
+            if (txt) items.push({ kind: 'text', text: txt });
+          }
+        }
       }
     }
   });
@@ -749,7 +852,12 @@ export function parseAskFragment(html: string): ParsedAskResult {
   const verifiedParts = parseContainerParts(firstUnit);
   const aiWritten = answerCards[1]?.querySelector('.answer-unit')?.textContent?.trim() || '';
 
-  const disc = panel.querySelector('details.pill');
+  // Only the evidence pill that is a direct child of the panel: data tags nest their own
+  // "Show source rows" pill, which must not be taken for the evidence block.
+  const disc =
+    Array.from(panel.children).find(
+      (el) => el.tagName === 'DETAILS' && el.classList.contains('pill'),
+    ) || null;
   const tables = Array.from(disc?.querySelectorAll('table') || []);
   let evidenceRows: string[][] = [];
   let screeningTable: ParsedAskResult['screeningTable'] | undefined;
@@ -831,50 +939,99 @@ export async function fetchDraftSheet(
   const countsLine = stepSec?.querySelector('p.prov-counts')?.textContent?.trim() || '';
 
   const sheet = doc.querySelector('article.sheet');
-  const metaRows = Array.from(sheet?.querySelectorAll('table.sh-meta tr') || []).map((tr) => {
-    const ths = Array.from(tr.querySelectorAll('th'));
-    const tds = Array.from(tr.querySelectorAll('td'));
-    return {
-      label1: ths[0]?.textContent?.trim() || '',
-      parts1: parseContainerParts(tds[0] || null),
-      label2: ths[1]?.textContent?.trim() || '',
-      parts2: parseContainerParts(tds[1] || null),
-    };
-  });
+  const metaTable = sheet?.querySelector('table.sh-meta');
+  const metaRows = metaTable
+    ? directTableRows(metaTable)
+        .map((tr) => {
+          const { ths, tds } = directRowCells(tr);
+          if (ths.length === 0 && tds.length === 0) return null;
+          return {
+            label1: ths[0]?.textContent?.trim() || '',
+            parts1: parseContainerParts(tds[0] || null),
+            label2: ths[1]?.textContent?.trim() || '',
+            parts2: parseContainerParts(tds[1] || null),
+          };
+        })
+        .filter((r): r is NonNullable<typeof r> => r !== null && (Boolean(r.label1) || Boolean(r.label2)))
+    : [];
 
-  const shPs = Array.from(sheet?.querySelectorAll('div.sh-p') || []);
-  const studyIntro = parseContainerParts(shPs[0] || null);
-  const tkIntro = parseContainerParts(shPs[1] || null);
+  const h2s = Array.from(sheet?.querySelectorAll('h2') || []);
+  const sec1H2 = h2s.find((h) => h.textContent?.includes('1.'));
+  const sec1P = sec1H2?.nextElementSibling?.classList.contains('sh-p')
+    ? (sec1H2.nextElementSibling as Element)
+    : null;
+  const studyIntro = parseContainerParts(sec1P);
 
-  const shTabs = Array.from(sheet?.querySelectorAll('table.sh-tab') || []);
-  const parameterRows = Array.from(shTabs[0]?.querySelectorAll('tbody tr') || []).map((tr) => {
-    const tds = Array.from(tr.querySelectorAll('td'));
-    return {
-      label: tds[0]?.textContent?.trim() || '',
-      parts: parseContainerParts(tds[1] || null),
-    };
-  });
+  const sec2H2 = h2s.find((h) => h.textContent?.includes('2.'));
+  const sec2P = sec2H2?.nextElementSibling?.tagName === 'P'
+    ? sec2H2.nextElementSibling.textContent?.trim() || ''
+    : 'The following decisions on adversity of the findings were recorded.';
+  const decisionIntro = sec2P;
 
-  const decisionRows = Array.from(shTabs[1]?.querySelectorAll('tbody tr') || []).map((tr) => {
-    const tds = Array.from(tr.querySelectorAll('td'));
-    return {
-      slot: tds[0]?.textContent?.trim() || '',
-      parts: parseContainerParts(tds[1] || null),
-    };
-  });
+  const sec3H2 = h2s.find((h) => h.textContent?.includes('3.'));
+  const sec3P = sec3H2?.nextElementSibling?.classList.contains('sh-p')
+    ? (sec3H2.nextElementSibling as Element)
+    : null;
+  const tkIntro = parseContainerParts(sec3P);
 
-  const tkMeanHeader =
-    shTabs[2]?.querySelectorAll('thead th')[1]?.textContent?.trim() || 'Mean AUCtau';
-  const tkMeanRows = Array.from(shTabs[2]?.querySelectorAll('tbody tr') || []).map((tr) => {
-    const tds = Array.from(tr.querySelectorAll('td'));
-    return {
-      label: tds[0]?.textContent?.trim() || '',
-      parts: parseContainerParts(tds[1] || null),
-    };
-  });
+  // Top-level sh-tabs inside sheet (only direct report tables)
+  const shTabs = Array.from(sheet?.querySelectorAll('table.sh-tab') || []).filter(
+    (t) => t.parentElement === sheet || t.closest('article.sheet') === sheet,
+  );
 
-  const tkNotes = Array.from(sheet?.querySelectorAll('ul li') || []).map((li) =>
-    parseContainerParts(li),
+  const parameterRows = shTabs[0]
+    ? directTbodyRows(shTabs[0])
+        .map((tr) => {
+          const { tds } = directRowCells(tr);
+          return {
+            label: tds[0]?.textContent?.trim() || '',
+            parts: parseContainerParts(tds[1] || null),
+          };
+        })
+        .filter((r) => r.label.length > 0)
+    : [];
+
+  const decisionRows = shTabs[1]
+    ? directTbodyRows(shTabs[1])
+        .map((tr) => {
+          const { tds } = directRowCells(tr);
+          return {
+            slot: tds[0]?.textContent?.trim() || '',
+            parts: parseContainerParts(tds[1] || null),
+          };
+        })
+        .filter((r) => r.slot.length > 0)
+    : [];
+
+  let tkMeanHeader = 'Mean AUCtau';
+  let tkMeanRows: Array<{ label: string; parts: ParsedProvenanceItem[] }> = [];
+  if (shTabs[2]) {
+    const headRow = directTableRows(shTabs[2]).find((tr) => tr.querySelector('th'));
+    if (headRow) {
+      const { ths } = directRowCells(headRow);
+      if (ths[1]?.textContent?.trim()) {
+        tkMeanHeader = ths[1].textContent.trim();
+      }
+    }
+    tkMeanRows = directTbodyRows(shTabs[2])
+      .map((tr) => {
+        const { tds } = directRowCells(tr);
+        return {
+          label: tds[0]?.textContent?.trim() || '',
+          parts: parseContainerParts(tds[1] || null),
+        };
+      })
+      .filter((r) => r.label.length > 0);
+  }
+
+  // TK notes: direct ul inside sheet
+  const tkNotesList = Array.from(sheet?.querySelectorAll('ul') || []).filter(
+    (u) => u.parentElement === sheet,
+  );
+  const tkNotes = tkNotesList.flatMap((ul) =>
+    Array.from(ul.children)
+      .filter((li) => li.tagName === 'LI')
+      .map((li) => parseContainerParts(li)),
   );
 
   // Parse NOAEL 4.1 & 4.2 sections
@@ -895,9 +1052,13 @@ export async function fetchDraftSheet(
   );
   const footerNote = sheet?.querySelector('.sh-foot')?.textContent?.trim() || '';
 
-  // Parse Inside fold tables (Judge, 8 Rules, Session, MCP vs REST)
+  // Parse Inside fold tables (Judge, 8 Rules, Session, MCP vs REST, In production).
+  // While undecided the fold holds only the In production table: parse nothing else then.
   const insideTables = Array.from(doc.querySelectorAll('details.inside .inside-body table'));
-  const judgeTable = Array.from(insideTables[0]?.querySelectorAll('tbody tr') || []).map((tr) => {
+  const fullInside = !undecided && insideTables.length >= 4;
+  const judgeTable = Array.from(
+    (fullInside && insideTables[0]?.querySelectorAll('tbody tr')) || [],
+  ).map((tr) => {
     const tds = Array.from(tr.querySelectorAll('td'));
     const isExample = Boolean(tds[0]?.querySelector('.badge.example'));
     let sentence = tds[0]?.textContent?.trim() || '';
@@ -912,7 +1073,9 @@ export async function fetchDraftSheet(
     };
   });
 
-  const rulesTable = Array.from(insideTables[1]?.querySelectorAll('tbody tr') || []).map((tr) => {
+  const rulesTable = Array.from(
+    (fullInside && insideTables[1]?.querySelectorAll('tbody tr')) || [],
+  ).map((tr) => {
     const tds = Array.from(tr.querySelectorAll('td'));
     return {
       rule: tds[0]?.textContent?.trim() || '',
@@ -921,7 +1084,9 @@ export async function fetchDraftSheet(
     };
   });
 
-  const doorsTable = Array.from(insideTables[3]?.querySelectorAll('tbody tr') || []).map((tr) => {
+  const doorsTable = Array.from(
+    (fullInside && insideTables[3]?.querySelectorAll('tbody tr')) || [],
+  ).map((tr) => {
     const tds = Array.from(tr.querySelectorAll('td'));
     return {
       door: tds[0]?.textContent?.trim() || '',
@@ -938,6 +1103,7 @@ export async function fetchDraftSheet(
     countsLine,
     metaRows,
     studyIntro,
+    decisionIntro,
     parameterRows,
     decisionRows,
     tkIntro,
