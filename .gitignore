@@ -19,3 +19,4 @@ docs/PRD_Cairn_demo_share.pdf
 .ruff_cache/
 data/raw/
 data/build/
+data/cairn-frontend-reference/
