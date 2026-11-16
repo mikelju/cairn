@@ -1,6 +1,6 @@
 # 003 - Demo redesign: a landing that sells, visual hierarchy, in-page reading cues and an ES/EN toggle
 
-Status: ready locally
+Status: integrated
 
 ## Contract
 Goal and reason: the user did not approve proposal 1 (explanation drawer plus restyle) and widened the scope.
@@ -82,7 +82,7 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | E2 | ejecutor | Rework the record for the wider scope | failed | Ran out of context; nothing written |
 | E3 | ejecutor | Mockups v2: landing, step 3 and Explore under the new scope | done | `mockup2-*.png`; superseded by v3 after U6, U7 and U9 |
 | E4 | ejecutor | Rewrite this record: contract, criteria, decisions U1 to U8, plan in Sonnet-sized increments | done | Record rewritten |
-| E5 | ejecutor | Mockups v3: landing, step 3 and the Explore guided sequence with the ES/EN toggle and in-page cues | in progress | |
+| E5 | ejecutor | Mockups v3: landing, step 3 and the Explore guided sequence with the ES/EN toggle and in-page cues | done | Agent from an earlier session is gone; mockups superseded by the UI built and merged in PR 15 (d30d245) |
 | E6 | ejecutor | Record the user answers to U4 to U8 and the help removal; rework criteria and plan | done | This record |
 | E7 | ejecutor | Increment 1: dark tokens, pill shell with ES/EN toggle, string catalogue and parity test | done | See plan item 1 and Evidence |
 | E8 | ejecutor | Increment 2: disclosure pill macro, reading-cue macros, C1 and C11 tests | done | See plan item 2 and Evidence |

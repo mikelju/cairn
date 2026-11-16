@@ -45,4 +45,4 @@ Sin alguna precondición: pipeline local y se declara "No Mistakes pendiente", n
 ## Gotchas
 - Omitir etapas para conseguir verde es rebajar criterios.
 - Un escáner limpio no sustituye revisar permisos, entradas externas, secretos y dependencias.
-- Las comprobaciones de la plantilla solo cubren dependencias y hooks; un producto debe sustituirlas por pruebas reales.
+- Las comprobaciones de la plantilla solo cubren las dependencias declaradas; un producto debe sustituirlas por pruebas reales.

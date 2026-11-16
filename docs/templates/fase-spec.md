@@ -13,8 +13,9 @@ Fuera:
 
 ## Criterios de aceptación
 Congelados al aprobar. Cambiarlos exige una desviación aprobada por el usuario.
+Cada criterio indica cómo se comprueba en el recorrido real del usuario (comando, petición o acción en la interfaz, sin depender solo de mocks).
 
-| ID | Criterio observable | Cómo se comprueba |
+| ID | Criterio observable | Cómo se comprueba (recorrido real) |
 |---|---|---|
 | C1 | | |
 

@@ -1,6 +1,6 @@
 # Phase 02a - Tools and rules that write no numbers: plan and results
 
-Status: ready locally
+Status: integrated
 Spec: `spec.md` (approved, frozen)
 Base: branch `fase-02-tools-agent` from `main` at 70eebd1
 

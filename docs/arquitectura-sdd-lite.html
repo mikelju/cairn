@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Arquitectura y Flujo de SDD Lite + relevo-contexto v0.6.0</title>
+  <style>
+    /* Estilo 100 % autocontenido basado en Lavish SDD Lite (contraste > 4,5:1, sin dependencias externas) */
+    :root {
+      --fondo: #f4f6f9;
+      --tarjeta: #ffffff;
+      --tarjeta-alt: #f8fafc;
+      --texto: #102a43;
+      --suave: #486581;
+      --borde: #d9e2ec;
+      --indigo: #364fc7;
+      --indigo-f: #edf2ff;
+      --indigo-b: #bac8ff;
+      --azul: #0b69a3;
+      --azul-f: #e6f6ff;
+      --azul-b: #7cc4fa;
+      --verde: #1b6535;
+      --verde-f: #ebfbee;
+      --verde-b: #8ce99a;
+      --ambar: #8d4b00;
+      --ambar-f: #fff4e6;
+      --ambar-b: #ffd8a8;
+      --rojo: #b91c1c;
+      --rojo-f: #fff5f5;
+      --rojo-b: #ffc9c9;
+      --gris-f: #eef2f6;
+      color-scheme: light;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--fondo);
+      color: var(--texto);
+      font: 16px/1.6 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    }
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 28px 20px 64px;
+    }
+    h1, h2, h3, h4, p { margin: 0; }
+    h1 { font-size: 28px; line-height: 1.25; letter-spacing: -0.02em; margin-top: 4px; }
+    h2 { font-size: 22px; line-height: 1.3; letter-spacing: -0.01em; margin-top: 2px; }
+    h3 { font-size: 17px; line-height: 1.35; }
+    p, li { font-size: 15px; line-height: 1.55; }
+    code {
+      font: 600 0.88em "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+      background: var(--gris-f);
+      color: #1f2933;
+      padding: 2px 6px;
+      border-radius: 6px;
+      overflow-wrap: anywhere;
+    }
+
+    /* Contenedores principales */
+    .bloque {
+      background: var(--tarjeta);
+      border: 1px solid var(--borde);
+      border-radius: 16px;
+      padding: 24px 26px;
+      box-shadow: 0 1px 3px rgba(16, 42, 67, 0.05), 0 6px 16px rgba(16, 42, 67, 0.04);
+      margin-bottom: 22px;
+    }
+    .subtitulo-sup {
+      font-size: 12.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--suave);
+    }
+    .lead {
+      color: var(--suave);
+      font-size: 15.5px;
+      margin-top: 6px;
+    }
+
+    /* Leyenda de actores */
+    .cabecera-top {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+    }
+    .leyenda {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13.5px;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+    }
+    .chip-azul { color: var(--azul); background: var(--azul-f); border-color: var(--azul-b); }
+    .chip-indigo { color: var(--indigo); background: var(--indigo-f); border-color: var(--indigo-b); }
+    .chip-verde { color: var(--verde); background: var(--verde-f); border-color: var(--verde-b); }
+    .chip-ambar { color: var(--ambar); background: var(--ambar-f); border-color: var(--ambar-b); }
+    .chip-rojo { color: var(--rojo); background: var(--rojo-f); border-color: var(--rojo-b); }
+
+    /* Pestañas */
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 20px;
+      padding-top: 18px;
+      border-top: 1px solid var(--borde);
+    }
+    .tab-btn {
+      font: 600 14.5px Inter, system-ui, sans-serif;
+      padding: 9px 15px;
+      border-radius: 10px;
+      border: 1px solid var(--borde);
+      background: var(--tarjeta-alt);
+      color: var(--texto);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .tab-btn:hover { border-color: var(--indigo); background: var(--indigo-f); }
+    .tab-btn.activo {
+      background: var(--indigo);
+      color: #ffffff;
+      border-color: var(--indigo);
+    }
+
+    /* Etapas y rejillas de pasos */
+    .etapa {
+      border: 1px solid var(--borde);
+      border-radius: 14px;
+      padding: 20px;
+      background: var(--tarjeta);
+      margin-top: 18px;
+    }
+    .etapa-destacada {
+      border: 2px solid var(--indigo);
+      background: #fcfdff;
+    }
+    .etapa-cabecera {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .etapa-titulo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .num-etapa {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+    .ruta-badge {
+      font: 600 13px "JetBrains Mono", ui-monospace, Consolas, monospace;
+      padding: 5px 10px;
+      border-radius: 8px;
+      background: var(--gris-f);
+      color: var(--texto);
+    }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 14px;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 14px;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 16px;
+    }
+    .grid-5 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(205px, 1fr));
+      gap: 12px;
+    }
+
+    .paso {
+      border-radius: 12px;
+      padding: 15px 16px;
+      border: 1px solid var(--borde);
+      background: var(--tarjeta-alt);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .paso-indigo { background: var(--indigo-f); border-color: var(--indigo-b); }
+    .paso-verde { background: var(--verde-f); border-color: var(--verde-b); }
+    .paso-azul { background: var(--azul-f); border-color: var(--azul-b); border-width: 2px; }
+    .paso-ambar { background: var(--ambar-f); border-color: var(--ambar-b); }
+    .paso-rojo { background: var(--rojo-f); border-color: var(--rojo-b); }
+
+    .paso-rol {
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .rol-indigo { color: var(--indigo); }
+    .rol-verde { color: var(--verde); }
+    .rol-azul { color: var(--azul); }
+    .rol-ambar { color: var(--ambar); }
+    .rol-rojo { color: var(--rojo); }
+
+    .paso-titulo {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--texto);
+    }
+    .paso-desc {
+      font-size: 14.5px;
+      color: #243b53;
+    }
+
+    .conector {
+      text-align: center;
+      font-weight: 700;
+      font-size: 14.5px;
+      color: var(--indigo);
+      padding: 10px 0 0;
+    }
+
+    .nota-atasco {
+      margin-top: 14px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      background: var(--gris-f);
+      border-left: 4px solid var(--indigo);
+      font-size: 14.5px;
+    }
+
+    /* Tablas */
+    .tabla-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--borde);
+      border-radius: 12px;
+      margin-top: 16px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 15px;
+      background: var(--tarjeta);
+    }
+    th {
+      background: var(--gris-f);
+      color: var(--texto);
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      text-align: left;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--borde);
+    }
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--borde);
+      vertical-align: top;
+    }
+    tr:last-child td { border-bottom: 0; }
+    .num-circulo {
+      display: inline-flex;
+      width: 26px;
+      height: 26px;
+      border-radius: 999px;
+      background: var(--indigo);
+      color: #fff;
+      font-weight: 700;
+      font-size: 13px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Cifras de tokens */
+    .cifra-grande {
+      font-size: 28px;
+      font-weight: 800;
+      margin: 4px 0;
+      letter-spacing: -0.02em;
+    }
+    ul.lista-limpia {
+      margin: 8px 0 0;
+      padding-left: 18px;
+    }
+    ul.lista-limpia li + li { margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <main>
+
+    <!-- CABECERA -->
+    <header class="bloque">
+      <div class="cabecera-top">
+        <div>
+          <div class="subtitulo-sup">Guía Visual de Referencia · SDD Lite + relevo-contexto v0.6.0</div>
+          <h1>Cómo funciona SDD Lite de extremo a extremo</h1>
+          <p class="lead">
+            Tres aprobaciones humanas, ejecución delegada con contexto aislado, garantías deterministas por hooks (0 tokens) y relevo automático de sesión sin perder el hilo.
+          </p>
+        </div>
+      </div>
+
+      <div class="leyenda">
+        <span class="chip chip-azul">Azul: Decides / Apruebas tú (Usuario)</span>
+        <span class="chip chip-indigo">Índigo: Supervisor (Jefe)</span>
+        <span class="chip chip-verde">Verde: Subagentes (ejecutor · explorador · revisor)</span>
+        <span class="chip chip-ambar">Ámbar: Hooks deterministas (0 tokens en LLM)</span>
+      </div>
+
+      <nav class="tabs" id="tabs">
+        <button onclick="mostrarTab('all')" data-tab="all" class="tab-btn activo">Ver todo seguido</button>
+        <button onclick="mostrarTab('s1')" data-tab="s1" class="tab-btn">1. Ciclo de Vida (6 Etapas)</button>
+        <button onclick="mostrarTab('s2')" data-tab="s2" class="tab-btn">2. Delegación y Ahorro de Contexto</button>
+        <button onclick="mostrarTab('s3')" data-tab="s3" class="tab-btn">3. Mapa de Garantías (Hooks)</button>
+        <button onclick="mostrarTab('s4')" data-tab="s4" class="tab-btn">4. Relevo con Contexto v0.6.0</button>
+        <button onclick="mostrarTab('s5')" data-tab="s5" class="tab-btn">5. Presupuesto de Tokens</button>
+      </nav>
+    </header>
+
+    <!-- =====================================================================
+         SECCIÓN 1: CICLO DE VIDA COMPLETO (6 ETAPAS PASO A PASO)
+         ===================================================================== -->
+    <section id="s1" class="bloque seccion">
+      <div class="subtitulo-sup">Vista 1 de 5</div>
+      <h2>1. Ciclo de Vida Completo (6 Etapas paso a paso)</h2>
+      <p class="lead">
+        El flujo avanza por 6 etapas claras. Tú solo intervienes en los 3 recuadros azules (Plan Maestro, Spec de Fase y Fusión de la PR) o si surge una decisión de alcance/producto.
+      </p>
+
+      <!-- ETAPA 1 -->
+      <div class="etapa">
+        <div class="etapa-cabecera">
+          <div class="etapa-titulo">
+            <span class="num-etapa chip-indigo">1</span>
+            <div>
+              <h3>Arranque y Plan Maestro · Comando <code>/iniciar &lt;idea&gt;</code></h3>
+              <p class="suave" style="font-size:14px;color:var(--suave)">Una sola vez al crear el proyecto nuevo (o al incorporar SDD Lite con <code>scripts/incluir.mjs</code>).</p>
+            </div>
+          </div>
+          <span class="ruta-badge">docs/plans/0_plan_maestro.md</span>
+        </div>
+
+        <div class="grid-4">
+          <div class="paso paso-indigo">
+            <span class="paso-rol rol-indigo">Paso 1.1 · Supervisor</span>
+            <div class="paso-titulo">Inicializa el repositorio</div>
+            <p class="paso-desc">Ejecuta <code>npm run arrancar</code> (<code>git init -b main</code>, <code>npm run check</code> y primer commit base) y crea la rama <code>inicio</code>.</p>
+          </div>
+          <div class="paso paso-verde">
+            <span class="paso-rol rol-verde">Paso 1.2 · Ejecutor</span>
+            <div class="paso-titulo">Adapta plantilla y borrador</div>
+            <p class="paso-desc">Sustituye la descripción de <code>AGENTS.md</code>, <code>README.md</code> y <code>package.json</code> por las del producto y redacta <code>0_plan_maestro.md</code> dividido en fases pequeñas.</p>
+          </div>
+          <div class="paso paso-azul">
+            <span class="paso-rol rol-azul">Paso 1.3 · APROBACIÓN HUMANA 1</span>
+            <div class="paso-titulo">Tú apruebas el Plan Maestro</div>
+            <p class="paso-desc">Revisas las fases propuestas y resuelves las decisiones abiertas (en el chat o con Lavish). Sin tu aprobación no se empieza ninguna fase.</p>
+          </div>
+          <div class="paso paso-verde">
+            <span class="paso-rol rol-verde">Paso 1.4 · Ejecutor</span>
+            <div class="paso-titulo">Entrega en rama <code>inicio</code></div>
+            <p class="paso-desc">Guarda el Plan Maestro aprobado con commit en la rama <code>inicio</code> y abre la primera PR a <code>main</code>.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="conector">↓ Para cada fase del Plan Maestro ↓</div>
+
+      <!-- ETAPA 2 -->
+      <div class="etapa">
+        <div class="etapa-cabecera">
+          <div class="etapa-titulo">
+            <span class="num-etapa chip-indigo">2</span>
+            <div>
+              <h3>Especificar y Planear la Fase · Comando <code>/planear fase NN</code></h3>
+              <p style="font-size:14px;color:var(--suave)">Define los criterios observables de aceptación y desglosa el plan de incrementos.</p>
+            </div>
+          </div>
+          <span class="ruta-badge">docs/plans/fase-NN-nombre/spec.md + plan.md</span>
+        </div>
+
+        <div class="grid-4">
+          <div class="paso paso-verde">
+            <span class="paso-rol rol-verde">Paso 2.1 · Explorador (Opcional)</span>
+            <div class="paso-titulo">Reconoce el código</div>
+            <p class="paso-desc">Solo si una duda técnica puede cambiar qué se construye. Si se resuelve mirando 1 o 2 archivos conocidos, el Supervisor usa <code>Grep</code>/<code>Read</code> sin lanzar subagente.</p>
+          </div>
+          <div class="paso paso-verde">
+            <span class="paso-rol rol-verde">Paso 2.2 · Ejecutor</span>
+            <div class="paso-titulo">Redacta <code>spec.md</code></div>
+            <p class="paso-desc">Escribe objetivo, alcance, dudas abiertas y tabla de criterios <code>C1..Cn</code> indicando cómo se comprueba cada uno en el <strong>recorrido real sin depender solo de mocks</strong>.</p>
+          </div>
+          <div class="paso paso-azul">
+            <span class="paso-rol rol-azul">Paso 2.3 · APROBACIÓN HUMANA 2</span>
+            <div class="paso-titulo">Apruebas y congelas <code>spec.md</code></div>
+            <p class="paso-desc">Respondes las dudas abiertas y apruebas la spec. Desde ese instante los criterios quedan <strong>congelados</strong> (cambiarlos exige abrir una desviación).</p>
+          </div>
+          <div class="paso paso-verde">
+            <span class="paso-rol rol-verde">Paso 2.4 · Ejecutor</span>
+            <div class="paso-titulo">Redacta <code>plan.md</code></div>
+            <p class="paso-desc">Divide la spec congelada en incrementos verificables (<code>1..N</code>) asociados a los criterios <code>C*</code>. No requiere otra aprobación tuya.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="conector">↓ Con la spec congelada y el plan listo, arranca el bucle autónomo ↓</div>
+
+      <!-- ETAPA 3 -->
+      <div class="etapa etapa-destacada">
+        <div class="etapa-cabecera">
+          <div class="etapa-titulo">
+            <span class="num-etapa chip-indigo">3</span>
+            <div>
+              <h3>Ejecución por Incrementos · Comando <code>/ejecutar fase NN</code></h3>
+              <p style="font-size:14px;color:var(--suave)">Bucle autónomo incremento por incremento en la rama <code>fase-NN-nombre</code> (o <code>cambio-NNN</code>).</p>
+            </div>
+          </div>
+          <span class="chip chip-indigo">Regla clave: el ejecutor NO lee ni edita plan.md</span>
+        </div>
+
+        <div class="grid-4">
+          <div class="paso paso-indigo">
+            <span class="paso-rol rol-indigo">Paso 3.1 · Supervisor</span>
+            <div class="paso-titulo">Prepara Brief autocontenido</div>
+            <p class="paso-desc">Lee el incremento en <code>plan.md</code> y copia en el brief: intención literal del usuario, texto del incremento, criterios <code>C*</code>, radio de impacto (<code>local</code>/<code>profundo</code>) y <code>model</code> acorde a la dificultad.</p>
+          </div>
+          <div class="paso paso-verde">
+            <span class="paso-rol rol-verde">Paso 3.2 · Ejecutor</span>
+            <div class="paso-titulo">Implementa y prueba en real</div>
+            <p class="paso-desc">Lee <strong>únicamente</strong> los archivos de código indicados (nunca <code>plan.md</code> ni fases pasadas). Implementa, ejecuta comprobación según radio de impacto y verifica el recorrido real del usuario.</p>
+          </div>
+          <div class="paso paso-ambar">
+            <span class="paso-rol rol-ambar">Paso 3.3 · Hook stop-gate.mjs</span>
+            <div class="paso-titulo">Exige <code>npm run check</code> en verde</div>
+            <p class="paso-desc">El ejecutor hace <code>git commit</code> en la rama de trabajo. Al cerrar su turno, <code>stop-gate.mjs</code> ejecuta <code>npm run check</code>; si falla, bloquea el cierre hasta corregirlo.</p>
+          </div>
+          <div class="paso paso-indigo">
+            <span class="paso-rol rol-indigo">Paso 3.4 · Supervisor</span>
+            <div class="paso-titulo">Valida y marca <code>plan.md</code> (≤160 chars)</div>
+            <p class="paso-desc">Contrasta el informe con <code>git log</code>/<code>diff</code>. Si cumple, el Supervisor marca <code>- [x]</code> y cierra la fila en <code>## Encargos</code> en <strong>una línea corta de máximo 160 caracteres</strong>.</p>
+          </div>
+        </div>
+
+        <div class="nota-atasco">
+          <strong>Escalera de atasco de 4 niveles (<code>supervision.md</code>):</strong>
+          (1) Si el ejecutor pregunta algo que ya está en el brief, el Supervisor responde en 1 línea con <code>SendMessage</code> →
+          (2) Si entra en bucle, lo corrige en 1 línea →
+          (3) Si repite el mismo obstáculo dos veces, lanza un ejecutor nuevo con nota de progreso →
+          (4) Si vuelve a fallar, marca el encargo <code>fallido</code> y te escala con evidencia y opciones.
+        </div>
+      </div>
+
+      <div class="conector">↓ Cuando todos los incrementos de plan.md están marcados en [x] ↓</div>
+
+      <!-- ETAPA 4 -->
+      <div class="etapa">
+        <div class="etapa-cabecera">
+          <div class="etapa-titulo">
+            <span class="num-etapa chip-verde">4</span>
+            <div>
+              <h3>Revisión Adversarial en Contexto Limpio · Skill <code>sdd-review</code> (o <code>No Mistakes</code>)</h3>
+              <p style="font-size:14px;color:var(--suave)">El autor nunca revisa su propio código. También disponible sin cambios con <code>/verificar</code> o <code>/verificar seguridad</code>.</p>
+            </div>
+          </div>
+          <span class="ruta-badge">Máximo 2 rondas</span>
+        </div>
+
+        <div class="grid-3">
+          <div class="paso paso-verde">
+            <span class="paso-rol rol-verde">Paso 4.1 · Hasta 4 Revisores en paralelo</span>
+            <div class="paso-titulo">4 Lentes en contexto limpio</div>
+            <p class="paso-desc">Reciben solo <code>spec.md</code> y <code>git diff</code> (jamás el resumen ni el razonamiento del ejecutor): (1) Corrección, (2) Seguridad y datos, (3) Evidencia y tests, (4) Alcance y mantenimiento.</p>
+          </div>
+          <div class="paso paso-indigo">
+            <span class="paso-rol rol-indigo">Paso 4.2 · Supervisor + Explorador</span>
+            <div class="paso-titulo">Juzga y reproduce hallazgos</div>
+            <p class="paso-desc">Cada hallazgo exige <code>archivo:línea</code> y escenario de fallo concreto. El Supervisor descarta preferencias de estilo y, si hay duda, encarga a un <code>explorador</code> reproducir el fallo.</p>
+          </div>
+          <div class="paso paso-verde">
+            <span class="paso-rol rol-verde">Paso 4.3 · Ejecutor de corrección</span>
+            <div class="paso-titulo">Corrige y renueva la evidencia</div>
+            <p class="paso-desc">Corrige solo los hallazgos confirmados y repite la evidencia de los criterios tocados. Ninguna fase se entrega con hallazgos de seguridad Critical o High abiertos.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="conector">↓ Con revisión adversarial limpia y comprobaciones en verde ↓</div>
+
+      <!-- ETAPAS 5 Y 6 -->
+      <div class="grid-2" style="margin-top:18px">
+        <div class="etapa" style="margin-top:0">
+          <div class="etapa-cabecera">
+            <div class="etapa-titulo">
+              <span class="num-etapa chip-azul">5</span>
+              <div>
+                <h3>Entrega y Pull Request · Skill <code>sdd-delivery</code></h3>
+                <p style="font-size:14px;color:var(--suave)">El ejecutor publica la rama y la PR; tú decides la fusión.</p>
+              </div>
+            </div>
+          </div>
+          <ul class="lista-limpia">
+            <li><strong>Ejecutor en modo Entrega:</strong> actualiza documentación afectada, hace push de la rama de trabajo y abre PR a <code>main</code> con <code>gh-axi</code> (<code>--body-file</code> con criterios, evidencias y tabla de revisión).</li>
+            <li><strong style="color:var(--ambar)">Bloqueo por <code>guard.mjs</code>:</strong> ningún agente puede ejecutar <code>gh pr merge</code>, <code>gh pr review --approve</code> ni hacer push directo a <code>main</code>.</li>
+            <li><strong style="color:var(--azul)">APROBACIÓN HUMANA 3:</strong> tú revisas la PR en GitHub y la fusionas cuando estés conforme.</li>
+          </ul>
+        </div>
+
+        <div class="etapa" style="margin-top:0">
+          <div class="etapa-cabecera">
+            <div class="etapa-titulo">
+              <span class="num-etapa chip-indigo">6</span>
+              <div>
+                <h3>Cierre y Poda con Presupuesto · Skill <code>sdd-ablate</code></h3>
+                <p style="font-size:14px;color:var(--suave)">Deja el contexto limpio para la siguiente fase.</p>
+              </div>
+            </div>
+          </div>
+          <ul class="lista-limpia">
+            <li><strong>Estado <code>integrada</code> / <code>integrado</code>:</strong> el Supervisor actualiza la cabecera de <code>plan.md</code> (o del cambio) a <code>Estado: integrada</code> para que <code>rumbo.mjs</code> no la arrastre en sesiones futuras.</li>
+            <li><strong>Pasada de aprendizaje (<code>sdd-ablate</code>):</strong> propone como máximo 5 mejoras respaldadas por ≥2 sesiones. Las prohibiciones mecánicas van a hooks (0 tokens) y <code>AGENTS.md</code> nunca rebasa los 5.000 tokens.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- =====================================================================
+         SECCIÓN 2: DELEGACIÓN Y AHORRO DE CONTEXTO
+         ===================================================================== -->
+    <section id="s2" class="bloque seccion">
+      <div class="subtitulo-sup">Vista 2 de 5</div>
+      <h2>2. Delegación y Ahorro de Contexto (Secuencia Visual y Antes vs. Ahora)</h2>
+      <p class="lead">
+        Por qué una fase con decenas de incrementos se mantiene ligera en tokens de principio a fin.
+      </p>
+
+      <div class="grid-2" style="margin-top:16px">
+        <div class="paso paso-rojo">
+          <span class="paso-rol rol-rojo">Antes (Caso real demo-cairn: 54.000 – 80.000 tokens tras relevo)</span>
+          <div class="paso-titulo">Qué inflaba la ventana de contexto</div>
+          <ul class="lista-limpia">
+            <li>El <code>ejecutor</code> leía y editaba <code>plan.md</code> en cada incremento, concatenando volcados largos con <code>;</code> en una sola línea hasta engordar <code>plan.md</code> a <strong>74,5 KB (~20.384 tokens)</strong>.</li>
+            <li>Cada lectura y edición de <code>plan.md</code> inyectaba 20.000 tokens en el Supervisor y en cada subagente (6 subagentes agotaron su ventana).</li>
+            <li>Las fases terminadas quedaban en <code>ready locally</code> y <code>rumbo.mjs</code> las seguía anunciando como abiertas en fases posteriores.</li>
+            <li>En cada relevo, <code>relevo-contexto</code> inyectaba hasta 20.000 caracteres de <code>&lt;ultima_respuesta&gt;</code> y pedía repetirlos (~11.000 tokens consumidos de golpe).</li>
+          </ul>
+        </div>
+
+        <div class="paso paso-verde">
+          <span class="paso-rol rol-verde">Ahora (SDD Lite optimizado + relevo-contexto v0.6.0)</span>
+          <div class="paso-titulo">Ahorro de 15.000 – 30.000 tokens por incremento</div>
+          <ul class="lista-limpia">
+            <li><strong>El <code>ejecutor</code> no lee ni edita <code>plan.md</code>:</strong> trabaja solo contra el incremento y los criterios <code>C*</code> copiados en su brief y los archivos de código indicados.</li>
+            <li><strong>Tope estricto de 160 caracteres por línea en <code>plan.md</code>:</strong> el Supervisor marca <code>- [x]</code> y cierra la fila en <code>## Encargos</code> (solo <code>commit + comando + resultado corto</code>; <code>plan.md</code> se mantiene en ~1.500–2.500 tokens toda la fase).</li>
+            <li><strong>Cierre en <code>Estado: integrada</code>:</strong> prohibido releer fases pasadas; <code>rumbo.mjs</code> las descarta automáticamente.</li>
+            <li><strong><code>ANSWER_MAX = 2000</code> + comando <code>/ultima</code> (0 tokens):</strong> el relevo inyecta como máximo ~550 tokens y conserva la respuesta completa en memoria/disco para verla gratis con <code>/ultima</code>.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="tabla-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:52px">Paso</th>
+              <th style="width:220px">Actor</th>
+              <th>Qué lee y qué escribe exactamente</th>
+              <th style="width:290px">Tokens que entran en ventana</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="num-circulo">1</span></td>
+              <td><strong style="color:var(--indigo)">Supervisor (Jefe)</strong></td>
+              <td>Lee el siguiente incremento pendiente de <code>plan.md</code> y registra la fila <code>E&lt;n&gt; | ejecutor | en curso</code>.</td>
+              <td><code>plan.md</code> compacto (~1.500 – 2.500 tokens).</td>
+            </tr>
+            <tr>
+              <td><span class="num-circulo">2</span></td>
+              <td><strong style="color:var(--indigo)">Supervisor → Ejecutor</strong></td>
+              <td>Lanza subagente <code>ejecutor</code> con brief autocontenido: intención literal del usuario + texto del incremento + criterios <code>C*</code> + rutas de código.</td>
+              <td><strong style="color:var(--verde)">~2.414 tok basales + ~400 tok del brief</strong> (sin <code>plan.md</code> ni historial de conversación).</td>
+            </tr>
+            <tr>
+              <td><span class="num-circulo">3</span></td>
+              <td><strong style="color:var(--verde)">Subagente ejecutor</strong></td>
+              <td>Lee <code>ejecucion.md</code> (253 tok) y los archivos de código, implementa, ejecuta comprobación (<code>local</code> o <code>profundo</code>), pasa <code>npm run check</code> y hace <code>git commit</code>.</td>
+              <td>Todo el ruido de compilación, trazas y diffs queda aislado en la ventana efímera del subagente.</td>
+            </tr>
+            <tr>
+              <td><span class="num-circulo">4</span></td>
+              <td><strong style="color:var(--verde)">Ejecutor → Supervisor</strong></td>
+              <td>Devuelve su informe final conciso (<code>Estado: hecho</code>, hash del commit, comando o recorrido real y resultado observado) y <strong>su contexto se destruye</strong>.</td>
+              <td><strong style="color:var(--verde)">Solo ~250 – 400 tokens</strong> entran en la ventana del Supervisor.</td>
+            </tr>
+            <tr>
+              <td><span class="num-circulo">5</span></td>
+              <td><strong style="color:var(--indigo)">Supervisor (Jefe)</strong></td>
+              <td>Verifica con <code>git log -1</code> / <code>git diff --stat</code> y actualiza <code>plan.md</code> marcando <code>- [x]</code> y la celda <code>Resultado o bloqueo</code> en <strong>≤160 caracteres</strong>.</td>
+              <td>Crecimiento casi nulo (~40 tokens por incremento completado).</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- =====================================================================
+         SECCIÓN 3: MAPA DE GARANTÍAS DETERMINISTAS (HOOKS DE 0 TOKENS)
+         ===================================================================== -->
+    <section id="s3" class="bloque seccion">
+      <div class="subtitulo-sup">Vista 3 de 5</div>
+      <h2>3. Mapa de Garantías Deterministas (Hooks de 0 tokens)</h2>
+      <p class="lead">
+        Lo que debe cumplirse siempre no se confía a recordar un prompt: lo imponen scripts de Node.js en <code>.claude/hooks/</code> y el plugin <code>relevo-contexto</code> en 5 momentos del turno, con coste de <strong>0 tokens</strong>.
+      </p>
+
+      <div class="grid-5" style="margin-top:16px">
+        <div class="paso paso-ambar">
+          <span class="paso-rol rol-ambar">1. SessionStart</span>
+          <div class="paso-titulo">Al abrir sesión o hacer <code>/clear</code></div>
+          <ul class="lista-limpia">
+            <li><strong><code>rumbo.mjs</code>:</strong> inyecta rama actual, plan maestro y encargos/decisiones pendientes de fases <strong>no integradas</strong> (~52–250 tok).</li>
+            <li><strong><code>relevo-contexto</code>:</strong> registra los comandos inmediatos <code>/contexto</code>, <code>/ultima</code>, <code>/relevo</code> y <code>/historial-contexto</code>.</li>
+          </ul>
+        </div>
+
+        <div class="paso paso-ambar">
+          <span class="paso-rol rol-ambar">2. PreToolUse (Rol)</span>
+          <div class="paso-titulo"><code>supervisor.mjs</code></div>
+          <ul class="lista-limpia">
+            <li>En la sesión principal, <strong>bloquea escribir</strong> fuera de <code>docs/plans/</code>, <code>docs/changes/</code>, <code>.claude/relevo/</code> y <code>docs/security.md</code>.</li>
+            <li>Bloquea escribir archivos o instalar paquetes desde Bash/PowerShell en el Supervisor.</li>
+            <li>Rechaza lanzar subagentes distintos de <code>ejecutor</code>, <code>explorador</code> o <code>revisor</code> o con briefs sin los encabezados obligatorios.</li>
+            <li>Impide que un subagente delegue en cadena.</li>
+          </ul>
+        </div>
+
+        <div class="paso paso-ambar">
+          <span class="paso-rol rol-ambar">3. PreToolUse (Git / Secretos)</span>
+          <div class="paso-titulo"><code>guard.mjs</code></div>
+          <ul class="lista-limpia">
+            <li>Bloquea <code>git push</code>, <code>commit</code>, <code>merge</code> o <code>rebase</code> sobre <code>main</code>/<code>master</code>.</li>
+            <li>Bloquea <code>git push --force</code> y <code>git clean -x</code>.</li>
+            <li>Bloquea <code>gh pr merge</code> y <code>gh pr review --approve</code> (también vía <code>gh-axi</code> o <code>gh api</code>).</li>
+            <li>Bloquea leer, copiar o enviar secretos (<code>.env*</code>, claves privadas, tokens), incluso anidados en <code>bash -c</code>, PowerShell o <code>$(...)</code>.</li>
+          </ul>
+        </div>
+
+        <div class="paso paso-ambar">
+          <span class="paso-rol rol-ambar">4. PostToolUse + Paso LLM</span>
+          <div class="paso-titulo"><code>format.mjs</code> + Freno</div>
+          <ul class="lista-limpia">
+            <li><strong><code>format.mjs</code>:</strong> tras cada <code>Write</code> o <code>Edit</code>, ejecuta el script <code>format</code> del proyecto sobre el archivo editado.</li>
+            <li><strong>Freno de subagentes (<code>relevo-contexto</code>):</strong> al <strong>80 %</strong> del límite avisa una vez que haga commit y entregue informe; al <strong>100 %</strong> (400k <code>ejecutor</code> / 200k resto) bloquea toda herramienta salvo <code>git add/commit/status</code> y entrega del informe.</li>
+          </ul>
+        </div>
+
+        <div class="paso paso-ambar">
+          <span class="paso-rol rol-ambar">5. Stop / SubagentStop</span>
+          <div class="paso-titulo"><code>stop-gate.mjs</code> + Relevo</div>
+          <ul class="lista-limpia">
+            <li><strong><code>stop-gate.mjs</code>:</strong> si hay cambios en el árbol de trabajo, ejecuta <code>npm run check</code> (o <code>comprobar</code> en <code>.sdd-lite.json</code>). Si falla, <strong>impide cerrar el turno</strong>.</li>
+            <li><strong>Umbral 90 % (<code>relevo-contexto</code>):</strong> si la sesión principal alcanza <strong>180k tokens</strong>, inicia automáticamente el relevo a sesión limpia.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- =====================================================================
+         SECCIÓN 4: MÁQUINA DE ESTADOS DEL RELEVO CON CONTEXTO (v0.6.0)
+         ===================================================================== -->
+    <section id="s4" class="bloque seccion">
+      <div class="subtitulo-sup">Vista 4 de 5</div>
+      <h2>4. Máquina de Estados del Relevo con Contexto (<code>v0.6.0</code>)</h2>
+      <p class="lead">
+        Cómo hace el corte limpio a los 180.000 tokens (90 % de 200k) sin perder la última respuesta ni desperdiciar tokens en la sesión nueva.
+      </p>
+
+      <div class="grid-5" style="margin-top:16px">
+        <div class="paso paso-ambar">
+          <span class="paso-rol rol-ambar">Paso 1 · Umbral 180k (90 %)</span>
+          <div class="paso-titulo">Detecta límite y pide traspaso</div>
+          <p class="paso-desc">En cada turno normal se guarda en memoria <code>lastAnswer</code>. Al llegar a 180k tokens (o al ejecutar <code>/relevo</code>), el plugin pasa a fase <code>handoff</code> y envía el <code>handoffPrompt</code>.</p>
+        </div>
+
+        <div class="paso paso-indigo">
+          <span class="paso-rol rol-indigo">Paso 2 · Turno de Traspaso</span>
+          <div class="paso-titulo">Escribe <code>HANDOFF-&lt;id8&gt;.md</code></div>
+          <p class="paso-desc">El agente escribe <code>.claude/relevo/HANDOFF-&lt;id8&gt;.md</code> con título <code># Relevo - &lt;tarea&gt;</code> y las 8 secciones (objetivo, convenciones, hecho, decisiones, estado, próximos pasos, subagentes y riesgos).</p>
+        </div>
+
+        <div class="paso paso-verde">
+          <span class="paso-rol rol-verde">Paso 3 · Cabecera y Copia Íntegra</span>
+          <div class="paso-titulo">Guarda en Atom + Historial</div>
+          <p class="paso-desc">El plugin añade la cabecera <code>&lt;!-- relevo: session=... branch=... --&gt;</code> y guarda la última respuesta <strong>íntegra sin recortar</strong> en <code>lastAnswerAtom</code> y en <code>.claude/relevo/historial/HANDOFF-&lt;fecha&gt;-&lt;id8&gt;.md</code>.</p>
+        </div>
+
+        <div class="paso paso-azul">
+          <span class="paso-rol rol-azul">Paso 4 · /clear Verificado</span>
+          <div class="paso-titulo">Abre sesión nueva limpia</div>
+          <p class="paso-desc">Ejecuta <code>/clear</code>, comprueba que el <code>session.id</code> cambió de verdad y envía <code>continuePrompt</code> con <code>&lt;traspaso&gt;</code> y <code>&lt;ultima_respuesta&gt;</code> recortada a <strong>máx. 2.000 caracteres (~550 tokens)</strong>.</p>
+        </div>
+
+        <div class="paso paso-verde">
+          <span class="paso-rol rol-verde">Paso 5 · Retoma + Comando /ultima</span>
+          <div class="paso-titulo">0 tokens para ver el texto completo</div>
+          <p class="paso-desc">La sesión nueva muestra <code>## Última respuesta antes del relevo</code> y retoma desde «Próximos pasos». Si la respuesta superaba los 2.000 chars, escribes <strong><code>/ultima</code></strong> y se muestra entera al instante (<code>immediate: true</code>, <strong>0 tokens</strong>).</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- =====================================================================
+         SECCIÓN 5: PRESUPUESTO DE TOKENS Y MAPA DE ARCHIVOS
+         ===================================================================== -->
+    <section id="s5" class="bloque seccion">
+      <div class="subtitulo-sup">Vista 5 de 5</div>
+      <h2>5. Presupuesto de Tokens y Mapa de Archivos del Framework</h2>
+      <p class="lead">
+        Medición exacta sobre la plantilla <code>SDD-lite - vacio</code> (conversión en español/Markdown: <code>1 token ≈ 3,65 caracteres</code>).
+      </p>
+
+      <div class="grid-4" style="margin-top:16px">
+        <div class="paso paso-indigo">
+          <span class="paso-rol rol-indigo">Supervisor (Jefe) al abrir sesión</span>
+          <div class="cifra-grande" style="color:var(--indigo)">~2.149 tok</div>
+          <p class="paso-desc"><strong>1,07 % de 200k</strong> · Incluye <code>CLAUDE.md</code> (3), <code>AGENTS.md</code> (1.224), frontmatter de 6 skills (508), frontmatter de 3 agentes (272), <code>jefe.md</code> (90) y salida de <code>rumbo.mjs</code> (52).</p>
+        </div>
+
+        <div class="paso paso-verde">
+          <span class="paso-rol rol-verde">Subagente ejecutor en frío</span>
+          <div class="cifra-grande" style="color:var(--verde)">~2.414 tok</div>
+          <p class="paso-desc"><strong>1,21 % de 200k</strong> · Carga basal (1.735) + contrato <code>.claude/agents/ejecutor.md</code> (679). Al implementar suma <code>ejecucion.md</code> (253 tok) y su brief.</p>
+        </div>
+
+        <div class="paso paso-verde">
+          <span class="paso-rol rol-verde">Subagente explorador en frío</span>
+          <div class="cifra-grande" style="color:var(--verde)">~2.178 tok</div>
+          <p class="paso-desc"><strong>1,09 % de 200k</strong> · Carga basal (1.735) + contrato <code>.claude/agents/explorador.md</code> (443). Solo herramientas de lectura e investigación.</p>
+        </div>
+
+        <div class="paso paso-verde">
+          <span class="paso-rol rol-verde">Subagente revisor en frío</span>
+          <div class="cifra-grande" style="color:var(--verde)">~2.051 tok</div>
+          <p class="paso-desc"><strong>1,03 % de 200k</strong> · Carga basal (1.735) + contrato <code>.claude/agents/revisor.md</code> (316) + la lente asignada de <code>lentes.md</code>.</p>
+        </div>
+      </div>
+
+      <div class="tabla-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Archivo / Directorio</th>
+              <th>Cuándo entra en la ventana de contexto</th>
+              <th>Caracteres / Palabras</th>
+              <th style="text-align:right">Coste en Tokens</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>CLAUDE.md</code> + <code>AGENTS.md</code></td>
+              <td><strong>Siempre</strong> al abrir sesión principal o cualquier subagente</td>
+              <td>4.479 chars · 689 palabras</td>
+              <td style="text-align:right"><strong>1.227 tok</strong> (24,5 % del tope de 5.000)</td>
+            </tr>
+            <tr>
+              <td>Frontmatter YAML de las 6 skills (<code>.agents/skills/*/SKILL.md</code>)</td>
+              <td><strong>Siempre</strong> al arrancar (solo <code>name</code> y <code>description</code>)</td>
+              <td>1.853 chars · 277 palabras</td>
+              <td style="text-align:right"><strong>508 tok</strong></td>
+            </tr>
+            <tr>
+              <td>Frontmatter YAML de los 3 agentes (<code>.claude/agents/*.md</code>)</td>
+              <td><strong>Siempre</strong> en el catálogo de delegación del Supervisor</td>
+              <td>990 chars · 150 palabras</td>
+              <td style="text-align:right"><strong>272 tok</strong></td>
+            </tr>
+            <tr>
+              <td><code>.agents/skills/sdd-lite/SKILL.md</code> + <code>references/</code> (<code>encargos.md</code>, <code>supervision.md</code>, <code>ejecucion.md</code>)</td>
+              <td><strong>Bajo demanda</strong> según la tarea (coordinar, delegar o implementar)</td>
+              <td>15.792 chars · 2.499 palabras</td>
+              <td style="text-align:right"><strong>1.854 tok</strong> cuerpo skill · <strong>253 – 1.121 tok</strong> por ref.</td>
+            </tr>
+            <tr>
+              <td><code>sdd-review</code>, <code>sdd-delivery</code>, <code>sdd-ablate</code>, <code>github</code>, <code>lavish</code> (cuerpos + referencias)</td>
+              <td><strong>Bajo demanda</strong> solo cuando se ejecuta esa actividad</td>
+              <td>30.424 chars · 4.466 palabras</td>
+              <td style="text-align:right"><strong>253 – 1.195 tok</strong> por archivo leído</td>
+            </tr>
+            <tr>
+              <td><code>.claude/hooks/*.mjs</code> (8 archivos) + <code>scripts/*.mjs</code> (2 archivos)</td>
+              <td><strong>Nunca</strong> (se ejecutan fuera del LLM como procesos de Node.js)</td>
+              <td>78.290 chars · 10.424 palabras</td>
+              <td style="text-align:right"><strong style="color:var(--verde)">0 tok</strong></td>
+            </tr>
+            <tr>
+              <td><code>README.md</code>, <code>docs/como-trabajar.md</code> y <code>docs/arquitectura-sdd-lite.html</code></td>
+              <td><strong>Nunca se cargan automáticamente</strong> (documentación de referencia para ti)</td>
+              <td>—</td>
+              <td style="text-align:right"><strong style="color:var(--verde)">0 tok</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    function mostrarTab(id) {
+      var secciones = document.querySelectorAll('.seccion');
+      for (var i = 0; i < secciones.length; i++) {
+        secciones[i].style.display = (id === 'all' || secciones[i].id === id) ? 'block' : 'none';
+      }
+      var botones = document.querySelectorAll('.tab-btn');
+      for (var j = 0; j < botones.length; j++) {
+        var activo = botones[j].getAttribute('data-tab') === id;
+        botones[j].className = activo ? 'tab-btn activo' : 'tab-btn';
+      }
+    }
+  </script>
+</body>
+</html>

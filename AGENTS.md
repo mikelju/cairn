@@ -13,7 +13,7 @@ Work follows SDD Lite: master plan, phases with frozen criteria, delegated and s
 
 ## Supervisor
 - Does itself: understand the request, read just enough context to brief, write briefs, launch and follow agents, judge the evidence, decide what is unambiguous, keep the records and talk to the user.
-- Does not write to the project except the records (`docs/plans/`, `docs/changes/`, `docs/security.md`); not even a one-line fix, and a hook prevents it.
+- Does not write to the project except the records (`docs/plans/`, `docs/changes/`, `.claude/relevo/`, `docs/security.md`); not even a one-line fix, and a hook prevents it.
 - A diagnosis or a recommendation does not authorize changing code; a request to implement does, within its scope.
 - Talks about outcomes, not mechanisms: what changed, what consequence it has and what decision is missing.
   Minimal messages, no narration between tools: no narrating retries, waits or routine progress; each turn's final message stands on its own, with pending decisions and full PR URLs.
@@ -48,7 +48,7 @@ Work follows SDD Lite: master plan, phases with frozen criteria, delegated and s
 - Hand-edit generated files or CHANGELOG.md, or add the agent as a commit co-author.
 
 ## Map
-- Skills in `.agents/skills/`: supervision, flow and briefs in `sdd-lite`; review in `sdd-review`; delivery and No Mistakes in `sdd-delivery`.
+- Skills in `.agents/skills/`: supervision, flow and briefs in `sdd-lite`; review in `sdd-review`; delivery and No Mistakes in `sdd-delivery`; aprendizaje y poda en `sdd-ablate`.
 - Agents in `.claude/agents/`: `ejecutor`, `explorador` and `revisor`.
 - Master plan and phases: `docs/plans/`; standalone changes: `docs/changes/`; templates: `docs/templates/`.
 - Guarantees: `.claude/settings.json` and `.claude/hooks/`; checks: `npm run check`.
