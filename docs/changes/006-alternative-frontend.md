@@ -11,7 +11,7 @@ Current authorisation and limits: work on branch `cambio-006-frontend-alternativ
 
 | ID | Observable criterion | Evidence when verifying |
 |---|---|---|
-| C1 | Zero backend modifications: `git diff origin/main -- src/ tests/ package.json pyproject.toml` is empty and root `npm run check` passes | `git diff` and `npm run check` output |
+| C1 | Zero backend modifications: `git diff origin/main -- src/ tests/ pyproject.toml` is empty, root `package.json` differs only by the SDD Lite update commit `28ffeef` (U3), and root `npm run check` passes | `git diff` and `npm run check` output |
 | C2 | Standalone Vite + React + TypeScript application in `frontend-alt/` with a clean `npm run build` and a dev/preview proxy forwarding `/api`, `/jobs`, `/study`, `/ask`, `/decide`, `/draft`, `/explore`, `/highlight`, `/highlights`, `/static` and `/healthz` to `http://127.0.0.1:8000` | `npm run build` in `frontend-alt/` exits 0; live browser/HTTP verification against `uv run cairn serve` |
 | C3 | Visual design and bilingual UI (EN default, instant EN/ES toggle in header): dark clinical-grade palette (`#06131d` / `#0b2231` surfaces, `#29d7d4` cyan-teal and `#8b65f5` violet accents, light `.doc-sheet` for CTD 2.6.6.3), `IBM Plex Sans` + `IBM Plex Mono`, persistent left navigation, top context bar (active study `PDS2014`, backend health indicator, active thread ID, `A. Author` / `R. Reviewer` role switcher, `EN` / `ES` selector) | Browser screenshots and DOM verification in EN and ES |
 | C4 | Explicit production-preview controls (disabled in demo with clear badges/tooltips explaining why): `+ New Analysis` button, SEND/XPT/PDF study drag-and-drop uploader on the Study view, Guideline PDF uploader on the Guidelines view, and `Download PDF` / `Export DOCX` buttons on the Report view | Rendered controls with `disabled` attribute and production-preview explanation |
@@ -39,6 +39,15 @@ Kept by the supervisor. Statuses: in progress, blocked, needs decision, done, fa
 | E1 | explorador | Inspect `data/cairn-frontend-reference/` and its 7 HTML files and 4 PNG mockups | done | Static templates with unrendered `{{ ... }}` placeholders, empty tables and unused JS stub |
 | E2 | explorador | Catalogue all FastAPI JSON and HTML endpoints on `origin/main` and check constraints | done | Full endpoint contract documented; proxy approach keeps `src/cairn/` untouched |
 | E3 | ejecutor | Build and verify `frontend-alt/` (Vite + React + TS) connected to all existing Cairn endpoints | done | Built `frontend-alt/` with 7 live views, bilingual EN/ES UI, SVG charts, provenance modals and full E2E proxy verification |
+| R1 | revisor | Adversarial review of `cambio-006-frontend-alternativo` (lens: correctness) | done | 6 important findings (`parseAskFragment` direct-child selector, unconfirmed/null NOAEL & rule-failure counter, `handleConfirmNoael` unsaved edits & status message, `/explore/live` refusal/template rendering, `locale` parameter in HTML endpoints, Judge `'not judged'` string & `EXAMPLE` row) and 1 minor finding (`StrictMode` init race & `seqHint` range) |
+| R2 | revisor | Adversarial review of `cambio-006-frontend-alternativo` (lens: security and data) | done | 0 critical/important findings; 1 minor finding (`sessionEvents` actor attribution when action passes explicit `asActor`) |
+| E4 | ejecutor | Fix all 8 findings from R1 and R2 in `frontend-alt/` and re-verify | failed | Agent stopped on model quota (429) before any change |
+| E4b | ejecutor | Same brief as E4 | cancelled | Stopped by supervisor to run the SDD Lite update (`28ffeef`); partial uncommitted edits in `App.tsx`, `api.ts` |
+| E6 | ejecutor | Declutter UI (reduce 60% text), apply expert tone and fix R1/R2 findings | done | Applied comprehensive text decluttering across all 7 views (-1396 LOC net); build green |
+| E7 | ejecutor | Fix Report view HTML parsing (prevent nested prov table leak) and elevate card styling (borderless + soft shadows) | done | Commit 63edd6d: fixed direct children table parsing in api.ts/ReportView.tsx and elevated styling in cairn-alt.css; checks green |
+| E8 | ejecutor | Ignore `data/cairn-frontend-reference/` in `.gitignore` (U4) | done | Commit 81e756b: `.gitignore:22`; `git check-ignore` confirms, folder gone from `git status` |
+| E9 | ejecutor (sonnet) | SDD Lite alignment: flip merged records to integrated, close stale briefs, add fast `check:puerta` | done | df4c699 records, a5f9838 `check:puerta` (40 s green); full `check` green, 926 passed in 29.5 min; 004 integrated: `origin/main..claude/ui-redesign-b81e12` is empty (PR #15, 2026-11-07) |
+| E10 | ejecutor (sonnet) | Apply the 4 approved `sdd-ablate` edits (U5): brief sizing, WIP commit, no prod/AWS briefs, stale refs | done | Commit 9793dcf; skeleton install refs kept on purpose; `check:puerta` green (369 passed) |
 
 ## User decisions
 Questions the supervisor raises with the user. Statuses: open, answered, deferred; each closes with the user's literal answer.
@@ -47,10 +56,14 @@ Questions the supervisor raises with the user. Statuses: open, answered, deferre
 |---|---|---|---|---|
 | U1 | How to structure and serve the alternative frontend alongside the current one without altering backend endpoints? | Standalone modern app in its own folder (Vite + React + TypeScript) with proxy to `127.0.0.1:8000` (Recommended) vs Vanilla HTML/JS vs FastAPI sub-mount | answered | "(Recommended) App moderna independiente en carpeta propia (Vite + React + TypeScript) con proxy a 127.0.0.1:8000 (0 cambios en src/cairn/)" |
 | U2 | Language of the alternative frontend UI? | Bilingual EN/ES with EN default and header toggle (Recommended) vs EN only vs ES only | answered | "(Recommended) Bilingüe (EN por defecto como en las imágenes de referencia, con selector EN/ES en la cabecera)" |
+| U3 | The SDD Lite update (`28ffeef`, user-requested) changes root `package.json` on this branch, against C1. Keep it here or split it out? | Keep on this branch and adjust C1 (Recommended) vs separate branch and PR | answered | "1" |
+| U4 | What to do with untracked `data/cairn-frontend-reference/` (about 7 MB of PNGs, public repo)? | Commit without PNGs (Recommended) vs ignore in git | answered | "Ignorarla en git" |
+| U5 | Apply the 4 edits from the first `sdd-ablate` pass? | All four (Recommended) vs only 1 and 2 | answered | "Sí, las cuatro" |
 
 ## Adversarial review
 | Round | Backend | Range | Lenses | Findings | Status |
 |---|---|---|---|---|---|
+| 1 | Local (`R1`, `R2`) | `origin/main..eb95521` | `corrección`, `seguridad y datos` | 0 critical, 6 important (`parseAskFragment` direct-child selector, unconfirmed/null NOAEL & rule counter, `handleConfirmNoael` unsaved edits & status message, `/explore/live` refusal & raw template display, `locale` propagation to HTML endpoints, Judge `'not judged'` & `EXAMPLE` row), 2 minor (`StrictMode` init race & multi-entry `seqHint` range, explicit `effectiveActor` in `sessionEvents`) | fixing in E4 |
 
 ## Evidence
 
@@ -65,6 +78,10 @@ Questions the supervisor raises with the user. Statuses: open, answered, deferre
 | C7 | Live `GuidelinesAskView` against `POST /api/tools/search_guidance`, `POST /ask/run` (`Q1`–`Q8`, `G1`–`G3`, `NS1`, `NS2`), `GET /highlight/FDA-IV-01.s2`, `GET /highlights/FDA-IV-01.s2@p8.png`, `POST /explore/live` | Displays 4 pinned guidelines with SHA-256 hashes, live hybrid retrieval ranking table (`rerank_score` vs `threshold`), side-by-side Verified Answer vs Raw AI Skeleton (0 digits), and modal displaying `/highlights/FDA-IV-01.s2@p8.png` (HTTP 200 PNG) |
 | C8 | Live `AssessmentView` and `ReportView` against `/api/threads` lifecycle + `/draft` | `POST /api/threads` (201) -> `A. Author` `/decisions` (403) -> `R. Reviewer` `/decisions` D1–D11 (200, `noael.F=20.0`, `noael.M=200.0` with 2 incomplete-exam flags) -> `A. Author` `/confirm` (403) -> `R. Reviewer` `/confirm` (200, `waiting="await_approval"`, `final.ok=true`) -> `/draft` `.doc-sheet` with interactive chips, 8 rules, Sonnet 4.6 Judge & MCP/REST parity -> `A. Author` `/approve` (403) -> `R. Reviewer` `/approve` (200, `approved_by="R. Reviewer"`) |
 | C9 | Live `AuditView` against `GET /api/threads/{thread_id}/audit/verify` | Returns `{"ok": true, "count": 9, "first_broken": null}` after the full lifecycle including 3 chained `403` refusals; renders visual SHA-256 block chain diagram and real-time session event log |
+
+## Pending
+- Full `check` takes about 30 min on this machine; run it before delivery.
+- Verify that `/api/tools/run_job` called at `frontend-alt/src/api.ts:385` is a registered tool behind `POST /api/tools/{name}`.
 
 ## Delivery
 - Branch: `cambio-006-frontend-alternativo`
