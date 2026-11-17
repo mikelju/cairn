@@ -149,6 +149,15 @@ function exigirRamaNoProtegida(cwd, accion, args = []) {
   return rama;
 }
 
+/**
+ * Resuelve `ruta` contra `base`. En Windows, Git Bash escribe las unidades como `/c/ruta`:
+ * Node las leeria como `C:\c\ruta` y la rama saldria desconocida, asi que se traducen a `C:/ruta`.
+ */
+function resolverRuta(base, ruta) {
+  const msys = process.platform === "win32" ? ruta.match(/^[\/]([a-zA-Z])(?:[\/](.*))?$/) : null;
+  return msys ? resolve(`${msys[1].toUpperCase()}:/`, msys[2] || "") : resolve(base, ruta);
+}
+
 /** Separa los flags globales de git del subcomando real, resuelve alias en linea y `-C`. */
 function analizarGit(t, cwdBase) {
   if (verboDe(t[0]) !== "git") return null;
@@ -163,7 +172,7 @@ function analizarGit(t, cwdBase) {
       i += 2;
       continue;
     }
-    if (a === "-C") { cwd = resolve(cwd, t[i + 1] || "."); i += 2; continue; }
+    if (a === "-C") { cwd = resolverRuta(cwd, t[i + 1] || "."); i += 2; continue; }
     if (["--git-dir", "--work-tree", "--namespace", "--exec-path"].includes(a)) { i += 2; continue; }
     if (a.startsWith("-")) { i += 1; continue; }
     break;
@@ -497,7 +506,7 @@ export function evaluar(entrada, dirProyecto = process.env.CLAUDE_PROJECT_DIR) {
       for (const t of comandosAnalizables(comando)) {
         if (VERBOS_CD.has(verboDe(t[0]))) {
           const destino = t.slice(1).find((a) => !a.startsWith("-"));
-          if (destino) cwd = destino.startsWith("~") ? resolve(homedir(), destino.slice(1).replace(/^[\\/]/, "")) : resolve(cwd, destino);
+          if (destino) cwd = destino.startsWith("~") ? resolve(homedir(), destino.slice(1).replace(/^[\\/]/, "")) : resolverRuta(cwd, destino);
           continue;
         }
         revisarComando(t, cwd);

@@ -154,7 +154,8 @@ function rutaEnProyecto(ruta, raiz) {
 }
 
 function esRegistro(rel) {
-  const r = rel.toLowerCase();
+  // Dentro de un worktree (`.claude/worktrees/<nombre>/`) los registros cuelgan de esa carpeta.
+  const r = rel.toLowerCase().replace(/^\.claude\/worktrees\/[^/]+\//, "");
   return PREFIJOS_REGISTRO.some((p) => r.startsWith(p)) || ARCHIVOS_REGISTRO.includes(r);
 }
 
