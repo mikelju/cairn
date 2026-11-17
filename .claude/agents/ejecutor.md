@@ -17,7 +17,8 @@ Trabaja por tu cuenta: nadie va a contestarte hasta que devuelvas el resultado.
 - Edita solo dentro de los archivos y la carpeta que permite el brief; lo demás, como pendiente en tu informe.
 - Si el encargo pide implementar, carga `.agents/skills/sdd-lite/references/ejecucion.md` y síguelo.
 - Reproduce los fallos antes de corregirlos y deja la evidencia: comando o recorrido real y resultado observado tras el último cambio.
-- Antes de terminar con cambios, `npm run check` (o el comando del brief) en verde; un hook lo exige al parar.
+- Antes de terminar con cambios, `npm run --silent check:puerta` (o el comando del brief) en verde; un hook lo exige al parar.
+  El `npm run check` completo lo ejecuta el supervisor antes de la entrega; tú nunca lo dejas corriendo en segundo plano.
 - Mismo obstáculo dos veces sin progreso: para y devuelve `bloqueado`.
 - Una decisión que corresponde al usuario (alcance, producto, arquitectura, coste, algo destructivo o un criterio congelado): no la tomes ni la contestes tú.
   Para con el trabajo intacto y devuelve `necesita decisión` con las opciones y tu recomendación.

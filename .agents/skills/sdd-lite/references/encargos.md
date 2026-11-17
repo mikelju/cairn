@@ -28,7 +28,7 @@ Permisos: commit sí o no; push y PR sí o no.
 
 ## Terminado
 Qué tiene que ser cierto para devolver `hecho`:
-- Nivel de comprobación durante el desarrollo según el radio de impacto del cambio: `local` (comprobación directa del archivo o módulo tocado) o `profundo` (batería completa y regresión en cada paso); al cerrar el encargo, `npm run check` siempre en verde.
+- Nivel de comprobación durante el desarrollo según el radio de impacto del cambio: `local` (comprobación directa del archivo o módulo tocado) o `profundo` (batería completa y regresión en cada paso); al cerrar el encargo, `npm run --silent check:puerta` siempre en verde (el `npm run check` completo lo ejecuta el supervisor antes de la entrega).
 - Criterios cumplidos con evidencia empírica: comando o recorrido real del usuario ejecutado tras el último cambio y resultado observado (si el cambio toca interfaz, CLI o servidor, comprobado contra la aplicación en ejecución, no solo mediante mocks).
 - Árbol limpio y commits hechos (el plan lo marca el supervisor al validar tu informe), o, para un explorador, la pregunta respondida con citas `archivo:línea`.
 ```
