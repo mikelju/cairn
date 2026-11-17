@@ -1,6 +1,6 @@
 # 006 - Production-grade alternative frontend
 
-Status: ready locally
+Status: integrated
 
 ## Contract
 Goal and reason: the user wants a modern, visual, production-shaped alternative frontend that improves upon the static reference HTML files in `data/cairn-frontend-reference/` and reflects the visual direction of the reference mockups (deep navy/petrol clinical SaaS workspace, cyan/teal and violet accents, visual charts, clean cards, explicit production-preview disabled controls and full end-to-end interactivity).
