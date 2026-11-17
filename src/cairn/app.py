@@ -14,7 +14,7 @@ from cairn.jobs import Job, JobRunner
 from cairn.observation import check_build
 from cairn.retrieval import StaleRetrievalCache
 from cairn.tools import REGISTRY, argument_problems, call_tool
-from cairn.web import explore_live, mount_web
+from cairn.web import explore_live, mount_alt, mount_web
 
 
 class JobRequest(BaseModel):
@@ -72,5 +72,6 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=422, detail=detail) from error
 
     mount_web(app)
+    mount_alt(app)  # before the catch-all MCP mount
     app.mount("/", mcp_app)
     return app

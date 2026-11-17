@@ -1492,3 +1492,29 @@ def test_woff2_fonts_are_served_as_font_woff2() -> None:
         reply = client.get(f"/static/fonts/{font.name}")
     assert reply.status_code == 200
     assert reply.headers["content-type"] == "font/woff2"
+
+
+def test_alt_frontend_served_when_bundle_exists(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "index.html").write_text("<html>alt-bundle</html>")
+    (tmp_path / "assets").mkdir()
+    (tmp_path / "assets" / "app.js").write_text("x=1")
+    monkeypatch.setenv("CAIRN_ALT_DIST", str(tmp_path))
+    with TestClient(create_app()) as client:
+        assert "alt-bundle" in client.get("/alt/").text
+        assert client.get("/alt/assets/app.js").status_code == 200
+        moved = client.get("/alt", follow_redirects=False)
+        assert moved.status_code in (301, 307) and moved.headers["location"].endswith("/alt/")
+        assert "alt-bundle" not in client.get("/?lang=en").text
+        assert client.get("/healthz").status_code == 200
+
+
+def test_alt_frontend_absent_without_bundle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("CAIRN_ALT_DIST", str(tmp_path / "missing"))
+    with TestClient(create_app()) as client:
+        assert client.get("/alt/").status_code == 404
+        assert client.get("/healthz").status_code == 200
+        assert "Study toxicologist" in client.get("/?lang=en").text

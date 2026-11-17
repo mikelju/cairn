@@ -15,3 +15,5 @@ tests
 data/raw
 data/build
 **/__pycache__
+frontend-alt/node_modules
+frontend-alt/dist

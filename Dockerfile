@@ -1,5 +1,12 @@
 # syntax=docker/dockerfile:1
 # Lightsail runs linux/amd64: docker build --platform linux/amd64 -t cairn .
+FROM node:22-slim AS frontend
+WORKDIR /f
+COPY frontend-alt/package.json frontend-alt/package-lock.json ./
+RUN npm ci
+COPY frontend-alt ./
+RUN npm run build
+
 FROM python:3.12-slim AS weights
 COPY --from=ghcr.io/astral-sh/uv:0.10.9 /uv /usr/local/bin/uv
 ENV UV_LINK_MODE=copy CAIRN_MODELS=/models
@@ -38,10 +45,12 @@ FROM python:3.12-slim
 WORKDIR /app
 RUN useradd --system --no-create-home cairn
 COPY --from=build /app /app
+# Alternative frontend bundle, served at /alt/ (CAIRN_ALT_DIST); no Node in the runtime image.
+COPY --from=frontend /f/dist /app/frontend-alt-dist
 # Not read at request time (replay uses the precomputed cache); kept for the live box of phase 06.
 COPY --from=weights /models /models
 ARG COMMIT=unknown
-ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 CAIRN_MODELS=/models CAIRN_COMMIT=$COMMIT
+ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 CAIRN_MODELS=/models CAIRN_COMMIT=$COMMIT CAIRN_ALT_DIST=/app/frontend-alt-dist
 USER cairn
 EXPOSE 8000
 CMD ["uvicorn", "cairn.app:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
