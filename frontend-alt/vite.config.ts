@@ -27,7 +27,9 @@ const proxyConfig = Object.fromEntries(
   ]),
 );
 
-export default defineConfig({
+// Builds are served by FastAPI under /alt/; the dev server keeps base '/' so `npm run dev` is unchanged.
+export default defineConfig(({ command }) => ({
+  base: command === 'build' ? '/alt/' : '/',
   plugins: [react()],
   server: {
     host: '127.0.0.1',
@@ -39,4 +41,4 @@ export default defineConfig({
     port: 4173,
     proxy: proxyConfig,
   },
-});
+}));

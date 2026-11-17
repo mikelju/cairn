@@ -19,7 +19,9 @@ It operates **100% against the existing FastAPI backend (`127.0.0.1:8000`)** wit
    ```
    Open `http://127.0.0.1:5173`. Vite proxies all backend routes (`/api`, `/jobs`, `/study`, `/ask`, `/decide`, `/draft`, `/explore`, `/highlight`, `/highlights`, `/static`, `/healthz`) directly to `http://127.0.0.1:8000`.
 
-3. **Production build & preview**:
+3. **Served by the backend**: the Docker image builds the bundle (base `/alt/`, hash routing) and FastAPI serves it at `/alt/`; set `CAIRN_ALT_DIST` to a built `dist` to do the same locally. `npm run dev` keeps base `/`.
+
+4. **Production build & preview**:
    ```bash
    cd frontend-alt
    npm run build

@@ -686,3 +686,21 @@ def mount_web(app: FastAPI) -> None:
     app.include_router(people)
     app.include_router(explore_live)
     app.include_router(threads)
+
+
+def alt_dist_dir() -> Path:
+    """Built frontend-alt bundle: CAIRN_ALT_DIST, else the repo's frontend-alt/dist."""
+    configured = os.environ.get("CAIRN_ALT_DIST")
+    return (
+        Path(configured)
+        if configured
+        else Path(__file__).resolve().parents[3] / "frontend-alt" / "dist"
+    )
+
+
+def mount_alt(app: FastAPI) -> None:
+    """Serve the built alternative frontend at /alt/, only when its index.html exists."""
+    dist = alt_dist_dir()
+    if (dist / "index.html").is_file():
+        app.add_api_route("/alt", lambda: RedirectResponse("/alt/"), include_in_schema=False)
+        app.mount("/alt", StaticFiles(directory=dist, html=True), name="alt")
